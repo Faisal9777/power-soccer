@@ -1,6 +1,6 @@
 [gd_scene load_steps=11 format=3 uid="uid://ex55agd4o2wj"]
 
-[ext_resource type="Script" path="res://Player.gd" id="1_nk2bv"]
+[ext_resource type="Script" uid="uid://ch6yk2dibs0ub" path="res://Player.gd" id="1_nk2bv"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_ayaqe"]
 
