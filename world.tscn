@@ -1,6 +1,7 @@
-[gd_scene load_steps=12 format=3 uid="uid://ex55agd4o2wj"]
+[gd_scene load_steps=13 format=3 uid="uid://ex55agd4o2wj"]
 
 [ext_resource type="Script" uid="uid://ba1oat4ex8suj" path="res://scripts/Player.gd" id="1_f3sb7"]
+[ext_resource type="Script" uid="uid://c0abdhp12js1u" path="res://scripts/camera_3d.gd" id="1_fj7yv"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_ayaqe"]
 
@@ -40,7 +41,9 @@ radius = 19.017
 
 [node name="Camera3D" type="Camera3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 0.866025, 0.5, 0, -0.5, 0.866025, 0, 16, 24)
-fov = 60.0
+fov = 80.0
+script = ExtResource("1_fj7yv")
+target_path = NodePath("../Scene/Player")
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
 environment = SubResource("Environment_2tuav")
