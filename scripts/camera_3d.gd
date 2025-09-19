@@ -11,6 +11,9 @@ extends Camera3D
 @export var collision_mask: int = 1
 @export var collision_padding: float = 0.2
 
+
+var _aim_mode: bool = false
+
 var _target: Node3D
 var _yaw: float = 0.0
 var _pitch: float = -0.25
@@ -26,57 +29,87 @@ func _ready() -> void:
 	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 
 func _unhandled_input(event: InputEvent) -> void:
-	# toggle capture with Esc
-	if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
-		_captured = not _captured
+	# RMB toggles aim mode (release mouse for on-screen cursor while aiming)
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT:
+		_aim_mode = event.pressed
+		_captured = not _aim_mode
 		if _captured:
 			Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 		else:
 			Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 
-	# mouse rotates the camera (always-on)
-	if event is InputEventMouseMotion and _captured:
+	# Only rotate camera from mouse when captured (i.e., not aiming)
+	elif event is InputEventMouseMotion and _captured:
 		var mm := event as InputEventMouseMotion
 		var sy: float = (1.0 if invert_y else -1.0)
 		_yaw -= mm.relative.x * mouse_sens
 		_pitch += mm.relative.y * mouse_sens * sy
 		_pitch = clamp(_pitch, _min_pitch, _max_pitch)
 
-	# wheel zoom
-	if event is InputEventMouseButton and event.pressed:
+	# Wheel zoom (disable during aim if you prefer: add `and not _aim_mode`)
+	elif event is InputEventMouseButton and event.pressed:
 		var mb := event as InputEventMouseButton
 		if mb.button_index == MOUSE_BUTTON_WHEEL_UP:
 			distance = max(min_distance, distance - _wheel_step)
 		elif mb.button_index == MOUSE_BUTTON_WHEEL_DOWN:
 			distance = min(max_distance, distance + _wheel_step)
-
 func _process(delta: float) -> void:
 	if _target == null:
 		return
 
-	# 1) Mouse-driven orientation only (no look_at):
-	var R := Basis(Vector3.UP, _yaw) * Basis(Vector3.RIGHT, _pitch)  # rotation from yaw/pitch
+	# Read ball reference (typed to avoid Variant warnings)
+	var ball: Node3D = _target.get("current_ball") as Node3D
+	var has_ball: bool = ball != null
 
-	# 2) Focus point above the player
-	var focus: Vector3 = _target.global_transform.origin + Vector3(0, height, 0)
+	# Player head-height focus (used for "behind player" positioning)
+	var focus_player: Vector3 = _target.global_transform.origin + Vector3(0, height, 0)
 
-	# 3) Desired position = focus + rotated back offset
-	var desired_pos: Vector3 = focus + R * Vector3(0, 0, -distance)
+	if _aim_mode and has_ball:
+		# ===== AIM MODE =====
+		# 1) POSITION: stay behind the player (ignore mouse yaw/pitch & ball)
+		var player_forward: Vector3 = (-_target.global_transform.basis.z).normalized() # -Z is forward
+		var desired_pos: Vector3 = focus_player - player_forward * distance
+		# (optional shoulder offset)
+		# var player_right: Vector3 = _target.global_transform.basis.x.normalized()
+		# desired_pos += player_right * 0.3
 
-	# 4) Wall avoidance (ray from focus to desired_pos)
-	var space := get_world_3d().direct_space_state
-	var q := PhysicsRayQueryParameters3D.create(focus, desired_pos)
-	q.collision_mask = collision_mask
-	q.hit_from_inside = true
-	var hit := space.intersect_ray(q)
-	if hit.size() > 0:
-		var hit_pos: Vector3 = hit.position
-		var back_dir: Vector3 = (focus - hit_pos).normalized()
-		desired_pos = hit_pos + back_dir * collision_padding
+		# 2) Wall avoidance from player focus -> desired camera pos (NOT from ball)
+		var space := get_world_3d().direct_space_state
+		var q := PhysicsRayQueryParameters3D.create(focus_player, desired_pos)
+		q.collision_mask = collision_mask
+		q.hit_from_inside = true
+		var hit := space.intersect_ray(q)
+		if hit.size() > 0:
+			var hit_pos: Vector3 = hit.position
+			var back_dir: Vector3 = (focus_player - hit_pos).normalized()
+			desired_pos = hit_pos + back_dir * collision_padding
 
-	# 5) Smoothly move camera position
-	var t := 1.0 - exp(-follow_speed * delta)
-	global_transform.origin = global_transform.origin.lerp(desired_pos, t)
+		# 3) Smoothly move camera to that "behind player" spot
+		var t: float = 1.0 - exp(-follow_speed * delta)
+		global_transform.origin = global_transform.origin.lerp(desired_pos, t)
 
-	# 6) Set rotation directly from yaw/pitch (NO look_at)
+		# 4) ROTATION: look at the ball (this does not move the camera)
+		var focus_ball: Vector3 = ball.global_transform.origin
+		look_at(focus_ball, Vector3.UP)
+		return  # stop here; do not run normal mouse-orbit block
+
+	# ===== NORMAL MODE (no RMB) =====
+	# Mouse-driven orbit around player (position + rotation from yaw/pitch)
+	var R := Basis(Vector3.UP, _yaw) * Basis(Vector3.RIGHT, _pitch)
+	var desired_pos_norm: Vector3 = focus_player + R * Vector3(0, 0, -distance)
+
+	# Wall avoidance (player focus -> desired camera pos)
+	var space2 := get_world_3d().direct_space_state
+	var q2 := PhysicsRayQueryParameters3D.create(focus_player, desired_pos_norm)
+	q2.collision_mask = collision_mask
+	q2.hit_from_inside = true
+	var hit2 := space2.intersect_ray(q2)
+	if hit2.size() > 0:
+		var hit_pos2: Vector3 = hit2.position
+		var back_dir2: Vector3 = (focus_player - hit_pos2).normalized()
+		desired_pos_norm = hit_pos2 + back_dir2 * collision_padding
+
+	# Smooth move + apply mouse yaw/pitch rotation
+	var t2: float = 1.0 - exp(-follow_speed * delta)
+	global_transform.origin = global_transform.origin.lerp(desired_pos_norm, t2)
 	global_transform.basis = R

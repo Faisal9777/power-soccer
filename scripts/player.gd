@@ -48,7 +48,10 @@ func _ready() -> void:
 func _physics_process(delta: float) -> void:
 	_update_cooldowns(delta)
 	apply_gravity(delta)
-	_face_camera_yaw(delta)
+	if _is_aiming():
+		_face_ball_yaw(delta)   # only while RMB held & ball in area
+	else:
+		_face_camera_yaw(delta)
 	var input_dir = _get_input_dir()
 	_move(input_dir, delta)
 	_handle_jump()
@@ -114,7 +117,7 @@ func _handle_jump() -> void:
 		velocity.y = jump_velocity
 
 func _handle_shoot() -> void:
-	if Input.is_action_just_pressed("shoot") and _cooldowns["shoot"] == 0.0:
+	if aim_active and current_ball != null and Input.is_action_just_pressed("shoot") and _cooldowns["shoot"] == 0.0:
 		_cooldowns["shoot"] = shoot_cooldown
 		_kick_at_contact()
 
@@ -188,73 +191,65 @@ func _get_ball_radius(ball: RigidBody3D) -> float:
 	return r
 
 func _update_aim(delta: float) -> void:
-	if not aim_active or not current_ball:
+	# Arrow only exists while a ball is in the KickArea
+	if not aim_active or current_ball == null:
 		_show_arrow(false)
 		return
 
-	var cam := get_viewport().get_camera_3d()
-	if cam == null:
-		_show_arrow(false)
-		return
-
-	# --- Ray from mouse into world
-	var mp: Vector2 = get_viewport().get_mouse_position()
-	var ro: Vector3 = cam.project_ray_origin(mp)
-	var rd: Vector3 = cam.project_ray_normal(mp).normalized()
-
-	# --- Ball center & radius
 	var C: Vector3 = current_ball.global_transform.origin
 	var R: float = _get_ball_radius(current_ball)
 
-	# --- Ray-sphere intersection to pick a surface contact point
-	var oc: Vector3 = ro - C
-	var b: float = 2.0 * rd.dot(oc)
-	var c: float = oc.dot(oc) - R * R
-	var disc: float = b * b - 4.0 * c  # (a=1 since rd is normalized)
-	var contact: Vector3 = Vector3.ZERO
+	if _is_aiming():
+		# --- Mouse-driven contact (ray -> sphere)
+		var cam := get_viewport().get_camera_3d()
+		if cam == null:
+			_show_arrow(false)
+			return
+		var mp: Vector2 = get_viewport().get_mouse_position()
+		var ro: Vector3 = cam.project_ray_origin(mp)
+		var rd: Vector3 = cam.project_ray_normal(mp).normalized()
 
-	if disc >= 0.0:
-		var sqrt_disc: float = sqrt(disc)
-		var t1: float = (-b - sqrt_disc) * 0.5
-		var t2: float = (-b + sqrt_disc) * 0.5
-		var t: float = -1.0
-		if t1 > 0.0:
-			t = t1
-		elif t2 > 0.0:
-			t = t2
-		if t > 0.0:
-			contact = ro + rd * t
+		var oc: Vector3 = ro - C
+		var b: float = 2.0 * rd.dot(oc)
+		var c: float = oc.dot(oc) - R * R
+		var disc: float = b * b - 4.0 * c
+		var contact: Vector3 = Vector3.ZERO
+		if disc >= 0.0:
+			var sd: float = sqrt(disc)
+			var t1: float = (-b - sd) * 0.5
+			var t2: float = (-b + sd) * 0.5
+			var t: float = -1.0
+			if t1 > 0.0:
+				t = t1
+			elif t2 > 0.0:
+				t = t2
+			if t > 0.0:
+				contact = ro + rd * t
+		if contact == Vector3.ZERO:
+			var t_closest: float = -rd.dot(oc)
+			var closest: Vector3 = ro + rd * maxf(t_closest, 0.0)
+			var dir_to: Vector3 = closest - C
+			if dir_to == Vector3.ZERO:
+				dir_to = global_transform.origin - C
+			contact = C + dir_to.normalized() * R
+		aim_contact = contact
+	else:
+		# --- Fixed contact: front-facing surface toward the player (no mouse)
+		var dir := (C - global_transform.origin).normalized()
+		aim_contact = C - dir * R
 
-	# --- Fallback: closest point on the ray, projected to sphere surface
-	if contact == Vector3.ZERO:
-		var t_closest: float = -rd.dot(oc)
-		var closest: Vector3 = ro + rd * maxf(t_closest, 0.0)
-		var dir_to: Vector3 = closest - C
-		if dir_to == Vector3.ZERO:
-			dir_to = global_transform.origin - C
-		contact = C + dir_to.normalized() * R
-
-	# --- Save contact & compute vector from player to contact
-	aim_contact = contact
+	# Common: drive the arrow from player -> contact
 	var vec: Vector3 = aim_contact - global_transform.origin
 	if vec == Vector3.ZERO:
 		_show_arrow(false)
 		return
-
-	# IMPORTANT: measure distance BEFORE normalizing, so the arrow can grow freely
-	var dist: float = vec.length()
-	# Optional minimum so it never collapses visually; no upper clamp
-	dist = maxf(dist, aim_min_len)
-
-	# Direction for orientation
+	var dist: float = maxf(vec.length(), aim_min_len)  # no upper clamp
 	aim_dir = vec.normalized()
 
-	# --- Drive the arrow to exactly reach the contact point
 	_show_arrow(true)
 	aim_arrow.global_transform.origin = global_transform.origin
 	aim_arrow.look_at(aim_arrow.global_transform.origin + aim_dir, Vector3.UP)
 	aim_arrow.scale = Vector3(1.0, 1.0, dist)
-
 func _kick_at_contact() -> void:
 	if not is_instance_valid(current_ball):
 		return
@@ -276,16 +271,26 @@ func _on_kick_area_body_entered(body: Node) -> void:
 	if body is RigidBody3D and body.is_in_group("ball"):
 		current_ball = body
 		aim_active = true
-		# Initial aim: arrow points to ball center, contact on the front-facing surface
 		var C := current_ball.global_transform.origin
 		var R := _get_ball_radius(current_ball)
 		var dir := (C - global_transform.origin).normalized()
 		aim_contact = C - dir * R
 		aim_dir = (aim_contact - global_transform.origin).normalized()
-		_show_arrow(true)
 
 func _on_kick_area_body_exited(body: Node) -> void:
 	if body == current_ball:
 		current_ball = null
 		aim_active = false
 		_show_arrow(false)
+		
+func _is_aiming() -> bool:
+	return aim_active and current_ball != null and Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)
+func _face_ball_yaw(delta: float) -> void:
+	if current_ball == null: return
+	var to_ball: Vector3 = current_ball.global_transform.origin - global_transform.origin
+	to_ball.y = 0.0
+	if to_ball == Vector3.ZERO: return
+	var target_yaw: float = atan2(-to_ball.x, -to_ball.z) # -Z is forward
+	var cur := rotation
+	cur.y = lerp_angle(cur.y, target_yaw, clamp(turn_speed * delta, 0.0, 1.0))
+	rotation = cur
