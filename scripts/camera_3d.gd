@@ -1,6 +1,7 @@
 extends Camera3D
 
 @export var target_path: NodePath
+@export var ball_target_path: NodePath
 @export var height: float = 1.6
 @export var distance: float = 5.0
 @export var min_distance: float = 2.5
@@ -21,9 +22,11 @@ var _min_pitch: float = deg_to_rad(-70.0)
 var _max_pitch: float = deg_to_rad(75.0)
 var _wheel_step: float = 0.7
 var _captured: bool = true
+var _target_ball : Node3D
 
 func _ready() -> void:
 	_target = get_node_or_null(target_path)
+	_target_ball = get_node_or_null(ball_target_path)
 	current = true
 	_captured = true
 	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
@@ -58,13 +61,14 @@ func _process(delta: float) -> void:
 		return
 
 	# Read ball reference (typed to avoid Variant warnings)
-	var ball: Node3D = _target.get("current_ball") as Node3D
+	#var ball: Node3D = _target.get("current_ball") as Node3D
+	var ball: Node3D = _target_ball
 	var has_ball: bool = ball != null
 
 	# Player head-height focus (used for "behind player" positioning)
 	var focus_player: Vector3 = _target.global_transform.origin + Vector3(0, height, 0)
 
-	if _aim_mode and has_ball:
+	if _aim_mode:
 		# ===== AIM MODE =====
 		# 1) POSITION: stay behind the player (ignore mouse yaw/pitch & ball)
 		var player_forward: Vector3 = (-_target.global_transform.basis.z).normalized() # -Z is forward

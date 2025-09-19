@@ -284,7 +284,9 @@ func _on_kick_area_body_exited(body: Node) -> void:
 		_show_arrow(false)
 		
 func _is_aiming() -> bool:
-	return aim_active and current_ball != null and Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)
+	return aim_active and Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)
+
+	#return aim_active and current_ball != null and Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)
 func _face_ball_yaw(delta: float) -> void:
 	if current_ball == null: return
 	var to_ball: Vector3 = current_ball.global_transform.origin - global_transform.origin

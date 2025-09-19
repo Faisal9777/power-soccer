@@ -44,6 +44,7 @@ transform = Transform3D(1, 0, 0, 0, 0.866025, 0.5, 0, -0.5, 0.866025, 0, 16, 24)
 fov = 80.0
 script = ExtResource("1_fj7yv")
 target_path = NodePath("../Scene/Player")
+ball_target_path = NodePath("../Scene/Ball")
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
 environment = SubResource("Environment_2tuav")
