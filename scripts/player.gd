@@ -15,6 +15,9 @@ extends CharacterBody3D
 
 @export var turn_speed: float = 12.0
 
+@export var charge_time_to_max: float = 1.2   # seconds to fill from 0 → 1
+@export var charge_decay_speed: float = 1.5   # how fast it drains when released (per second)
+@export var charge_rate_mul: float = 2   # >1 faster, <1 slower
 var current_ball: RigidBody3D = null
 var aim_active: bool = false
 var aim_dir: Vector3 = Vector3.ZERO      # direction from player to contact point
@@ -23,9 +26,14 @@ var aim_arrow: Node3D = null
 var arrow_shaft: MeshInstance3D = null
 var arrow_head: MeshInstance3D = null
 
+var _charge: float = 0.0
+var _charge_layer: CanvasLayer
+var _charge_root: Control
+var _charge_bar: ProgressBar
+
 @onready var ground_ray: RayCast3D = $GroundRay
 @onready var kick_area: Area3D = $KickArea
-
+		
 var _cooldowns := {
 	"shoot": 0.0
 }
@@ -44,19 +52,73 @@ func _ready() -> void:
 		$KickArea.body_entered.connect(_on_kick_area_body_entered)
 		$KickArea.body_exited.connect(_on_kick_area_body_exited)
 	_ensure_aim_arrow()
+	_init_charge_ui()   # <— add this
+
+func _init_charge_ui() -> void:
+	_charge_layer = CanvasLayer.new()
+	add_child(_charge_layer)  # attach to player; CanvasLayer draws on top of world
+
+	_charge_root = Control.new()
+	_charge_root.name = "ChargeUI"
+	_charge_layer.add_child(_charge_root)
+
+	# Anchor to bottom-right with 16px margin; size 200x20
+	_charge_root.anchor_left = 1.0
+	_charge_root.anchor_top = 1.0
+	_charge_root.anchor_right = 1.0
+	_charge_root.anchor_bottom = 1.0
+	_charge_root.offset_right = -16
+	_charge_root.offset_bottom = -16
+	_charge_root.offset_left = _charge_root.offset_right - 200
+	_charge_root.offset_top = _charge_root.offset_bottom - 20
+
+	_charge_bar = ProgressBar.new()
+	_charge_bar.min_value = 0.0
+	_charge_bar.max_value = 100.0
+	_charge_bar.step = 0.1          # smooth enough
+	_charge_bar.value = 0.0
+	_charge_bar.rounded = true
+	_charge_bar.show_percentage = false
+	_charge_bar.visible = false
+	# Make the bar fill its parent rect
+	_charge_bar.anchor_left = 0.0
+	_charge_bar.anchor_top = 0.0
+	_charge_bar.anchor_right = 1.0
+	_charge_bar.anchor_bottom = 1.0
+	_charge_bar.offset_left = 0
+	_charge_bar.offset_top = 0
+	_charge_bar.offset_right = 0
+	_charge_bar.offset_bottom = 0
+	_charge_root.add_child(_charge_bar)
+
 
 func _physics_process(delta: float) -> void:
 	_update_cooldowns(delta)
+	_update_charge(delta)
 	apply_gravity(delta)
-	if _is_aiming():
-		_face_ball_yaw(delta)   # only while RMB held & ball in area
-	else:
-		_face_camera_yaw(delta)
+	_face_camera_yaw(delta)
 	var input_dir = _get_input_dir()
 	_move(input_dir, delta)
 	_handle_jump()
 	_update_aim(delta)   # <-- add this
 	_handle_shoot()
+
+func _update_charge(delta: float) -> void:
+	var lmb_down := Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
+	if lmb_down:
+		# fill toward 1 over charge_time_to_max seconds
+		if charge_time_to_max > 0.0:
+			#_charge = minf(1.0, _charge + (delta / charge_time_to_max))
+			_charge = minf(1.0, _charge + charge_rate_mul * (delta / charge_time_to_max))
+	else:
+		# drain when released (optional; remove if you want it to snap to 0)
+		_charge = maxf(0.0, _charge - charge_decay_speed * delta)
+		#_charge = minf(1.0, _charge + charge_rate_mul * (delta / charge_time_to_max))
+	# Reflect in UI
+	if is_instance_valid(_charge_bar):
+		_charge_bar.value = _charge * 100.0
+		# Show while charging or if there’s still some value left
+		_charge_bar.visible = lmb_down or _charge > 0.001
 
 func _update_cooldowns(delta: float) -> void:
 	for k in _cooldowns.keys():
@@ -261,8 +323,8 @@ func _kick_at_contact() -> void:
 
 	var linear := impulse_dir * kick_force
 	var lift := Vector3.UP * kick_up
-	var J := linear + lift
-
+	var mag := 0.05
+	var J := (linear + lift)*mag
 	# Apply at contact point to generate spin (torque = r x J)
 	var local_contact := current_ball.to_local(hit_point)
 	current_ball.apply_impulse(J, local_contact)

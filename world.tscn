@@ -1,6 +1,6 @@
 [gd_scene load_steps=13 format=3 uid="uid://ex55agd4o2wj"]
 
-[ext_resource type="Script" uid="uid://ba1oat4ex8suj" path="res://scripts/Player.gd" id="1_f3sb7"]
+[ext_resource type="Script" uid="uid://ba1oat4ex8suj" path="res://scripts/player.gd" id="1_f3sb7"]
 [ext_resource type="Script" uid="uid://c0abdhp12js1u" path="res://scripts/camera_3d.gd" id="1_fj7yv"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_ayaqe"]
@@ -45,6 +45,7 @@ fov = 80.0
 script = ExtResource("1_fj7yv")
 target_path = NodePath("../Scene/Player")
 ball_target_path = NodePath("../Scene/Ball")
+collision_mask = 2
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
 environment = SubResource("Environment_2tuav")
@@ -63,6 +64,8 @@ shape = SubResource("ConvexPolygonShape3D_f1i8d")
 
 [node name="Ball" type="RigidBody3D" parent="Scene" groups=["ball"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 5.84313, 0)
+collision_layer = 4
+collision_mask = 3
 mass = 0.1
 can_sleep = false
 
@@ -76,6 +79,8 @@ metadata/_edit_lock_ = true
 
 [node name="Player" type="CharacterBody3D" parent="Scene"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.525856, 2, 0)
+collision_layer = 2
+collision_mask = 5
 script = ExtResource("1_f3sb7")
 sprint_speed = 12.0
 
@@ -86,6 +91,8 @@ mesh = SubResource("CapsuleMesh_2vmtx")
 shape = SubResource("CapsuleShape3D_ld6s0")
 
 [node name="KickArea" type="Area3D" parent="Scene/Player"]
+collision_layer = 8
+collision_mask = 4
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Scene/Player/KickArea"]
 transform = Transform3D(0.99997, 0.00703362, 0.0031066, -0.00703358, 0.999975, -2.18512e-05, -0.00310668, 0, 0.999995, 0, -0.9, -0.6)

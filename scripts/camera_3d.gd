@@ -34,13 +34,20 @@ func _ready() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	# RMB toggles aim mode (release mouse for on-screen cursor while aiming)
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT:
-		_aim_mode = event.pressed
-		_captured = not _aim_mode
-		if _captured:
-			Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
-		else:
+		if event.pressed:
+			_aim_mode = true
+			_captured = false
 			Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+		else:
+			# sync yaw/pitch to current view before returning to mouse orbit
+			var e := global_transform.basis.get_euler()
+			_yaw = e.y
+			_pitch = clamp(e.x, _min_pitch, _max_pitch)
 
+			_aim_mode = false
+			_captured = true
+			Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+		return
 	# Only rotate camera from mouse when captured (i.e., not aiming)
 	elif event is InputEventMouseMotion and _captured:
 		var mm := event as InputEventMouseMotion
