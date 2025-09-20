@@ -18,6 +18,18 @@ extends CharacterBody3D
 @export var charge_time_to_max: float = 1.2   # seconds to fill from 0 → 1
 @export var charge_decay_speed: float = 1.5   # how fast it drains when released (per second)
 @export var charge_rate_mul: float = 2   # >1 faster, <1 slower
+
+@export var charge_min_mul: float = 0.03   # very small at low charge
+@export var charge_max_mul: float = 20   # big at full charge
+@export var charge_curve:   float = 12   # >1 = slow start, fast finish (try 2–4)
+@export var charge_knee: float = 0.5      # where the power takes off (0..1)
+@export var charge_steepness: float = 20.0 # how sharp the takeoff is (bigger = sharper)
+
+
+@export var vel_influence:  float = 0.3      # 0..1 how much player speed matters
+@export var vel_ref_speed:  float = 0.0      # 0 = auto (uses sprint_speed)
+@export var kick_max_impulse: float = 8.0    # safety cap (optional)
+
 var current_ball: RigidBody3D = null
 var aim_active: bool = false
 var aim_dir: Vector3 = Vector3.ZERO      # direction from player to contact point
@@ -30,6 +42,7 @@ var _charge: float = 0.0
 var _charge_layer: CanvasLayer
 var _charge_root: Control
 var _charge_bar: ProgressBar
+var _pre_move_vel: Vector3
 
 @onready var ground_ray: RayCast3D = $GroundRay
 @onready var kick_area: Area3D = $KickArea
@@ -98,6 +111,7 @@ func _physics_process(delta: float) -> void:
 	apply_gravity(delta)
 	_face_camera_yaw(delta)
 	var input_dir = _get_input_dir()
+	_pre_move_vel = velocity
 	_move(input_dir, delta)
 	_handle_jump()
 	_update_aim(delta)   # <-- add this
@@ -179,7 +193,7 @@ func _handle_jump() -> void:
 		velocity.y = jump_velocity
 
 func _handle_shoot() -> void:
-	if aim_active and current_ball != null and Input.is_action_just_pressed("shoot") and _cooldowns["shoot"] == 0.0:
+	if aim_active and current_ball != null and Input.is_action_just_released("shoot") and _cooldowns["shoot"] == 0.0:
 		_cooldowns["shoot"] = shoot_cooldown
 		_kick_at_contact()
 
@@ -316,18 +330,58 @@ func _kick_at_contact() -> void:
 	if not is_instance_valid(current_ball):
 		return
 
-	# Impulse points from CONTACT toward CENTER (bottom hit -> upward, top hit -> downward, etc.)
-	var C := current_ball.global_transform.origin
-	var hit_point := aim_contact
-	var impulse_dir := (C - hit_point).normalized()
+	# Geometry
+	var C: Vector3 = current_ball.global_transform.origin
+	var hit_point: Vector3 = aim_contact
+	var impulse_dir: Vector3 = (C - hit_point).normalized()
 
-	var linear := impulse_dir * kick_force
-	var lift := Vector3.UP * kick_up
-	var mag := 0.05
-	var J := (linear + lift)*mag
-	# Apply at contact point to generate spin (torque = r x J)
-	var local_contact := current_ball.to_local(hit_point)
+	# Base (your tunables)
+	var linear: Vector3 = impulse_dir * kick_force
+	var lift: Vector3 = Vector3.UP * kick_up
+
+	# --- 1) Charge scaling: logistic ease-in (tiny start, huge end)
+	var q: float = clampf(_charge, 0.0, 1.0)
+
+	# Logistic with knee at charge_knee and steepness charge_steepness, normalized to [0,1]
+	var m: float = clampf(charge_knee, 0.05, 0.95)               # knee (midpoint) of the curve
+	var s: float = maxf(0.001, charge_steepness)                 # slope
+
+	# Compute logistic and normalize so f(0)=0, f(1)=1
+	var f0: float = 1.0 / (1.0 + exp(-s * (0.0 - m)))
+	var f1: float = 1.0 / (1.0 + exp(-s * (1.0 - m)))
+	var f:  float = 1.0 / (1.0 + exp(-s * (q - m)))
+	var q_eased: float = (f - f0) / maxf(1e-6, (f1 - f0))        # normalized 0..1
+
+	var charge_mul: float = lerpf(charge_min_mul, charge_max_mul, q_eased)
+
+	# --- 2) Velocity influence (use pre-move vel if captured)
+	var v_player: Vector3 = _pre_move_vel
+	if v_player == Vector3.ZERO:
+		v_player = velocity
+	var v_along: float = maxf(v_player.dot(impulse_dir), 0.0)
+	var v_ref: float = vel_ref_speed
+	if v_ref <= 0.0:
+		v_ref = maxf(0.001, sprint_speed)
+	var v_norm: float = clampf(v_along / v_ref, 0.0, 1.0)
+	var vel_mul: float = lerpf(1.0 - vel_influence, 1.0 + vel_influence, v_norm)
+	# --- Final impulse (+ optional cap)
+	var J: Vector3 = (linear + lift) * (charge_mul * vel_mul)
+	print("the force is: ", J)
+	if kick_max_impulse > 0.0:
+		var Jlen: float = J.length()
+		if Jlen > kick_max_impulse:
+			J = J * (kick_max_impulse / Jlen)
+
+	# Apply at contact (adds spin). Lerp toward center to reduce spin if desired:
+	current_ball.sleeping = false
+	var local_contact: Vector3 = current_ball.to_local(hit_point)
+	# local_contact = local_contact.lerp(Vector3.ZERO, 0.5)  # uncomment to reduce spin
 	current_ball.apply_impulse(J, local_contact)
+
+	# Reset charge (optional)
+	_charge = 0.0
+	if is_instance_valid(_charge_bar):
+		_charge_bar.value = 0.0
 
 func _on_kick_area_body_entered(body: Node) -> void:
 	if body is RigidBody3D and body.is_in_group("ball"):
