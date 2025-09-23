@@ -1,4 +1,4 @@
-[gd_scene load_steps=13 format=3 uid="uid://ex55agd4o2wj"]
+[gd_scene load_steps=14 format=3 uid="uid://ex55agd4o2wj"]
 
 [ext_resource type="Script" uid="uid://ba1oat4ex8suj" path="res://scripts/player.gd" id="1_f3sb7"]
 [ext_resource type="Script" uid="uid://c0abdhp12js1u" path="res://scripts/camera_3d.gd" id="1_fj7yv"]
@@ -36,6 +36,9 @@ height = 4.0
 
 [sub_resource type="SphereShape3D" id="SphereShape3D_f3sb7"]
 radius = 19.017
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_fj7yv"]
+radius = 1.467
 
 [node name="World" type="Node3D"]
 
@@ -97,3 +100,11 @@ collision_mask = 4
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Scene/Player/KickArea"]
 transform = Transform3D(0.99997, 0.00703362, 0.0031066, -0.00703358, 0.999975, -2.18512e-05, -0.00310668, 0, 0.999995, 0, -0.9, -0.6)
 shape = SubResource("SphereShape3D_f3sb7")
+
+[node name="TackleField" type="Area3D" parent="Scene/Player"]
+collision_layer = 16
+collision_mask = 4
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Scene/Player/TackleField"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.0160648, -1.35571, 4.76837e-07)
+shape = SubResource("SphereShape3D_fj7yv")
