@@ -1,4 +1,4 @@
-[gd_scene load_steps=49 format=4 uid="uid://b0autf4kxd4x8"]
+[gd_scene load_steps=51 format=4 uid="uid://b0autf4kxd4x8"]
 
 [ext_resource type="Script" uid="uid://ba1oat4ex8suj" path="res://scripts/player.gd" id="1_f3sb7"]
 [ext_resource type="Script" uid="uid://c0abdhp12js1u" path="res://scripts/camera_3d.gd" id="1_fj7yv"]
@@ -10,8 +10,10 @@
 [ext_resource type="Script" uid="uid://bpbky3qchyq2t" path="res://scripts/spring_mesh.gd" id="8_gbfbk"]
 [ext_resource type="Script" uid="uid://citpqyq2an0lc" path="res://scripts/joy_stick.gd" id="9_k3n1d"]
 [ext_resource type="Texture2D" uid="uid://cl47ta5h6ne1t" path="res://JumpButtonTexture.png" id="10_ic0uy"]
-[ext_resource type="Texture2D" uid="uid://q3mj6x207jgg" path="res://SprintButtonTexture.png" id="11_k3n1d"]
+[ext_resource type="Script" uid="uid://dd73weg2gsjs5" path="res://scripts/goal_markers.gd" id="12_70uel"]
 [ext_resource type="Texture2D" uid="uid://q6muixq3msuu" path="res://ShootButtonTexture.png" id="12_k3n1d"]
+[ext_resource type="Texture2D" uid="uid://cj3trlht0ycuh" path="res://BlueMarker.png" id="13_70uel"]
+[ext_resource type="Texture2D" uid="uid://07miebfe7fc2" path="res://GreenMarker.png" id="14_hiqwa"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_ayaqe"]
 
@@ -133,16 +135,16 @@ uv1_scale = Vector3(8, 8, 8)
 
 [sub_resource type="BoxMesh" id="BoxMesh_wse8f"]
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_2o6r5"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_2u3nc"]
 albedo_color = Color(0.85, 0.85, 0.9, 1)
 metallic = 0.9
 roughness = 0.2
 
-[sub_resource type="ArrayMesh" id="ArrayMesh_70uel"]
+[sub_resource type="ArrayMesh" id="ArrayMesh_udxuc"]
 _surfaces = [{
 "aabb": AABB(-0.559671, -0.0598102, -0.557261, 1.11934, 1.61962, 1.11452),
 "format": 34359738375,
-"material": SubResource("StandardMaterial3D_2o6r5"),
+"material": SubResource("StandardMaterial3D_2u3nc"),
 "primitive": 3,
 "uv_scale": Vector4(0, 0, 0, 0),
 "vertex_count": 12960,
@@ -463,7 +465,7 @@ spring_mesh_path = NodePath("SpringMesh")
 top_plate_root_path = NodePath("TopPlateRoot")
 
 [node name="SpringMesh" type="MeshInstance3D" parent="SpringPad"]
-mesh = SubResource("ArrayMesh_70uel")
+mesh = SubResource("ArrayMesh_udxuc")
 script = ExtResource("8_gbfbk")
 
 [node name="TopPlateRoot" type="Node3D" parent="SpringPad"]
@@ -545,19 +547,12 @@ grow_vertical = 0
 rotation = 3.14159
 mouse_filter = 2
 
-[node name="Jump" type="TouchScreenButton" parent="CanvasLayer/UI/ActionPad"]
-position = Vector2(350, 420)
+[node name="Sprint" type="TouchScreenButton" parent="CanvasLayer/UI/ActionPad"]
+position = Vector2(500, 240)
 rotation = 3.14159
 texture_normal = ExtResource("10_ic0uy")
 shape = SubResource("RectangleShape2D_ioo17")
 action = "jump"
-
-[node name="Sprint" type="TouchScreenButton" parent="CanvasLayer/UI/ActionPad"]
-position = Vector2(500, 240)
-rotation = 3.14159
-texture_normal = ExtResource("11_k3n1d")
-shape = SubResource("RectangleShape2D_ioo17")
-action = "sprint"
 
 [node name="Shoot" type="TouchScreenButton" parent="CanvasLayer/UI/ActionPad"]
 position = Vector2(175, 240)
@@ -565,3 +560,30 @@ rotation = 3.14159
 texture_normal = ExtResource("12_k3n1d")
 shape = SubResource("RectangleShape2D_ioo17")
 action = "shoot_touch"
+
+[node name="GoalMarkers" type="Control" parent="CanvasLayer/UI"]
+anchors_preset = 0
+offset_right = 40.0
+offset_bottom = 40.0
+script = ExtResource("12_70uel")
+camera_path = NodePath("../../../Camera3D")
+blue_goal_path = NodePath("../../../Goal_A")
+green_goal_path = NodePath("../../../Goal_B")
+blue_offset_below_m = 10.0
+green_offset_below_m = 10.0
+
+[node name="GreenMarker" type="TextureRect" parent="CanvasLayer/UI/GoalMarkers"]
+layout_mode = 0
+offset_right = 24.0
+offset_bottom = 24.0
+pivot_offset = Vector2(12, 12)
+mouse_filter = 2
+texture = ExtResource("14_hiqwa")
+
+[node name="BlueMarker" type="TextureRect" parent="CanvasLayer/UI/GoalMarkers"]
+layout_mode = 0
+offset_right = 24.0
+offset_bottom = 24.0
+pivot_offset = Vector2(12, 12)
+mouse_filter = 2
+texture = ExtResource("13_70uel")
