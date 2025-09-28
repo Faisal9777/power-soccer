@@ -1,9 +1,10 @@
-[gd_scene load_steps=51 format=4 uid="uid://b0autf4kxd4x8"]
+[gd_scene load_steps=54 format=4 uid="uid://b0autf4kxd4x8"]
 
 [ext_resource type="Script" uid="uid://ba1oat4ex8suj" path="res://scripts/player.gd" id="1_f3sb7"]
 [ext_resource type="Script" uid="uid://c0abdhp12js1u" path="res://scripts/camera_3d.gd" id="1_fj7yv"]
 [ext_resource type="Texture2D" uid="uid://bvxkxaod0qfp" path="res://grass.png" id="2_tlwt5"]
 [ext_resource type="Texture2D" uid="uid://iqnucbl6j3qr" path="res://fence.png" id="4_aqk2v"]
+[ext_resource type="Script" uid="uid://2id0s4h5brsa" path="res://scripts/GoalTrigger.gd" id="5_2u3nc"]
 [ext_resource type="Texture2D" uid="uid://ckyaiflvqt25u" path="res://teleporter.png" id="6_dwbse"]
 [ext_resource type="Script" uid="uid://dik215cvsxd74" path="res://scripts/teleporter_pad.gd" id="6_pkg7o"]
 [ext_resource type="Script" uid="uid://dewcp3wer75qd" path="res://scripts/spring_pad.gd" id="7_pkg7o"]
@@ -13,7 +14,8 @@
 [ext_resource type="Script" uid="uid://dd73weg2gsjs5" path="res://scripts/goal_markers.gd" id="12_70uel"]
 [ext_resource type="Texture2D" uid="uid://q6muixq3msuu" path="res://ShootButtonTexture.png" id="12_k3n1d"]
 [ext_resource type="Texture2D" uid="uid://cj3trlht0ycuh" path="res://BlueMarker.png" id="13_70uel"]
-[ext_resource type="Texture2D" uid="uid://07miebfe7fc2" path="res://GreenMarker.png" id="14_hiqwa"]
+[ext_resource type="Texture2D" uid="uid://cqgt28qoecxru" path="res://PurpleMarker.png" id="13_hiqwa"]
+[ext_resource type="Script" uid="uid://dg86aqlcacndc" path="res://scripts/scoreboard.gd" id="15_hiqwa"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_ayaqe"]
 
@@ -131,20 +133,22 @@ cull_mode = 2
 albedo_texture = ExtResource("4_aqk2v")
 uv1_scale = Vector3(8, 8, 8)
 
+[sub_resource type="BoxShape3D" id="BoxShape3D_hiqwa"]
+
 [sub_resource type="BoxShape3D" id="BoxShape3D_ioo17"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_wse8f"]
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_2u3nc"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_70uel"]
 albedo_color = Color(0.85, 0.85, 0.9, 1)
 metallic = 0.9
 roughness = 0.2
 
-[sub_resource type="ArrayMesh" id="ArrayMesh_udxuc"]
+[sub_resource type="ArrayMesh" id="ArrayMesh_hiqwa"]
 _surfaces = [{
 "aabb": AABB(-0.559671, -0.0598102, -0.557261, 1.11934, 1.61962, 1.11452),
 "format": 34359738375,
-"material": SubResource("StandardMaterial3D_2u3nc"),
+"material": SubResource("StandardMaterial3D_70uel"),
 "primitive": 3,
 "uv_scale": Vector4(0, 0, 0, 0),
 "vertex_count": 12960,
@@ -200,7 +204,7 @@ transform = Transform3D(10, 0, 0, 0, 1, 0, 0, 0, 10, 0, -1, 0)
 shape = SubResource("ConvexPolygonShape3D_f1i8d")
 
 [node name="Ball" type="RigidBody3D" parent="Scene" groups=["ball"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 5.84313, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 5, 0)
 collision_layer = 4
 collision_mask = 3
 mass = 0.1
@@ -215,7 +219,7 @@ shape = SubResource("SphereShape3D_6tagv")
 metadata/_edit_lock_ = true
 
 [node name="Player" type="CharacterBody3D" parent="Scene" groups=["player"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.0830667, 3.32572, -1.81184)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5, 0)
 collision_layer = 3
 collision_mask = 5
 script = ExtResource("1_f3sb7")
@@ -247,6 +251,7 @@ transform = Transform3D(6, 0, 0, 0, 0.5, 0, 0, 0, 6, 0, 1.5, 0)
 shape = SubResource("BoxShape3D_aqk2v")
 
 [node name="Walls" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.860714, -0.665835, -2.33582)
 
 [node name="Wall_North" type="StaticBody3D" parent="Walls"]
 
@@ -295,6 +300,10 @@ shape = SubResource("BoxShape3D_036b0")
 
 [node name="Goal_A" type="Node3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -243)
+script = ExtResource("5_2u3nc")
+scoreboard_path = NodePath("../CanvasLayer/UI/Scoreboard")
+ball_path = NodePath("../Scene/Ball")
+ball_spawn_path = NodePath("../BallSpawn")
 
 [node name="GoalBody" type="StaticBody3D" parent="Goal_A"]
 
@@ -358,8 +367,21 @@ transform = Transform3D(8, 0, 0, 0, 0.05, 0, 0, 0, 3.15, 0, 3.5, -1.7)
 mesh = SubResource("BoxMesh_ic0uy")
 surface_material_override/0 = SubResource("StandardMaterial3D_k3n1d")
 
+[node name="ScoreZone" type="Area3D" parent="Goal_A"]
+collision_layer = 4
+collision_mask = 7
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Goal_A/ScoreZone"]
+transform = Transform3D(7.5, 0, 0, 0, 6.3, 0, 0, 0, 2.95, 0, 0, -1.65)
+shape = SubResource("BoxShape3D_hiqwa")
+
 [node name="Goal_B" type="Node3D" parent="."]
 transform = Transform3D(-1, 0, -8.74228e-08, 0, 1, 0, 8.74228e-08, 0, -1, 0, 0, 243)
+script = ExtResource("5_2u3nc")
+score_for = 0
+scoreboard_path = NodePath("../CanvasLayer/UI/Scoreboard")
+ball_path = NodePath("../Scene/Ball")
+ball_spawn_path = NodePath("../BallSpawn")
 
 [node name="GoalBody" type="StaticBody3D" parent="Goal_B"]
 
@@ -423,6 +445,14 @@ transform = Transform3D(8, 0, 0, 0, 0.05, 0, 0, 0, 3.15, 0, 3.5, -1.7)
 mesh = SubResource("BoxMesh_ic0uy")
 surface_material_override/0 = SubResource("StandardMaterial3D_k3n1d")
 
+[node name="ScoreZone" type="Area3D" parent="Goal_B"]
+collision_layer = 4
+collision_mask = 7
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Goal_B/ScoreZone"]
+transform = Transform3D(7.5, 0, 0, 0, 6.3, 0, 0, 0, 2.95, 0, 0, -1.65)
+shape = SubResource("BoxShape3D_hiqwa")
+
 [node name="TelePad_A" type="Area3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 50, 0.5, 0)
 collision_layer = 3
@@ -465,7 +495,7 @@ spring_mesh_path = NodePath("SpringMesh")
 top_plate_root_path = NodePath("TopPlateRoot")
 
 [node name="SpringMesh" type="MeshInstance3D" parent="SpringPad"]
-mesh = SubResource("ArrayMesh_udxuc")
+mesh = SubResource("ArrayMesh_hiqwa")
 script = ExtResource("8_gbfbk")
 
 [node name="TopPlateRoot" type="Node3D" parent="SpringPad"]
@@ -574,16 +604,34 @@ green_offset_below_m = 10.0
 
 [node name="GreenMarker" type="TextureRect" parent="CanvasLayer/UI/GoalMarkers"]
 layout_mode = 0
-offset_right = 24.0
-offset_bottom = 24.0
-pivot_offset = Vector2(12, 12)
+offset_right = 32.0
+offset_bottom = 32.0
+pivot_offset = Vector2(16, 16)
 mouse_filter = 2
-texture = ExtResource("14_hiqwa")
+texture = ExtResource("13_hiqwa")
 
 [node name="BlueMarker" type="TextureRect" parent="CanvasLayer/UI/GoalMarkers"]
 layout_mode = 0
-offset_right = 24.0
-offset_bottom = 24.0
-pivot_offset = Vector2(12, 12)
+offset_right = 32.0
+offset_bottom = 32.0
+pivot_offset = Vector2(16, 16)
 mouse_filter = 2
 texture = ExtResource("13_70uel")
+
+[node name="Scoreboard" type="Control" parent="CanvasLayer/UI"]
+layout_mode = 1
+anchor_right = 1.0
+offset_top = 8.0
+offset_bottom = 56.0
+script = ExtResource("15_hiqwa")
+
+[node name="Text" type="Label" parent="CanvasLayer/UI/Scoreboard"]
+layout_mode = 1
+anchors_preset = -1
+anchor_right = 1.0
+anchor_bottom = 1.0
+theme_override_font_sizes/font_size = 32
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="BallSpawn" type="Marker3D" parent="."]
