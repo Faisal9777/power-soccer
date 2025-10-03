@@ -1,7 +1,8 @@
-[gd_scene load_steps=14 format=3 uid="uid://ex55agd4o2wj"]
+[gd_scene load_steps=12 format=3 uid="uid://ex55agd4o2wj"]
 
-[ext_resource type="Script" uid="uid://ba1oat4ex8suj" path="res://scripts/player.gd" id="1_f3sb7"]
-[ext_resource type="Script" uid="uid://c0abdhp12js1u" path="res://scripts/camera_3d.gd" id="1_fj7yv"]
+[ext_resource type="Script" uid="uid://garne2t5qlao" path="res://scripts/world.gd" id="1_tlwt5"]
+[ext_resource type="PackedScene" uid="uid://dv5l1qjf5gwfn" path="res://Player.tscn" id="3_aqk2v"]
+[ext_resource type="PackedScene" uid="uid://dpicujbq5yvvi" path="res://PlayerCamera.tscn" id="3_tlwt5"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_ayaqe"]
 
@@ -26,34 +27,29 @@ height = 2.0
 [sub_resource type="SphereShape3D" id="SphereShape3D_6tagv"]
 radius = 1.0
 
-[sub_resource type="CapsuleMesh" id="CapsuleMesh_2vmtx"]
-radius = 1.0
-height = 4.0
-
-[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_ld6s0"]
-radius = 1.0
-height = 4.0
-
-[sub_resource type="SphereShape3D" id="SphereShape3D_f3sb7"]
-radius = 19.017
-
-[sub_resource type="SphereShape3D" id="SphereShape3D_fj7yv"]
-radius = 1.467
+[sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_tlwt5"]
+properties/0/path = NodePath(".:global_transform")
+properties/0/spawn = true
+properties/0/replication_mode = 1
+properties/1/path = NodePath(".:linear_velocity")
+properties/1/spawn = true
+properties/1/replication_mode = 1
+properties/2/path = NodePath(".:angular_velocity")
+properties/2/spawn = true
+properties/2/replication_mode = 1
 
 [node name="World" type="Node3D"]
-
-[node name="Camera3D" type="Camera3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 0.866025, 0.5, 0, -0.5, 0.866025, 0, 16, 24)
-fov = 80.0
-script = ExtResource("1_fj7yv")
-target_path = NodePath("../Scene/Player")
-ball_target_path = NodePath("../Scene/Ball")
-collision_mask = 2
+script = ExtResource("1_tlwt5")
+player_scene = ExtResource("3_aqk2v")
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
 environment = SubResource("Environment_2tuav")
 
 [node name="Scene" type="Node3D" parent="."]
+
+[node name="Camera3D" parent="Scene" instance=ExtResource("3_tlwt5")]
+transform = Transform3D(1, 0, 0, 0, 0.866025, 0.5, 0, -0.5, 0.866025, 0, 11.7219, 16.9727)
+ball_target_path = NodePath("../Ball")
 
 [node name="Floor" type="StaticBody3D" parent="Scene"]
 
@@ -80,31 +76,15 @@ metadata/_edit_lock_ = true
 shape = SubResource("SphereShape3D_6tagv")
 metadata/_edit_lock_ = true
 
-[node name="Player" type="CharacterBody3D" parent="Scene"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.525856, 2, 0)
-collision_layer = 2
-collision_mask = 5
-script = ExtResource("1_f3sb7")
-sprint_speed = 12.0
+[node name="BallSync" type="MultiplayerSynchronizer" parent="Scene/Ball"]
+replication_config = SubResource("SceneReplicationConfig_tlwt5")
 
-[node name="Mesh" type="MeshInstance3D" parent="Scene/Player"]
-mesh = SubResource("CapsuleMesh_2vmtx")
+[node name="SpawnPoints" type="Node3D" parent="."]
 
-[node name="PlayerCollision" type="CollisionShape3D" parent="Scene/Player"]
-shape = SubResource("CapsuleShape3D_ld6s0")
+[node name="Marker3D" type="Marker3D" parent="SpawnPoints"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6.76195, -0.0660555, 0)
 
-[node name="KickArea" type="Area3D" parent="Scene/Player"]
-collision_layer = 8
-collision_mask = 4
+[node name="Marker3D2" type="Marker3D" parent="SpawnPoints"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.2403, -0.108868, 4.76837e-07)
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Scene/Player/KickArea"]
-transform = Transform3D(0.99997, 0.00703362, 0.0031066, -0.00703358, 0.999975, -2.18512e-05, -0.00310668, 0, 0.999995, 0, -0.9, -0.6)
-shape = SubResource("SphereShape3D_f3sb7")
-
-[node name="TackleField" type="Area3D" parent="Scene/Player"]
-collision_layer = 16
-collision_mask = 4
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Scene/Player/TackleField"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.0160648, -1.35571, 4.76837e-07)
-shape = SubResource("SphereShape3D_fj7yv")
+[node name="Players" type="Node3D" parent="."]

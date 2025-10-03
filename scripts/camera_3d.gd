@@ -25,11 +25,54 @@ var _captured: bool = true
 var _target_ball : Node3D
 
 func _ready() -> void:
+	#print("camera is getting called")
+	# Disable entirely on dedicated server
+	#if multiplayer.is_server() and multiplayer.get_peers().size() > 0:
+		#current = false
+		#set_process(false)
+		#set_process_unhandled_input(false)
+		#return
+
 	_target = get_node_or_null(target_path)
+	if _target == null:
+		_target = get_parent() as Node3D   # <-- Player is the parent
 	_target_ball = get_node_or_null(ball_target_path)
-	current = true
-	_captured = true
+	if not _target_ball:
+		print("could not find the ball trying another way")
+		_target_ball = get_node_or_null("Ball")
+	if not _target_ball:
+		print("still could not find the ball will cause error")
+		push_error("The camera could not locate the ball")
+	print("does the target path exists? ", _target != null)
+	print("does the ball_target_path exists? ", ball_target_path != null)
+	 # Dedicated server? bail out
+	#activate()
+
+func activate() -> void:
+	if OS.has_feature("server"):
+		_set_active(false)
+		return
+	_set_active(true)
 	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+
+func deactivate() -> void:
+	print("deactivating camera")
+	_set_active(false)
+	if Input.get_mouse_mode() == Input.MOUSE_MODE_CAPTURED:
+		Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+
+func _set_active(on: bool) -> void:
+	print("activating camera")
+	current = on
+	visible = on
+	set_process(on)
+	set_process_unhandled_input(on)
+
+func set_ball(ball: Node3D) -> void:
+	_target_ball = ball
+	
+func set_target(player: Node3D) -> void:
+	_target = player
 
 func _unhandled_input(event: InputEvent) -> void:
 	# RMB toggles aim mode (release mouse for on-screen cursor while aiming)
@@ -71,11 +114,11 @@ func _process(delta: float) -> void:
 	#var ball: Node3D = _target.get("current_ball") as Node3D
 	var ball: Node3D = _target_ball
 	var has_ball: bool = ball != null
-
+	
 	# Player head-height focus (used for "behind player" positioning)
 	var focus_player: Vector3 = _target.global_transform.origin + Vector3(0, height, 0)
 
-	if _aim_mode:
+	if _aim_mode and has_ball:
 		# ===== AIM MODE =====
 		# 1) POSITION: stay behind the player (ignore mouse yaw/pitch & ball)
 		var player_forward: Vector3 = (-_target.global_transform.basis.z).normalized() # -Z is forward
