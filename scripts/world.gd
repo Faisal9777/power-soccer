@@ -153,29 +153,7 @@ func _gather_input() -> Dictionary:
 		if me:
 			yaw = me.rotation.y
 			
-	# --- compute aim_contact while RMB is down ---
-	var aim_contact: Variant = null
-	if cam and Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
-		var mp := get_viewport().get_mouse_position()
-		var from := cam.project_ray_origin(mp)
-		var dir := cam.project_ray_normal(mp)
-		var to := from + dir * 1000.0
-
-		var q := PhysicsRayQueryParameters3D.create(from, to)
-		var me2: CharacterBody3D = _players.get(multiplayer.get_unique_id(), null) as CharacterBody3D
-		if me2:
-			q.exclude = [me2.get_rid()]  # optional: don't hit yourself
-
-		var space_state := get_viewport().world_3d.direct_space_state
-		var hit: Dictionary = space_state.intersect_ray(q)
-		if hit.has("position"):
-			aim_contact = hit["position"]
-		else:
-			var plane := Plane(Vector3.UP, 0.0)
-			var plane_hit: Variant = plane.intersects_ray(from, dir)  # Vector3 or null
-			if plane_hit is Vector3:
-				aim_contact = plane_hit as Vector3
-	# --------------------------------------------
+	
 	
 	return {
 		"mvx": mvx,
@@ -187,7 +165,7 @@ func _gather_input() -> Dictionary:
 		"stop_ball": Input.is_action_pressed("stop_ball"),
 		"shoot_down": Input.is_action_pressed("shoot"),
 		"shoot_up": Input.is_action_just_released("shoot"),
-		"aim_contact": aim_contact,
+		"rmb": Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT),
 		"cam_yaw": yaw
 	}
 
@@ -246,6 +224,9 @@ func _rpc_attach_cam(player_path: NodePath) -> void:
 	if cam:
 		cam.set_target(p)
 		cam.activate()
+	# Assign camera variable on the Player and hook it up
+	if p.has_method("attach_camera"):
+		p.attach_camera(cam)
 	#if cam and cam.has_method("set_target"):
 		#cam.call_deferred("set_target", p)  # use deferred in case camera script isn’t ready yet
 	#elif cam:

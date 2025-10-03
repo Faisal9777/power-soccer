@@ -69,7 +69,7 @@ var _charge: float = 0.0
 var _charge_layer: CanvasLayer
 var _charge_root: Control
 var _charge_bar: ProgressBar
-
+var _ball_prev_parent: Node = null
 var _pre_move_vel: Vector3
 var tackle_active: bool = false
 var tackle_time_left: float = 0.0
@@ -78,11 +78,15 @@ var tackle_velocity: Vector3 = Vector3.ZERO
 # Latch helpers (no reparenting in netcode—see notes below)
 var ball_latched: bool = false
 var _latched_offset_local: Vector3 = Vector3.ZERO
+var _saved_ball_layer: int = 0
+var _saved_ball_mask: int = 0
+var _latched_ball: RigidBody3D = null
+var cam: Camera3D = null  # local-only reference
 
 @onready var ground_ray: RayCast3D = $GroundRay
 @onready var kick_area: Area3D = $KickArea
 @onready var tackle_field: Area3D = $TackleField
-
+@onready var ball_latch_anchor: Node3D = Node3D.new()
 
 var _cooldowns := {"shoot": 0.0, "move": 0.0, "jump": 0.0}
 
@@ -98,7 +102,7 @@ var _net := {
 	"shoot_down": false,   # held
 	"shoot_up": false,     # edge
 	# optional (if you later send mouse aim):
-	"aim_contact": null,    # Vector3 or null
+	"rmb": false,    # Vector3 or null
 	"cam_yaw": 0.0,
 }
 
@@ -107,6 +111,12 @@ func apply_net_input(d: Dictionary) -> void:
 	for k in _net.keys():
 		if d.has(k):
 			_net[k] = d[k]
+func attach_camera(c: Camera3D) -> void:
+	cam = c
+	if cam:
+		print("camera has been assigned in player")
+	else:
+		print("no camera was found to gget assigned in the player")
 
 # --- Helpers to read net "buttons" ---
 func _btn_down(name: String) -> bool:
@@ -141,6 +151,9 @@ func _ready() -> void:
 	#_log_pid("in ready of player.gd: ")
 	print("my id: ", my_id)
 	print("owner peer id: ", owner_peer_id)
+	
+	ball_latch_anchor.name = "BallLatchAnchor"
+	add_child(ball_latch_anchor)  # or: tackle_field.add_child(ball_latch_anchor)
 	#var cam := $Camera3D  # adjust if your camera lives deeper
 	
 	#if is_dedicated or not is_local:
@@ -322,9 +335,29 @@ func _handle_shoot_server() -> void:
 func _kick_at_contact_server() -> void:
 	if !is_instance_valid(current_ball):
 		return
+
 	var C := current_ball.global_transform.origin
-	# If you later send aim from client, set aim_contact from _net["aim_contact"] when present
-	var hit_point := (aim_contact if aim_contact != Vector3.ZERO else C - (C - global_transform.origin).normalized() * _get_ball_radius(current_ball))
+	var R := _get_ball_radius(current_ball)
+
+	# --- NEW: build hit_point from latest input, clamped to ball surface ---
+	var hit_point: Vector3
+	var target: Variant = _net.get("aim_contact", null)  # may be Vector3 or null
+	if target is Vector3:
+		var dir := (target as Vector3) - C
+		if dir.length() < 1e-5:
+			dir = C - global_transform.origin  # fallback: from player toward ball
+		dir = dir.normalized()
+		hit_point = C - dir * R              # clamp onto sphere surface
+	else:
+		var dir2 := C - global_transform.origin
+		if dir2.length() < 1e-5:
+			dir2 = Vector3.FORWARD
+		hit_point = C - dir2.normalized() * R
+
+	# (optional) keep visuals in sync
+	aim_contact = hit_point
+	# ----------------------------------------------------------------------
+
 	var impulse_dir := (C - hit_point).normalized()
 
 	var linear := impulse_dir * kick_force
@@ -424,13 +457,33 @@ func _update_tackle_server(delta: float) -> void:
 		_end_tackle_server()
 
 func _tick_latch_ball_server() -> void:
-	if !ball_latched or current_ball == null or !is_instance_valid(current_ball):
-		return
-	# Anchor is player-local; place ball there each tick
-	var anchor_world := to_global(_latched_offset_local)
-	current_ball.global_transform.origin = anchor_world
-	current_ball.linear_velocity = Vector3.ZERO
-	current_ball.angular_velocity = Vector3.ZERO
+	if current_ball and tackle_field.overlaps_body(current_ball) and current_ball is RigidBody3D and current_ball.is_in_group("ball"):
+		print("latching the ball")
+		var ball := current_ball
+		var C: Vector3 = ball.global_transform.origin
+		var F: Vector3 = tackle_field.global_transform.origin
+		var dir: Vector3 = (C - F).normalized()
+		var r: float = _get_ball_radius(ball)
+		var contact_world: Vector3 = C - dir * r
+
+		# Position the anchor at the contact point in world space
+		ball_latch_anchor.global_transform.origin = contact_world
+
+		# Save parent & collisions
+		_ball_prev_parent = current_ball.get_parent()
+		_saved_ball_layer = current_ball.collision_layer
+		_saved_ball_mask  = current_ball.collision_mask
+
+		# Freeze so physics won’t fight the parenting, and avoid blocking
+		current_ball.freeze = true
+		current_ball.linear_velocity  = Vector3.ZERO
+		current_ball.angular_velocity = Vector3.ZERO
+		current_ball.collision_layer = 0
+		current_ball.collision_mask  = 0
+		_latched_ball = current_ball
+		# Reparent under the anchor, keeping world transform
+		current_ball.reparent(ball_latch_anchor, true)  # keep_global = true
+		ball_latched = true
 
 func _end_tackle_server() -> void:
 	tackle_active = false
@@ -440,11 +493,19 @@ func _end_tackle_server() -> void:
 		_unlatch_ball_server()
 
 func _unlatch_ball_server() -> void:
-	if current_ball and is_instance_valid(current_ball):
-		current_ball.freeze = false
-		current_ball.sleeping = false
+	if _latched_ball:
+		print("unlatching the ball")
+	current_ball = _latched_ball
+	_latched_ball = null
+	if _ball_prev_parent != null and is_instance_valid(_ball_prev_parent):
+		# Keep world transform when restoring parent
+		current_ball.reparent(_ball_prev_parent, true)
+	current_ball.freeze = false
+	current_ball.sleeping = false
+	current_ball.collision_layer = _saved_ball_layer
+	current_ball.collision_mask  = _saved_ball_mask
+	_ball_prev_parent = null
 	ball_latched = false
-	_latched_offset_local = Vector3.ZERO
 
 # --- Misc / UI / aim ---
 
@@ -523,24 +584,67 @@ func _get_ball_radius(ball: RigidBody3D) -> float:
 
 # Server uses a simple, camera-forward contact if no aim sent.
 func _update_aim_server(delta: float) -> void:
-	if !aim_active or current_ball == null:
-		_show_arrow(false); return
-	var C := current_ball.global_transform.origin
-	var R := _get_ball_radius(current_ball)
-	if _net["aim_contact"] != null:
-		aim_contact = _net["aim_contact"]
+	# Arrow only exists while a ball is in the KickArea
+	if not aim_active or current_ball == null:
+		_show_arrow(false)
+		return
+
+	var C: Vector3 = current_ball.global_transform.origin
+	var R: float = _get_ball_radius(current_ball)
+
+	if _is_aiming():
+		# --- Mouse-driven contact (ray -> sphere)
+		var cam := get_viewport().get_camera_3d()
+		if cam == null:
+			_show_arrow(false)
+			return
+		var mp: Vector2 = get_viewport().get_mouse_position()
+		var ro: Vector3 = cam.project_ray_origin(mp)
+		var rd: Vector3 = cam.project_ray_normal(mp).normalized()
+
+		var oc: Vector3 = ro - C
+		var b: float = 2.0 * rd.dot(oc)
+		var c: float = oc.dot(oc) - R * R
+		var disc: float = b * b - 4.0 * c
+		var contact: Vector3 = Vector3.ZERO
+		if disc >= 0.0:
+			var sd: float = sqrt(disc)
+			var t1: float = (-b - sd) * 0.5
+			var t2: float = (-b + sd) * 0.5
+			var t: float = -1.0
+			if t1 > 0.0:
+				t = t1
+			elif t2 > 0.0:
+				t = t2
+			if t > 0.0:
+				contact = ro + rd * t
+		if contact == Vector3.ZERO:
+			var t_closest: float = -rd.dot(oc)
+			var closest: Vector3 = ro + rd * maxf(t_closest, 0.0)
+			var dir_to: Vector3 = closest - C
+			if dir_to == Vector3.ZERO:
+				dir_to = global_transform.origin - C
+			contact = C + dir_to.normalized() * R
+		aim_contact = contact
 	else:
+		# --- Fixed contact: front-facing surface toward the player (no mouse)
 		var dir := (C - global_transform.origin).normalized()
 		aim_contact = C - dir * R
-	var vec := aim_contact - global_transform.origin
-	if vec == Vector3.ZERO: _show_arrow(false); return
-	var dist := maxf(vec.length(), aim_min_len)
+
+	# Common: drive the arrow from player -> contact
+	var vec: Vector3 = aim_contact - global_transform.origin
+	if vec == Vector3.ZERO:
+		_show_arrow(false)
+		return
+	var dist: float = maxf(vec.length(), aim_min_len)  # no upper clamp
 	aim_dir = vec.normalized()
+
 	_show_arrow(true)
 	aim_arrow.global_transform.origin = global_transform.origin
 	aim_arrow.look_at(aim_arrow.global_transform.origin + aim_dir, Vector3.UP)
 	aim_arrow.scale = Vector3(1.0, 1.0, dist)
-
+func _is_aiming() -> bool:
+	return aim_active and _net["rmb"]
 # KickArea hooks
 func _on_kick_area_body_entered(body: Node) -> void:
 	if not multiplayer.is_server(): return
