@@ -1,7 +1,8 @@
-[gd_scene load_steps=58 format=4 uid="uid://b0autf4kxd4x8"]
+[gd_scene load_steps=59 format=4 uid="uid://b0autf4kxd4x8"]
 
 [ext_resource type="Script" uid="uid://ba1oat4ex8suj" path="res://scripts/player.gd" id="1_f3sb7"]
 [ext_resource type="Script" uid="uid://c0abdhp12js1u" path="res://scripts/camera_3d.gd" id="1_fj7yv"]
+[ext_resource type="Texture2D" uid="uid://lg2bc8rys6fs" path="res://bg_cliffs.png" id="2_bc84e"]
 [ext_resource type="Texture2D" uid="uid://bvxkxaod0qfp" path="res://grass.png" id="2_tlwt5"]
 [ext_resource type="Texture2D" uid="uid://iqnucbl6j3qr" path="res://fence.png" id="4_aqk2v"]
 [ext_resource type="Script" uid="uid://2id0s4h5brsa" path="res://scripts/GoalTrigger.gd" id="5_2u3nc"]
@@ -22,6 +23,14 @@
 [ext_resource type="Texture2D" uid="uid://b8dabvdjlh5yx" path="res://BallMarker.png" id="19_26xuy"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_ayaqe"]
+sky_top_color = Color(0.403922, 0.72549, 0.776471, 1)
+sky_horizon_color = Color(0.941176, 0.811765, 0.541176, 1)
+sky_energy_multiplier = 0.25
+sky_cover = ExtResource("2_bc84e")
+ground_bottom_color = Color(0.941176, 0.811765, 0.541176, 1)
+ground_horizon_color = Color(0.941176, 0.811765, 0.541176, 1)
+ground_energy_multiplier = 0.5
+sun_angle_max = 45.0
 
 [sub_resource type="Sky" id="Sky_cwee5"]
 sky_material = SubResource("ProceduralSkyMaterial_ayaqe")
@@ -688,3 +697,6 @@ horizontal_alignment = 1
 vertical_alignment = 1
 
 [node name="BallSpawn" type="Marker3D" parent="."]
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+light_color = Color(1, 0.843137, 0.639216, 1)
