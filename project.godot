@@ -11,9 +11,13 @@ config_version=5
 [application]
 
 config/name="Soccer"
-run/main_scene="uid://b0autf4kxd4x8"
+run/main_scene="uid://c7aw8ja2qjdd3"
 config/features=PackedStringArray("4.4", "Forward Plus")
 config/icon="res://icon.svg"
+
+[autoload]
+
+GameState="*res://scripts/GameState.gd"
 
 [editor]
 
