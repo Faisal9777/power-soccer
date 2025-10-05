@@ -22,7 +22,7 @@ func _ready() -> void:
 		spawner.add_spawnable_scene(player_scene.resource_path)
 		players_root.add_child(spawner)
 	# 1) Connect to the Network autoload signals (do it here so it works even if not wired in editor)
-	print("inside the engine network statement")
+
 	Network.server_started.connect(_on_server_started)
 	Network.joined_server.connect(_on_joined_server)
 	Network.peer_joined.connect(_on_peer_joined)
@@ -44,7 +44,6 @@ func _process(delta: float) -> void:
 		if multiplayer.multiplayer_peer is ENetMultiplayerPeer and multiplayer.is_server():
 			print("Already hosting (ENet)")
 		else:
-			print("about to host from world.gd")
 			Network.host()              # start hosting
 
 	if Input.is_action_just_pressed("join_key"):
@@ -239,7 +238,6 @@ func _rpc_attach_cam(player_path: NodePath) -> void:
 func _focus_camera_on_player(p: Node, peer_id: int) -> void:
 	# Find your camera (adjust the path/group/name to your project)
 	var my_id := multiplayer.get_unique_id()
-	print("in focus camera on player: ", p.name)
 	# If this world.gd is running on the same machine that should see the camera,
 	# do it locally; otherwise, tell that specific client to do it.
 	if my_id == peer_id:
@@ -247,7 +245,6 @@ func _focus_camera_on_player(p: Node, peer_id: int) -> void:
 	else:
 		rpc_id(peer_id, "_rpc_enable_local_view", p.get_path())
 func _enable_local_view_now(p: Node) -> void:
-	_log_pid("in enabble local view now")
 	# mark for convenience if you want in Player.gd
 	p.add_to_group("LocalPlayer")
 

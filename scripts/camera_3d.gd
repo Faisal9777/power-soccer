@@ -42,9 +42,7 @@ func _ready() -> void:
 		_target_ball = get_node_or_null("Ball")
 	if not _target_ball:
 		print("still could not find the ball will cause error")
-		push_error("The camera could not locate the ball")
-	print("does the target path exists? ", _target != null)
-	print("does the ball_target_path exists? ", ball_target_path != null)
+		
 	 # Dedicated server? bail out
 	#activate()
 
@@ -56,13 +54,11 @@ func activate() -> void:
 	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 
 func deactivate() -> void:
-	print("deactivating camera")
 	_set_active(false)
 	if Input.get_mouse_mode() == Input.MOUSE_MODE_CAPTURED:
 		Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 
 func _set_active(on: bool) -> void:
-	print("activating camera")
 	current = on
 	visible = on
 	set_process(on)

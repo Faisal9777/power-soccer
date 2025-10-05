@@ -82,7 +82,7 @@ var _saved_ball_layer: int = 0
 var _saved_ball_mask: int = 0
 var _latched_ball: RigidBody3D = null
 var cam: Camera3D = null  # local-only reference
-
+var _ui_charge := 0.0  # client-only visual charge
 @onready var ground_ray: RayCast3D = $GroundRay
 @onready var kick_area: Area3D = $KickArea
 @onready var tackle_field: Area3D = $TackleField
@@ -148,23 +148,15 @@ func _ready() -> void:
 	var my_id := get_tree().get_multiplayer().get_unique_id()
 	var is_local := (owner_peer_id == my_id)
 	var is_dedicated := OS.has_feature("server")
-	#_log_pid("in ready of player.gd: ")
-	print("my id: ", my_id)
-	print("owner peer id: ", owner_peer_id)
 	
 	ball_latch_anchor.name = "BallLatchAnchor"
 	add_child(ball_latch_anchor)  # or: tackle_field.add_child(ball_latch_anchor)
-	#var cam := $Camera3D  # adjust if your camera lives deeper
-	
-	#if is_dedicated or not is_local:
-		#cam.deactivate()
-		#return
-	
-	#if cam and is_local:
-		#cam.activate()
 	
 	_ensure_aim_arrow()
-	_init_charge_ui()
+	if is_local:
+		_init_charge_ui()
+	else:
+		print("was not local so not creating charge bar")
 func _log_pid(msg : String) -> void:
 	print(msg, OS.get_process_id())
 func _physics_process(delta: float) -> void:
@@ -174,6 +166,9 @@ func _physics_process(delta: float) -> void:
 	simulate_server(delta)
 
 func _process(delta: float) -> void:
+	
+	if _charge_bar and get_tree().get_multiplayer().get_unique_id() == owner_peer_id:
+		_update_charge_ui_from_replication()
 	if not show_aim_arrow or aim_arrow == null:
 		return
 	if not aim_active:
@@ -191,6 +186,11 @@ func _process(delta: float) -> void:
 	aim_arrow.look_at(aim_arrow.global_transform.origin + n, Vector3.UP)
 	aim_arrow.scale = Vector3(1.0, 1.0, dist)
 # --- Server gameplay loop (moved out of _physics_process for clarity) ---
+
+func _update_charge_ui_from_replication() -> void:
+	# _charge here is replicated from the server via MultiplayerSynchronizer
+	_charge_bar.value = _charge * 100.0
+	_charge_bar.visible = _charge > 0.001 or _net["shoot_down"]
 
 func simulate_server(delta: float) -> void:
 	_update_cooldowns(delta)
@@ -221,6 +221,9 @@ func _update_charge_server(delta: float) -> void:
 	if is_instance_valid(_charge_bar):
 		_charge_bar.value = _charge * 100.0
 		_charge_bar.visible = down or _charge > 0.001
+	#else:
+		#_log_pid("")
+		#print("charge bar does not exist for the player with id: ", owner_peer_id)
 
 func _update_cooldowns(delta: float) -> void:
 	for k in _cooldowns.keys():
@@ -266,6 +269,7 @@ func _handle_jump_server() -> void:
 func _handle_kick_action_server() -> void:
 	if _cooldowns["shoot"] != 0.0:
 		return
+	print("cooldown of kick action is: ", _cooldowns["shoot"])
 	_handle_shoot_server()
 	_handle_dribble_server()
 	_handle_ball_stop_server()
@@ -569,6 +573,7 @@ func _init_charge_ui() -> void:
 	_charge_bar.offset_right = 0
 	_charge_bar.offset_bottom = 0
 	_charge_root.add_child(_charge_bar)
+	
 
 func _show_arrow(v: bool) -> void:
 	if arrow_shaft: arrow_shaft.visible = v
