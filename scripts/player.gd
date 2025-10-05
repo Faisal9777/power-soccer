@@ -31,7 +31,7 @@ extends CharacterBody3D
 @export var dribble_impulse: float = 0.9
 @export var dribble_forward_bias: float = 0.35
 @export var dribble_up: float = 0.15
-@export var dribble_cooldown: float = 0.5
+@export var dribble_cooldown: float = 1
 @export var dribble_cone_dot: float = 0.0
 
 @export var vel_influence: float = 0.3
@@ -54,7 +54,21 @@ extends CharacterBody3D
 @export var owner_peer_id: int = 1
 @export var characters_layer_bit: int = 2
 @export var ball_layer_bit: int = 3
+# --- Stamina config ---
+@export var stamina_max: float = 100.0
+@export var stamina_regen_rate: float = 15.0      # per second
+@export var stamina_sprint_drain: float = 25.0    # per second while sprinting
+@export var stamina_tackle_cost: float = 20.0     # one-time cost on tackle start
+@export var stamina_min_to_sprint: float = 5.0    # must be above this to sprint
 
+# --- Stamina runtime (authoritative on server; replicated to owner) ---
+var _stamina: float = 100.0
+
+# UI nodes (client-local)
+var _stam_layer: CanvasLayer
+var _stam_root: Control
+var _stam_bar: ProgressBar
+var _can_stamina_regen : bool = true
 
 # --- Runtime state ---
 var current_ball: RigidBody3D = null
@@ -155,6 +169,7 @@ func _ready() -> void:
 	_ensure_aim_arrow()
 	if is_local:
 		_init_charge_ui()
+		_init_stamina_ui()
 	else:
 		print("was not local so not creating charge bar")
 func _log_pid(msg : String) -> void:
@@ -166,9 +181,7 @@ func _physics_process(delta: float) -> void:
 	simulate_server(delta)
 
 func _process(delta: float) -> void:
-	
-	if _charge_bar and get_tree().get_multiplayer().get_unique_id() == owner_peer_id:
-		_update_charge_ui_from_replication()
+	if get_tree().get_multiplayer().get_unique_id() == owner_peer_id: _update_local_changes(delta)
 	if not show_aim_arrow or aim_arrow == null:
 		return
 	if not aim_active:
@@ -180,12 +193,18 @@ func _process(delta: float) -> void:
 
 	var dist := maxf(vec.length(), aim_min_len)
 	var n := vec.normalized()
-
-	_show_arrow(true)
+	if get_tree().get_multiplayer().get_unique_id() == owner_peer_id:
+		_show_arrow(true)
 	aim_arrow.global_transform.origin = global_transform.origin
 	aim_arrow.look_at(aim_arrow.global_transform.origin + n, Vector3.UP)
 	aim_arrow.scale = Vector3(1.0, 1.0, dist)
 # --- Server gameplay loop (moved out of _physics_process for clarity) ---
+
+func _update_local_changes(delta: float) -> void:
+	if _charge_bar :
+		_update_charge_ui_from_replication()
+	if _stam_bar:
+		_update_stamina_ui_from_replication()
 
 func _update_charge_ui_from_replication() -> void:
 	# _charge here is replicated from the server via MultiplayerSynchronizer
@@ -200,15 +219,31 @@ func simulate_server(delta: float) -> void:
 
 	var input_dir := _get_input_dir_server()
 	_pre_move_vel = velocity
-
-	_handle_tackle_input_server()
-	if tackle_active:
-		_update_tackle_server(delta)
-		return
-
+	_handle_tackle_input_server(delta)
 	_handle_action_server(input_dir, delta)
 	_update_aim_server(delta)
+	_update_stamina_server(delta)
 
+func _can_perform(action: String, stamina_required : float) -> bool:
+	if action == "sprint" and _stamina > stamina_min_to_sprint:
+		_stamina = maxf(0.0, _stamina - stamina_required)
+		_can_stamina_regen = false
+		return true
+	return false
+
+func _update_stamina_ui_from_replication() -> void:
+	# _stamina is replicated from server → owner via MultiplayerSynchronizer
+	var pct := 100.0 * (_stamina / maxf(1e-6, stamina_max))
+	_stam_bar.value = clampf(pct, 0.0, 100.0)
+	# Optionally hide when full
+	# _stam_bar.visible = pct < 99.9
+
+func _update_stamina_server(delta: float) -> void:
+	# Drain while actually sprinting & moving
+	if _can_stamina_regen:
+			_stamina = minf(stamina_max, _stamina + stamina_regen_rate * delta)
+	else:
+		_can_stamina_regen = true	
 # --- Server versions of your previous methods (Input → _net) ---
 
 func _update_charge_server(delta: float) -> void:
@@ -251,7 +286,7 @@ func _handle_action_server(input_dir: Vector3, delta: float) -> void:
 	_handle_kick_action_server()
 
 func _move_server(input_dir: Vector3, delta: float) -> void:
-	var target_speed := sprint_speed if _btn_down("sprint") else walk_speed
+	var target_speed := sprint_speed if _btn_down("sprint") and _can_perform("sprint", stamina_sprint_drain * delta) else walk_speed
 	var lateral := velocity; lateral.y = 0.0
 	var target_vel := input_dir * target_speed
 	var accel := 12.0 if is_on_floor() else 12.0 * air_control
@@ -269,7 +304,6 @@ func _handle_jump_server() -> void:
 func _handle_kick_action_server() -> void:
 	if _cooldowns["shoot"] != 0.0:
 		return
-	print("cooldown of kick action is: ", _cooldowns["shoot"])
 	_handle_shoot_server()
 	_handle_dribble_server()
 	_handle_ball_stop_server()
@@ -333,7 +367,7 @@ func perform_dribble_server(direction: int) -> void:
 
 func _handle_shoot_server() -> void:
 	# Use edge up for the release shot
-	if aim_active and current_ball != null and _btn_just_released("shoot") and _cooldowns["shoot"] == 0.0:
+	if aim_active and current_ball != null and _btn_just_released("shoot"):
 		_kick_at_contact_server()
 
 func _kick_at_contact_server() -> void:
@@ -399,11 +433,14 @@ func _kick_at_contact_server() -> void:
 
 # --- Tackle / latch (server) ---
 
-func _handle_tackle_input_server() -> void:
-	if tackle_active: return
+func _handle_tackle_input_server(delta: float) -> void:
+	if tackle_active: 
+		_update_tackle_server(delta)
+		return
 	if !_btn_just_pressed("tackle"): return
 	if tackle_require_floor and !is_on_floor(): return
 	_start_tackle_server()
+
 
 func _start_tackle_server() -> void:
 	var fwd := -global_transform.basis.z; fwd.y = 0.0
@@ -495,6 +532,7 @@ func _end_tackle_server() -> void:
 		collision_mask = collision_mask # (restore if you modify it elsewhere)
 	if ball_latched:
 		_unlatch_ball_server()
+	
 
 func _unlatch_ball_server() -> void:
 	if _latched_ball:
@@ -573,7 +611,43 @@ func _init_charge_ui() -> void:
 	_charge_bar.offset_right = 0
 	_charge_bar.offset_bottom = 0
 	_charge_root.add_child(_charge_bar)
-	
+
+func _init_stamina_ui() -> void:
+	_stam_layer = CanvasLayer.new()
+	add_child(_stam_layer)
+
+	_stam_root = Control.new()
+	_stam_root.name = "StaminaUI"
+	_stam_layer.add_child(_stam_root)
+
+	# Anchor bottom-right like the charge bar
+	_stam_root.anchor_left = 1.0
+	_stam_root.anchor_top = 1.0
+	_stam_root.anchor_right = 1.0
+	_stam_root.anchor_bottom = 1.0
+
+	# Place it just above the charge bar
+	_stam_root.offset_right = -16
+	_stam_root.offset_bottom = -44   # a bit higher than charge
+	_stam_root.offset_left = _stam_root.offset_right - 200
+	_stam_root.offset_top = _stam_root.offset_bottom - 20
+
+	_stam_bar = ProgressBar.new()
+	_stam_bar.min_value = 0.0
+	_stam_bar.max_value = 100.0
+	_stam_bar.step = 0.1
+	_stam_bar.value = 100.0
+	_stam_bar.rounded = true
+	_stam_bar.show_percentage = false
+	_stam_bar.anchor_left = 0.0
+	_stam_bar.anchor_top = 0.0
+	_stam_bar.anchor_right = 1.0
+	_stam_bar.anchor_bottom = 1.0
+	_stam_bar.offset_left = 0
+	_stam_bar.offset_top = 0
+	_stam_bar.offset_right = 0
+	_stam_bar.offset_bottom = 0
+	_stam_root.add_child(_stam_bar)
 
 func _show_arrow(v: bool) -> void:
 	if arrow_shaft: arrow_shaft.visible = v
@@ -644,7 +718,7 @@ func _update_aim_server(delta: float) -> void:
 	var dist: float = maxf(vec.length(), aim_min_len)  # no upper clamp
 	aim_dir = vec.normalized()
 
-	_show_arrow(true)
+	if get_tree().get_multiplayer().get_unique_id() == owner_peer_id: _show_arrow(true)
 	aim_arrow.global_transform.origin = global_transform.origin
 	aim_arrow.look_at(aim_arrow.global_transform.origin + aim_dir, Vector3.UP)
 	aim_arrow.scale = Vector3(1.0, 1.0, dist)
