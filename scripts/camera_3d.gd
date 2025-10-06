@@ -78,6 +78,19 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif mb.button_index == MOUSE_BUTTON_WHEEL_DOWN:
 			distance = min(max_distance, distance + _wheel_step)
 
+# Camera3D script (add this function)
+# In your Camera3D script
+func set_aim_mode(on: bool) -> void:
+	_aim_mode = on
+	if _is_mobile:
+		return
+	_captured = not on
+	if _captured:
+		Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+	else:
+		Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+
+
 func _physics_process(delta: float) -> void:
 	if _target == null:
 		return
