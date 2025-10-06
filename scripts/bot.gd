@@ -1,26 +1,26 @@
 extends CharacterBody3D
 
-# --- References ----
-@export var ball_path: NodePath = NodePath("../Ball")        # Bot is at Scene/Bot → ball is Scene/Ball
-@export var goal_path: NodePath = NodePath("../../Goal_B")   # Root sibling
+@export var ball_path: NodePath = NodePath("../Ball")
+@export var goal_path: NodePath = NodePath("../../Goal_B")
 
-# --- Tuning ----
 @export var move_speed: float = 6.0
-@export var sprint_speed: float = 9.0
 @export var accel: float = 12.0
 @export var gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
-@export var stop_dist: float = 0.8           # stop before overlapping the ball
-@export var shoot_cooldown: float = 0.7
-@export var kick_power: float = 10.0
-@export var kick_up: float = 1.0
-@export var shoot_align_dot: float = 0.6     # 1 = perfectly lined up
+
+# --- Kick tuning ---
+@export var kick_range: float = 1.0          # how close to be to kick
+@export var kick_power: float = 18.0          # stronger so it’s obvious
+@export var kick_up: float = 0.6              # small lift so it doesn’t dig into ground
+@export var kick_align_dot: float = 0.2       # 0.2 = very permissive
+@export var shoot_cooldown: float = 0.5       # time between kicks
+@export var backoff_time: float = 0.35        # step back after kick
+@export var backoff_speed: float = 5.0
 
 var _ball: RigidBody3D
 var _goal: Node3D
-var _cooldown: float = 0.0
-
-enum { CHASE_BALL, LINE_UP_SHOT }
-var _state: int = CHASE_BALL
+var _cooldown := 0.0
+var _backoff_timer := 0.0
+var _backoff_dir := Vector3.ZERO
 
 func _ready() -> void:
 	_ball = get_node(ball_path) as RigidBody3D
@@ -33,38 +33,24 @@ func _physics_process(delta: float) -> void:
 	else:
 		velocity.y = 0.0
 
-	if _cooldown > 0.0:
-		_cooldown -= delta
+	if _cooldown > 0.0: _cooldown -= delta
+	if _backoff_timer > 0.0:
+		_backoff_timer -= delta
+		_move_towards(_backoff_dir, delta, backoff_speed)
+		move_and_slide()
+		return
 
-	var to_ball: Vector3 = _ball.global_transform.origin - global_transform.origin
+	# --- Chase the ball ---
+	var to_ball := _ball.global_transform.origin - global_transform.origin
 	to_ball.y = 0.0
-	var dist_to_ball := to_ball.length()
+	var dist := to_ball.length()
 	var dir_to_ball := Vector3.ZERO if to_ball == Vector3.ZERO else to_ball.normalized()
 
-
-	match _state:
-		CHASE_BALL:
-			_move_towards(dir_to_ball, delta, sprint_speed)
-			if dist_to_ball <= stop_dist:
-				_state = LINE_UP_SHOT
-
-		LINE_UP_SHOT:
-			var ball_to_goal := (_goal.global_transform.origin - _ball.global_transform.origin); ball_to_goal.y = 0.0
-			var bot_to_ball := (_ball.global_transform.origin - global_transform.origin); bot_to_ball.y = 0.0
-			var align := bot_to_ball.normalized().dot(ball_to_goal.normalized())
-
-			if align > shoot_align_dot and _cooldown <= 0.0:
-				_kick_towards_goal()
-				_cooldown = shoot_cooldown
-				_state = CHASE_BALL
-			else:
-				# move to a point behind the ball (opposite the goal) to line up a shot
-				var behind_point := _ball.global_transform.origin - ball_to_goal.normalized() * 1.2
-				var to_point := behind_point - global_transform.origin
-				to_point.y = 0.0
-				_move_towards(to_point.normalized(), delta, move_speed)
-				if dist_to_ball > stop_dist * 1.5:
-					_state = CHASE_BALL
+	# close enough? try to kick toward goal_B
+	if dist <= kick_range and _cooldown <= 0.0:
+		_try_kick()
+	else:
+		_move_towards(dir_to_ball, delta, move_speed)
 
 	move_and_slide()
 
@@ -75,16 +61,33 @@ func _move_towards(dir: Vector3, delta: float, target_speed: float) -> void:
 	velocity.x = h.x
 	velocity.z = h.z
 
-	# rotate to face motion
+	# face the movement direction
 	if dir != Vector3.ZERO:
-		var target_yaw := atan2(-dir.x, -dir.z) # -Z forward
-		var cur := rotation
-		cur.y = lerp_angle(cur.y, target_yaw, clamp(8.0 * delta, 0.0, 1.0))
-		rotation = cur
+		var yaw := atan2(-dir.x, -dir.z)
+		rotation.y = lerp_angle(rotation.y, yaw, clamp(8.0 * delta, 0.0, 1.0))
 
-func _kick_towards_goal() -> void:
+func _try_kick() -> void:
+	# compute direction from ball to goal
 	var ball_pos := _ball.global_transform.origin
-	var to_goal := _goal.global_transform.origin - ball_pos
+	var goal_pos := _goal.global_transform.origin
+	var to_goal := goal_pos - ball_pos
 	to_goal.y = 0.0
-	var impulse := to_goal.normalized() * kick_power + Vector3.UP * kick_up
-	_ball.apply_impulse(impulse)
+	var dir := Vector3.ZERO if to_goal == Vector3.ZERO else to_goal.normalized()
+
+	# (optional) require rough alignment of bot → ball with ball → goal
+	var bot_to_ball := _ball.global_transform.origin - global_transform.origin
+	bot_to_ball.y = 0.0
+	var aligned := (Vector3.ZERO if bot_to_ball == Vector3.ZERO else bot_to_ball.normalized()).dot(dir) > kick_align_dot
+
+	if aligned:
+		var impulse := dir * kick_power + Vector3.UP * kick_up
+		_ball.apply_impulse(impulse)
+		_cooldown = shoot_cooldown
+
+		# back off a little so we don’t stick to the ball
+		_backoff_dir = -dir
+		_backoff_timer = backoff_time
+	else:
+		# small nudge toward alignment if we’re on the wrong side
+		_backoff_dir = (ball_pos - goal_pos).normalized()
+		_backoff_timer = 0.2
