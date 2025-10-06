@@ -60,7 +60,8 @@ extends CharacterBody3D
 @export var stamina_sprint_drain: float = 25.0    # per second while sprinting
 @export var stamina_tackle_cost: float = 20.0     # one-time cost on tackle start
 @export var stamina_min_to_sprint: float = 5.0    # must be above this to sprint
-
+const LAYER_SELF_BIT := 10
+const LAYER_SELF := 1 << (LAYER_SELF_BIT - 1)
 # --- Stamina runtime (authoritative on server; replicated to owner) ---
 var _stamina: float = 100.0
 
@@ -128,6 +129,8 @@ func apply_net_input(d: Dictionary) -> void:
 func attach_camera(c: Camera3D) -> void:
 	cam = c
 	if cam:
+		cam.cull_mask &= ~LAYER_SELF    # camera won’t render your own 3P body
+		cam.near = max(cam.near, 0.1)
 		print("camera has been assigned in player")
 	else:
 		print("no camera was found to gget assigned in the player")

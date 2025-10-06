@@ -43,6 +43,7 @@ script = ExtResource("1_xhfnw")
 sprint_speed = 12.0
 
 [node name="Mesh" type="MeshInstance3D" parent="."]
+layers = 512
 mesh = SubResource("CapsuleMesh_2vmtx")
 
 [node name="PlayerCollision" type="CollisionShape3D" parent="."]
