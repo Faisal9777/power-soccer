@@ -157,16 +157,16 @@ uv1_scale = Vector3(8, 8, 8)
 
 [sub_resource type="BoxMesh" id="BoxMesh_wse8f"]
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_mc2jv"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_bo7i5"]
 albedo_color = Color(0.85, 0.85, 0.9, 1)
 metallic = 0.9
 roughness = 0.2
 
-[sub_resource type="ArrayMesh" id="ArrayMesh_bo7i5"]
+[sub_resource type="ArrayMesh" id="ArrayMesh_4h6ng"]
 _surfaces = [{
 "aabb": AABB(-0.559671, -0.0598102, -0.557261, 1.11934, 1.61962, 1.11452),
 "format": 34359738375,
-"material": SubResource("StandardMaterial3D_mc2jv"),
+"material": SubResource("StandardMaterial3D_bo7i5"),
 "primitive": 3,
 "uv_scale": Vector4(0, 0, 0, 0),
 "vertex_count": 12960,
@@ -241,6 +241,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 5, 0)
 collision_layer = 3
 collision_mask = 5
 script = ExtResource("1_f3sb7")
+joystick_path = NodePath("../../CanvasLayer/UI/JoyStick")
 
 [node name="Mesh" type="MeshInstance3D" parent="Scene/Player"]
 mesh = SubResource("CapsuleMesh_2vmtx")
@@ -549,7 +550,7 @@ spring_mesh_path = NodePath("SpringMesh")
 top_plate_root_path = NodePath("TopPlateRoot")
 
 [node name="SpringMesh" type="MeshInstance3D" parent="SpringPad"]
-mesh = SubResource("ArrayMesh_bo7i5")
+mesh = SubResource("ArrayMesh_4h6ng")
 script = ExtResource("8_gbfbk")
 
 [node name="TopPlateRoot" type="Node3D" parent="SpringPad"]
