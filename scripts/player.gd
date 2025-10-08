@@ -22,6 +22,8 @@ extends CharacterBody3D
 @export var charge_decay_speed: float = 1.5
 @export var charge_rate_mul: float = 2
 
+@export var shoot_cost_mul: float = 0.2
+
 @export var charge_min_mul: float = 0.03
 @export var charge_max_mul: float = 20
 @export var charge_curve: float = 12
@@ -50,6 +52,7 @@ extends CharacterBody3D
 @export var tackle_decel: float = 9.0
 @export var tackle_dur_curve: float = 1.6
 @export var tackle_speed_curve: float = 1.2
+@export var tackle_cost_mul: float = 0.5
 @export var tackle_require_floor: bool = true
 @export var owner_peer_id: int = 1
 @export var characters_layer_bit: int = 2
@@ -59,9 +62,14 @@ extends CharacterBody3D
 @export var stamina_regen_rate: float = 15.0      # per second
 @export var stamina_sprint_drain: float = 25.0    # per second while sprinting
 @export var stamina_tackle_cost: float = 20.0     # one-time cost on tackle start
-@export var stamina_min_to_sprint: float = 5.0    # must be above this to sprint
+@export var stamina_min_to_sprint: float = 5.0 
+@export var stamina_min_to_shoot: float = 10    # must be above this to sprint
+@export var stamina_min_to_jump: float = 15
+@export var stamina_min_to_dribble: float = 10
+@export var stamina_min_to_stop_ball: float = 10    
 const LAYER_SELF_BIT := 10
 const LAYER_SELF := 1 << (LAYER_SELF_BIT - 1)
+
 # --- Stamina runtime (authoritative on server; replicated to owner) ---
 var _stamina: float = 100.0
 
@@ -219,7 +227,6 @@ func simulate_server(delta: float) -> void:
 	_update_charge_server(delta)
 	apply_gravity(delta)
 	_face_camera_yaw(delta)
-
 	var input_dir := _get_input_dir_server()
 	_pre_move_vel = velocity
 	_handle_tackle_input_server(delta)
@@ -228,11 +235,17 @@ func simulate_server(delta: float) -> void:
 	_update_stamina_server(delta)
 
 func _can_perform(action: String, stamina_required : float) -> bool:
-	if action == "sprint" and _stamina > stamina_min_to_sprint:
+	
+	if _is_valid_action(action) and _stamina > stamina_min_to_sprint:
 		_stamina = maxf(0.0, _stamina - stamina_required)
-		_can_stamina_regen = false
 		return true
-	return false
+	if action == "stamina_regen":
+		if not tackle_active and is_on_floor():
+			return true
+	return false	
+
+func _is_valid_action(action: String) -> bool:
+	return ["sprint", "tackle", "shoot", "dribble", "jump", "stop"].has(action)
 
 func _update_stamina_ui_from_replication() -> void:
 	# _stamina is replicated from server → owner via MultiplayerSynchronizer
@@ -243,10 +256,8 @@ func _update_stamina_ui_from_replication() -> void:
 
 func _update_stamina_server(delta: float) -> void:
 	# Drain while actually sprinting & moving
-	if _can_stamina_regen:
-			_stamina = minf(stamina_max, _stamina + stamina_regen_rate * delta)
-	else:
-		_can_stamina_regen = true	
+	if _can_perform("stamina_regen", 0.0): 
+		_stamina = minf(stamina_max, _stamina + stamina_regen_rate * delta)	
 # --- Server versions of your previous methods (Input → _net) ---
 
 func _update_charge_server(delta: float) -> void:
@@ -300,7 +311,7 @@ func _move_server(input_dir: Vector3, delta: float) -> void:
 
 func _handle_jump_server() -> void:
 	var grounded := is_on_floor() or (ground_ray and ground_ray.is_colliding())
-	if grounded and _btn_just_pressed("jump") and _cooldowns["jump"] == 0.0:
+	if grounded and _btn_just_pressed("jump") and _cooldowns["jump"] == 0.0 and _can_perform("jump", stamina_min_to_jump):
 		velocity.y = jump_velocity
 		_cooldowns["jump"] = jump_cooldownn
 
@@ -312,7 +323,7 @@ func _handle_kick_action_server() -> void:
 	_handle_ball_stop_server()
 
 func _handle_ball_stop_server() -> void:
-	if _btn_down("stop_ball") and current_ball and is_instance_valid(current_ball):
+	if _btn_down("stop_ball") and current_ball and is_instance_valid(current_ball) and _can_perform("stop", stamina_min_to_stop_ball):
 		current_ball.linear_velocity = Vector3.ZERO
 		current_ball.angular_velocity = Vector3.ZERO
 		current_ball.sleeping = false
@@ -321,8 +332,10 @@ func _handle_ball_stop_server() -> void:
 func _handle_dribble_server() -> void:
 	if !_btn_down("dribble") or _cooldowns["shoot"] != 0.0:
 		return
+	#if not _can_perform("dribble", stamina_min_to_dribble): return
 	var mvx := float(_net["mvx"])
 	var mvz := float(_net["mvz"])
+	if mvx + mvz == 0 or not _can_perform("dribble", stamina_min_to_dribble): return 
 	if mvx < -0.2:
 		perform_dribble_server(-1); _cooldowns["shoot"] = dribble_cooldown
 	elif mvx > 0.2:
@@ -376,7 +389,7 @@ func _handle_shoot_server() -> void:
 func _kick_at_contact_server() -> void:
 	if !is_instance_valid(current_ball):
 		return
-
+	if not _can_perform("shoot", stamina_min_to_shoot + _charge*shoot_cost_mul): return
 	var C := current_ball.global_transform.origin
 	var R := _get_ball_radius(current_ball)
 
@@ -433,7 +446,7 @@ func _kick_at_contact_server() -> void:
 	_charge = 0.0
 	if is_instance_valid(_charge_bar):
 		_charge_bar.value = 0.0
-
+		
 # --- Tackle / latch (server) ---
 
 func _handle_tackle_input_server(delta: float) -> void:
@@ -446,6 +459,7 @@ func _handle_tackle_input_server(delta: float) -> void:
 
 
 func _start_tackle_server() -> void:
+
 	var fwd := -global_transform.basis.z; fwd.y = 0.0
 	if fwd.length() == 0.0: return
 	fwd = fwd.normalized()
@@ -455,13 +469,13 @@ func _start_tackle_server() -> void:
 	var s_norm := clampf(speed0 / maxf(0.001, sprint_speed), 0.0, 1.0)
 
 	var w_dur := pow(s_norm, maxf(1.0, tackle_dur_curve))
-	tackle_time_left = lerpf(tackle_dur_min, tackle_dur_max, w_dur)
-
+	
 	var slide_speed := clampf(speed0 * tackle_speed_mul, tackle_speed_min, tackle_speed_max)
 	var w_spd := pow(s_norm, maxf(1.0, tackle_speed_curve))
 	slide_speed = lerpf(slide_speed, tackle_speed_max, 0.25 * w_spd)
 	tackle_velocity = fwd * slide_speed
-
+	if not _can_perform("tackle", stamina_tackle_cost + tackle_cost_mul * slide_speed): return
+	tackle_time_left = lerpf(tackle_dur_min, tackle_dur_max, w_dur)
 	tackle_active = true
 
 	# Begin latch attempt; no reparent—server will tick-snap ball (see _tick_latch_ball_server)
@@ -476,7 +490,7 @@ func _start_tackle_server() -> void:
 		current_ball.freeze = true
 		current_ball.linear_velocity = Vector3.ZERO
 		current_ball.angular_velocity = Vector3.ZERO
-
+	
 func _update_tackle_server(delta: float) -> void:
 	# keep the ball glued while latched (server-side tick snap)
 	_tick_latch_ball_server()
