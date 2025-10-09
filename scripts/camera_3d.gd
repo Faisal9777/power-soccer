@@ -6,7 +6,7 @@ extends Camera3D
 # First-person head height
 @export var height: float = 1.6
 
-# Kept for compatibility (ignored in first-person unless > 0)
+# Distance: FP if ~0, TP if > 0
 @export var distance: float = 0.0
 @export var min_distance: float = 0.0
 @export var max_distance: float = 0.0
@@ -20,7 +20,9 @@ extends Camera3D
 
 @onready var _is_mobile: bool = OS.has_feature("mobile")
 var _look_touch_id: int = -1
-@export var lead_factor: float = 0.0   # 0 = off; try 0.1..0.25 to predict motion a bit
+
+@export var lead_factor: float = 0.0   # (not used yet) try 0.1..0.25 to lead targets slightly
+
 var _aim_mode: bool = false
 var _target: Node3D
 var _target_ball: Node3D
@@ -35,13 +37,62 @@ var _captured: bool = true
 func _ready() -> void:
 	_target = get_node_or_null(target_path)
 	_target_ball = get_node_or_null(ball_target_path)
-	current = true
-	_captured = true
-	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+	# Auto-activate on clients / editor. On dedicated servers, activation will no-op.
+	activate()
+
+# ----------------------------
+# Activation / Deactivation API
+# ----------------------------
+func activate() -> void:
+	# If this is a dedicated headless server, don't run a camera.
+	if OS.has_feature("server"):
+		_set_active(false)
+		return
+	_set_active(true)
+	# Mouse capture/visibility based on platform and aim state
 	if _is_mobile:
 		_captured = false
 		Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+	else:
+		_captured = true
+		Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 
+func deactivate() -> void:
+	_set_active(false)
+	# Release mouse if we had captured it
+	if Input.get_mouse_mode() == Input.MOUSE_MODE_CAPTURED:
+		Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+
+func _set_active(on: bool) -> void:
+	current = on
+	set_process(on)
+	set_physics_process(on)
+	set_process_input(on)
+	set_process_unhandled_input(on)
+
+# Optional helpers (useful for runtime swaps)
+func set_target(player: Node3D) -> void:
+	_target = player
+
+func set_ball(ball: Node3D) -> void:
+	_target_ball = ball
+
+# ----------------------------
+# Public toggle for UI/other code
+# ----------------------------
+func set_aim_mode(on: bool) -> void:
+	_aim_mode = on
+	if _is_mobile:
+		return
+	_captured = not on
+	if _captured:
+		Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+	else:
+		Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+
+# ----------------------------
+# Desktop input (mouse)
+# ----------------------------
 func _unhandled_input(event: InputEvent) -> void:
 	if _is_mobile:
 		return
@@ -70,7 +121,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		_pitch += mm.relative.y * mouse_sens * sy
 		_pitch = clamp(_pitch, _min_pitch, _max_pitch)
 
-	# Keep wheel handlers (no-op in FP since distance==0)
+	# Wheel zoom (no-op for FP unless you expose min/max > 0)
 	elif event is InputEventMouseButton and event.pressed:
 		var mb := event as InputEventMouseButton
 		if mb.button_index == MOUSE_BUTTON_WHEEL_UP:
@@ -78,75 +129,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif mb.button_index == MOUSE_BUTTON_WHEEL_DOWN:
 			distance = min(max_distance, distance + _wheel_step)
 
-# Camera3D script (add this function)
-# In your Camera3D script
-func set_aim_mode(on: bool) -> void:
-	_aim_mode = on
-	if _is_mobile:
-		return
-	_captured = not on
-	if _captured:
-		Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
-	else:
-		Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
-
-
-func _physics_process(delta: float) -> void:
-	if _target == null:
-		return
-
-	# Head/eye anchor on the player
-	var focus_player: Vector3 = _target.global_transform.origin + Vector3(0.0, height, 0.0)
-	var R := Basis(Vector3.UP, _yaw) * Basis(Vector3.RIGHT, _pitch)
-	var ball: Node3D = _target_ball
-	var has_ball: bool = ball != null
-
-	# ===== FIRST-PERSON (distance ~ 0) =====
-	if distance <= 0.05:
-		# Stick camera to head exactly; no smoothing, no prediction
-		global_transform = Transform3D(R, focus_player)
-
-		# If aiming, only adjust look direction
-		if _aim_mode and has_ball:
-			look_at(ball.global_transform.origin, Vector3.UP)
-		return
-
-	# ===== THIRD-PERSON (distance > 0) =====
-	# Compute desired boom position from yaw/pitch
-	var desired_pos: Vector3
-
-	if _aim_mode:
-		# Stay behind player when aiming (ignore mouse yaw/pitch)
-		var player_forward: Vector3 = (-_target.global_transform.basis.z).normalized()
-		desired_pos = focus_player - player_forward * distance
-	else:
-		# Normal mouse-orbit
-		desired_pos = focus_player + R * Vector3(0, 0, -distance)
-
-	# Wall avoidance from head to desired camera position
-	var space := get_world_3d().direct_space_state
-	var q := PhysicsRayQueryParameters3D.create(focus_player, desired_pos)
-	q.collision_mask = collision_mask
-	q.hit_from_inside = true
-	var hit := space.intersect_ray(q)
-	if hit.size() > 0:
-		var hit_pos: Vector3 = hit.position
-		var back_dir: Vector3 = (focus_player - hit_pos).normalized()
-		desired_pos = hit_pos + back_dir * collision_padding
-
-	# Smooth follow and apply rotation
-	var t: float = 1.0 - exp(-follow_speed * delta)
-	var new_pos := global_transform.origin.lerp(desired_pos, t)
-
-	# In normal mode, use R (mouse yaw/pitch). In aim mode, rotate to face ball/player.
-	if _aim_mode:
-		global_transform.origin = new_pos
-		if has_ball:
-			look_at(ball.global_transform.origin, Vector3.UP)
-		else:
-			look_at(focus_player + (-_target.global_transform.basis.z), Vector3.UP)
-	else:
-		global_transform = Transform3D(R, new_pos)
+# ----------------------------
+# Mobile input (touch look)
+# ----------------------------
 func _input(event: InputEvent) -> void:
 	if not _is_mobile:
 		return  # Desktop uses mouse code in _unhandled_input
@@ -168,3 +153,65 @@ func _input(event: InputEvent) -> void:
 		_yaw -= event.relative.x * mouse_sens
 		_pitch += event.relative.y * mouse_sens * sy
 		_pitch = clamp(_pitch, _min_pitch, _max_pitch)
+
+# ----------------------------
+# Camera follow / collision / FP/TP logic
+# ----------------------------
+func _physics_process(delta: float) -> void:
+	if _target == null:
+		return
+
+	var focus_player: Vector3 = _target.global_transform.origin + Vector3(0.0, height, 0.0)
+	var R := Basis(Vector3.UP, _yaw) * Basis(Vector3.RIGHT, _pitch)
+
+	var ball: Node3D = _target_ball
+	var has_ball: bool = ball != null
+
+	# ===== FIRST-PERSON (distance ~ 0) =====
+	if distance <= 0.05:
+		# Stick camera to head; apply rotation from yaw/pitch
+		global_transform = Transform3D(R, focus_player)
+
+		# If aiming and we have a ball, only twist to face the ball (no position change)
+		if _aim_mode and has_ball:
+			look_at(ball.global_transform.origin, Vector3.UP)
+		return
+
+	# ===== THIRD-PERSON (boom) =====
+	var desired_pos: Vector3
+	if _aim_mode:
+		# Stay behind player in aim (ignore mouse yaw/pitch for position)
+		var player_forward: Vector3 = (-_target.global_transform.basis.z).normalized()
+		desired_pos = focus_player - player_forward * distance
+	else:
+		# Normal mouse-orbit
+		desired_pos = focus_player + R * Vector3(0, 0, -distance)
+
+	# Wall avoidance from head to desired camera position
+	var space := get_world_3d().direct_space_state
+	var q := PhysicsRayQueryParameters3D.create(focus_player, desired_pos)
+	q.collision_mask = collision_mask
+	q.hit_from_inside = true
+	var hit := space.intersect_ray(q)
+	if hit.size() > 0:
+		var hit_pos: Vector3 = hit.position
+		var back_dir: Vector3 = (focus_player - hit_pos).normalized()
+		desired_pos = hit_pos + back_dir * collision_padding
+
+	# Smooth follow and apply rotation
+	var t: float = 1.0 - exp(-follow_speed * delta)
+	var new_pos := global_transform.origin.lerp(desired_pos, t)
+
+	if _aim_mode:
+		# In aim, position behind player and rotate to ball/player forward
+		global_transform.origin = new_pos
+		if has_ball:
+			# Optional leading (if you wire ball velocity into a variable)
+			# var lead := ball.get("linear_velocity") * lead_factor if available
+			# look_at(ball.global_transform.origin + lead, Vector3.UP)  # when you have 'lead'
+			look_at(ball.global_transform.origin, Vector3.UP)
+
+		else:
+			look_at(focus_player + (-_target.global_transform.basis.z), Vector3.UP)
+	else:
+		global_transform = Transform3D(R, new_pos)
