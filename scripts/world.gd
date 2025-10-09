@@ -175,8 +175,10 @@ func _send_local_input() -> void:
 		return
 	var d := _gather_input()
 	if _players.has(1):
+		print("_players.has(1)")
 		var p: CharacterBody3D = _players[1]
 		if p and p.has_method("apply_net_input"):
+			print("_players.has(1)2")
 			p.apply_net_input(d)
 	else:
 		# Client: only send if we’re actually connected to the server (peer 1)
@@ -189,9 +191,12 @@ func _send_local_input() -> void:
 @rpc("any_peer")
 func _rpc_client_input(from_id: int, d: Dictionary) -> void:
 	#print("the input is coming from the player: ", from_id)
+	print("_rpc_client_input")
 	if _players.has(from_id):
+		print("_rpc_client_input2")
 		var p: CharacterBody3D = _players[from_id]
 		if p and p.has_method("apply_net_input"):
+			print("_rpc_client_input3")
 			p.apply_net_input(d)
 			
 

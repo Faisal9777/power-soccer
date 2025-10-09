@@ -67,9 +67,9 @@ extends CharacterBody3D
 @export var stamina_min_to_jump: float = 15
 @export var stamina_min_to_dribble: float = 10
 @export var stamina_min_to_stop_ball: float = 10    
-const LAYER_SELF_BIT := 10
-const LAYER_SELF := 1 << (LAYER_SELF_BIT - 1)
-
+const SELF_LAYER_UI := 19                     # the checkbox number in the inspector
+const SELF_LAYER_MASK := 1 << (SELF_LAYER_UI - 1)  # convert 1..20 -> bit 0..19
+const WORLD_LAYER_MASK := 1 << 0   # Layer 1 (default / visible to camera)
 # --- Stamina runtime (authoritative on server; replicated to owner) ---
 var _stamina: float = 100.0
 
@@ -136,12 +136,48 @@ func apply_net_input(d: Dictionary) -> void:
 			_net[k] = d[k]
 func attach_camera(c: Camera3D) -> void:
 	cam = c
-	if cam:
-		cam.cull_mask &= ~LAYER_SELF    # camera won’t render your own 3P body
-		cam.near = max(cam.near, 0.1)
-		print("camera has been assigned in player")
-	else:
-		print("no camera was found to gget assigned in the player")
+	if cam and _is_local_owner():
+		#print("hiding mesh for player: ", owner_peer_id)
+		#_log_pid("done in: ")
+	# Tag ONLY this player's visuals with the extra bit (additive!)
+		_mark_self_layer_recursive(self)
+		#_disable_self_shadows_recursive(self)
+		# Cull only this extra bit on this camera
+		cam.cull_mask &= ~SELF_LAYER_MASK
+		cam.current = true
+		cam.near = max(cam.near, 0.12) # small near-plane helps
+
+#func _debug_list_visible_to_cam():
+	#if cam == null: return
+	#for ch in get_tree().get_nodes_in_group("**unused**"): pass # no group? do recursive walk
+	#_debug_walk(self)
+#
+#func _debug_walk(n: Node) -> void:
+	#for ch in n.get_children():
+		#if ch is VisualInstance3D:
+			#var vi := ch as VisualInstance3D
+			#if (vi.layers & cam.cull_mask) != 0:
+				#print("Still visible: ", vi.get_path(), " layers=", vi.layers)
+		#_debug_walk(ch)
+
+func _mark_self_layer_recursive(n: Node) -> void:
+	for ch in n.get_children():
+		# Skip the whole arrow subtree
+		if aim_arrow and (ch == aim_arrow or aim_arrow.is_ancestor_of(ch)):
+			continue
+
+		if ch is VisualInstance3D:
+			var v := ch as VisualInstance3D
+			# add self bit, drop world bit (local-only)
+			v.layers = (v.layers | SELF_LAYER_MASK) & ~WORLD_LAYER_MASK
+			v.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+
+		_mark_self_layer_recursive(ch)
+func _disable_self_shadows_recursive(n: Node) -> void:
+	for ch in n.get_children():
+		if ch is GeometryInstance3D and (ch.layers & SELF_LAYER_MASK) != 0:
+			ch.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		_disable_self_shadows_recursive(ch)
 
 # --- Helpers to read net "buttons" ---
 func _btn_down(name: String) -> bool:
@@ -186,12 +222,18 @@ func _ready() -> void:
 func _log_pid(msg : String) -> void:
 	print(msg, OS.get_process_id())
 func _physics_process(delta: float) -> void:
+	if _btn_just_released("shoot"):
+		print("shoot button was released detected from physics process")
 	# Approach #2: only the SERVER simulates gameplay.
 	if !multiplayer.is_server():
 		return
 	simulate_server(delta)
 
 func _process(delta: float) -> void:
+	if _btn_just_released("shoot"):
+		print("shoot button was released detected from process")
+	if Input.is_action_just_released("shoot"):
+		print("shoot button was released detected from process when listened purely in player.gd")
 	if get_tree().get_multiplayer().get_unique_id() == owner_peer_id: _update_local_changes(delta)
 	if not show_aim_arrow or aim_arrow == null:
 		return
@@ -210,7 +252,8 @@ func _process(delta: float) -> void:
 	aim_arrow.look_at(aim_arrow.global_transform.origin + n, Vector3.UP)
 	aim_arrow.scale = Vector3(1.0, 1.0, dist)
 # --- Server gameplay loop (moved out of _physics_process for clarity) ---
-
+func _is_local_owner() -> bool:
+	return get_tree().get_multiplayer().get_unique_id() == owner_peer_id
 func _update_local_changes(delta: float) -> void:
 	if _charge_bar :
 		_update_charge_ui_from_replication()
@@ -384,6 +427,7 @@ func perform_dribble_server(direction: int) -> void:
 func _handle_shoot_server() -> void:
 	# Use edge up for the release shot
 	if aim_active and current_ball != null and _btn_just_released("shoot"):
+		print("shoot all conditions have been met")
 		_kick_at_contact_server()
 
 func _kick_at_contact_server() -> void:
@@ -575,17 +619,19 @@ func _face_camera_yaw(delta: float) -> void:
 	rotation = cur
 
 func _ensure_aim_arrow() -> void:
-	# purely visual; clients render it. Server won't show UI.
 	if !show_aim_arrow: return
 	aim_arrow = Node3D.new()
 	aim_arrow.name = "AimArrow"
 	add_child(aim_arrow)
+
 	arrow_shaft = MeshInstance3D.new()
 	var shaft_mesh := BoxMesh.new()
 	shaft_mesh.size = Vector3(0.08, 0.08, 1.0)
 	arrow_shaft.mesh = shaft_mesh
 	arrow_shaft.position = Vector3(0, 0, -0.5)
+	arrow_shaft.layers = WORLD_LAYER_MASK    # ensure visible to camera
 	aim_arrow.add_child(arrow_shaft)
+
 	arrow_head = MeshInstance3D.new()
 	var head_mesh := CylinderMesh.new()
 	head_mesh.top_radius = 0.0
@@ -594,7 +640,9 @@ func _ensure_aim_arrow() -> void:
 	arrow_head.mesh = head_mesh
 	arrow_head.rotation_degrees.x = 90.0
 	arrow_head.position = Vector3(0, 0, -1.0)
+	arrow_head.layers = WORLD_LAYER_MASK     # ensure visible to camera
 	aim_arrow.add_child(arrow_head)
+
 	_show_arrow(false)
 
 func _init_charge_ui() -> void:
