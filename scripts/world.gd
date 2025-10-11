@@ -10,7 +10,11 @@ var _players: Dictionary[int, CharacterBody3D] = {}    # { int: Node }
 # Input pump
 const NET_INPUT_HZ: float = 30.0
 var _input_accum: float = 0.0
-var tackle_inp := false
+var  tackle_edge_latched := false
+var  stop_ball_edge_latched := false
+var  jump_edge_latched := false
+var  shoot_edge_latched := false
+
 func _ready() -> void:
 	
 	# If you didn't set the spawner in the editor, do it here:
@@ -36,14 +40,34 @@ func _ready() -> void:
 		_players[1] = pre
 		print("Registered preplaced Player as host player; authority=", pre.get_multiplayer_authority())
 func _physics_process(delta: float) -> void:
-	var inputs := _gather_input()
-	_send_local_input(inputs) 
-	#_input_accum += delta
-	#var step: float = 1.0 / NET_INPUT_HZ
-	#while _input_accum >= step:
-		#_input_accum -= step
-		#_send_local_input(inputs)
-		#tackle_inp = false
+	#if  Input.is_action_just_pressed("tackle"): print("tackle input was detected in physics process")
+	#var inputs := _gather_input()
+	#_send_local_input(inputs)
+	_update_inputs() 
+	_input_accum += delta
+	var step: float = 1.0 / NET_INPUT_HZ
+	while _input_accum >= step:
+		_input_accum -= step
+		_send_local_input()
+		_reset_inputs()
+
+func _update_inputs() -> void:
+	if Input.is_action_just_pressed("jump") and not jump_edge_latched:
+		jump_edge_latched = true
+	if Input.is_action_just_pressed("tackle") and not tackle_edge_latched:
+		tackle_edge_latched = true			
+	if Input.is_action_just_pressed("stop_ball") and not stop_ball_edge_latched:
+		stop_ball_edge_latched = true		
+	if Input.is_action_just_released("shoot") and not shoot_edge_latched:
+		shoot_edge_latched = true	
+
+func _reset_inputs() -> void:
+	jump_edge_latched = false
+	tackle_edge_latched = false
+	stop_ball_edge_latched = false
+	shoot_edge_latched = false
+
+
 func _process(delta: float) -> void:
 	if Input.is_action_just_pressed("check_user"):
 		_log_pid("in process")
@@ -164,25 +188,22 @@ func _gather_input() -> Dictionary:
 		"mvx": mvx,
 		"mvz": mvz,
 		"sprint": Input.is_action_pressed("sprint"),
-		"jump_pressed": Input.is_action_just_pressed("jump"),
-		"tackle_pressed": Input.is_action_just_pressed("tackle"),
+		"jump_pressed": jump_edge_latched,
+		"tackle_pressed": tackle_edge_latched,
 		"dribble": Input.is_action_pressed("dribble"),
-		"stop_ball": Input.is_action_pressed("stop_ball"),
+		"stop_ball": stop_ball_edge_latched,
 		"shoot_down": Input.is_action_pressed("shoot"),
-		"shoot_up": Input.is_action_just_released("shoot"),
+		"shoot_up": shoot_edge_latched,
 		"rmb": Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT),
 		"cam_yaw": yaw
 	}
-func _get_input(event: String) -> int:
-	return tackle_inp
-	if Input.is_action_just_pressed(event): return 1 
-	return 0
-func _send_local_input(d:Dictionary) -> void:
+#
+func _send_local_input() -> void:
 	# 0) If there is no network peer yet (single-player / not joined / not hosting), do nothing
 	if multiplayer.multiplayer_peer == null:
 		print("no player has joined yet")
 		return
-	#var d := _gather_input()
+	var d := _gather_input()
 	if _players.has(1):
 		#print("_players.has(1)")
 		var p: CharacterBody3D = _players[1]
