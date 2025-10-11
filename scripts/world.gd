@@ -10,7 +10,7 @@ var _players: Dictionary[int, CharacterBody3D] = {}    # { int: Node }
 # Input pump
 const NET_INPUT_HZ: float = 30.0
 var _input_accum: float = 0.0
-
+var tackle_inp := false
 func _ready() -> void:
 	
 	# If you didn't set the spawner in the editor, do it here:
@@ -35,7 +35,15 @@ func _ready() -> void:
 		pre.set_multiplayer_authority(1)
 		_players[1] = pre
 		print("Registered preplaced Player as host player; authority=", pre.get_multiplayer_authority())
-
+func _physics_process(delta: float) -> void:
+	var inputs := _gather_input()
+	_send_local_input(inputs) 
+	#_input_accum += delta
+	#var step: float = 1.0 / NET_INPUT_HZ
+	#while _input_accum >= step:
+		#_input_accum -= step
+		#_send_local_input(inputs)
+		#tackle_inp = false
 func _process(delta: float) -> void:
 	if Input.is_action_just_pressed("check_user"):
 		_log_pid("in process")
@@ -54,11 +62,11 @@ func _process(delta: float) -> void:
 	#print("am i connected? ", multiplayer.multiplayer_peer != null and multiplayer.is_server())
 	#print("total numbers of players joined: ", multiplayer.get_peers())
 	# Input pump
-	_input_accum += delta
-	var step: float = 1.0 / NET_INPUT_HZ
-	while _input_accum >= step:
-		_input_accum -= step
-		_send_local_input()
+	#_input_accum += delta
+	#var step: float = 1.0 / NET_INPUT_HZ
+	#while _input_accum >= step:
+		#_input_accum -= step
+		#_send_local_input()
 
 func _is_really_hosting() -> bool:
 	return multiplayer.multiplayer_peer is ENetMultiplayerPeer and multiplayer.is_server()
@@ -151,8 +159,6 @@ func _gather_input() -> Dictionary:
 		var me: CharacterBody3D = _players.get(multiplayer.get_unique_id(), null) as CharacterBody3D
 		if me:
 			yaw = me.rotation.y
-			
-	
 	
 	return {
 		"mvx": mvx,
@@ -167,18 +173,21 @@ func _gather_input() -> Dictionary:
 		"rmb": Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT),
 		"cam_yaw": yaw
 	}
-
-func _send_local_input() -> void:
+func _get_input(event: String) -> int:
+	return tackle_inp
+	if Input.is_action_just_pressed(event): return 1 
+	return 0
+func _send_local_input(d:Dictionary) -> void:
 	# 0) If there is no network peer yet (single-player / not joined / not hosting), do nothing
 	if multiplayer.multiplayer_peer == null:
 		print("no player has joined yet")
 		return
-	var d := _gather_input()
+	#var d := _gather_input()
 	if _players.has(1):
-		print("_players.has(1)")
+		#print("_players.has(1)")
 		var p: CharacterBody3D = _players[1]
 		if p and p.has_method("apply_net_input"):
-			print("_players.has(1)2")
+			#print("_players.has(1)2")
 			p.apply_net_input(d)
 	else:
 		# Client: only send if we’re actually connected to the server (peer 1)
@@ -191,12 +200,12 @@ func _send_local_input() -> void:
 @rpc("any_peer")
 func _rpc_client_input(from_id: int, d: Dictionary) -> void:
 	#print("the input is coming from the player: ", from_id)
-	print("_rpc_client_input")
+	#print("_rpc_client_input")
 	if _players.has(from_id):
-		print("_rpc_client_input2")
+		#print("_rpc_client_input2")
 		var p: CharacterBody3D = _players[from_id]
 		if p and p.has_method("apply_net_input"):
-			print("_rpc_client_input3")
+			#print("_rpc_client_input3")
 			p.apply_net_input(d)
 			
 

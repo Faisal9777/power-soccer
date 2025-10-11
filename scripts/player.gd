@@ -134,6 +134,12 @@ func apply_net_input(d: Dictionary) -> void:
 	for k in _net.keys():
 		if d.has(k):
 			_net[k] = d[k]
+			#if k == "tackle_pressed":
+				##print("net[k]: ", _net[k])
+				##print("d[k]: ", d[k])
+				#_net[k] = _net[k] + d[k]
+			#else:
+				#_net[k] = d[k]
 func attach_camera(c: Camera3D) -> void:
 	cam = c
 	if cam and _is_local_owner():
@@ -494,12 +500,22 @@ func _kick_at_contact_server() -> void:
 # --- Tackle / latch (server) ---
 
 func _handle_tackle_input_server(delta: float) -> void:
+	
+	#if _net["tackle_pressed"] == 0: return
+	#_net["tackle_pressed"] = _net["tackle_pressed"] - 1
+	var can_perform : bool = _net["tackle_pressed"]
+	#if _net["tackle_pressed"]>0:
+		#print("the tackle pressed counter: ", _net["tackle_pressed"])
+		#_net["tackle_pressed"] = _net["tackle_pressed"] - 1
+		#can_perform = true  
 	if tackle_active: 
 		_update_tackle_server(delta)
 		return
-	if !_btn_just_pressed("tackle"): return
+	#if !_btn_just_pressed("tackle"): return
+	#if not Input.is_action_just_pressed("tackle"): return
 	if tackle_require_floor and !is_on_floor(): return
-	_start_tackle_server()
+	if can_perform : _start_tackle_server()
+	#_net["tackle_pressed"] = false
 
 
 func _start_tackle_server() -> void:
