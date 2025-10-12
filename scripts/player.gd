@@ -80,6 +80,7 @@ var _stam_bar: ProgressBar
 var _can_stamina_regen : bool = true
 
 # --- Runtime state ---
+var current_ball_path: NodePath = NodePath("")
 var current_ball: RigidBody3D = null
 var aim_active: bool = false
 var aim_dir: Vector3 = Vector3.ZERO
@@ -221,57 +222,170 @@ func _ready() -> void:
 	
 	_ensure_aim_arrow()
 	if is_local:
-		_init_charge_ui()
-		_init_stamina_ui()
-	else:
-		print("was not local so not creating charge bar")
+		_client_side_setup()
+	
 func _log_pid(msg : String) -> void:
 	print(msg, OS.get_process_id())
+
+func _client_side_setup() -> void:
+	_init_charge_ui()
+	_init_stamina_ui()
+	physics_interpolation_mode = Node3D.PHYSICS_INTERPOLATION_MODE_ON
+
 func _physics_process(delta: float) -> void:
-	if _btn_just_released("shoot"):
-		print("shoot button was released detected from physics process")
 	# Approach #2: only the SERVER simulates gameplay.
 	if !multiplayer.is_server():
 		return
 	simulate_server(delta)
 
 func _process(delta: float) -> void:
-	if _btn_just_released("shoot"):
-		print("shoot button was released detected from process")
-	if Input.is_action_just_released("shoot"):
-		print("shoot button was released detected from process when listened purely in player.gd")
-	if get_tree().get_multiplayer().get_unique_id() == owner_peer_id: _update_local_changes(delta)
-	if not show_aim_arrow or aim_arrow == null:
+	
+	if get_tree().get_multiplayer().get_unique_id() == owner_peer_id: 
+		_local_process(delta)
+
+	#if not show_aim_arrow or aim_arrow == null:
+		#return
+	#if not aim_active:
+		#_show_arrow(false); return
+#
+	#var vec := aim_contact - global_transform.origin
+	#if vec == Vector3.ZERO:
+		#_show_arrow(false); return
+#
+	#var dist := maxf(vec.length(), aim_min_len)
+	#var n := vec.normalized()
+	#if get_tree().get_multiplayer().get_unique_id() == owner_peer_id:
+		#_show_arrow(true)
+	#aim_arrow.global_transform.origin = global_transform.origin
+	#aim_arrow.look_at(aim_arrow.global_transform.origin + n, Vector3.UP)
+	#aim_arrow.scale = Vector3(1.0, 1.0, dist)
+func _update_arrow_position(delta: float) -> void:
+	var ball: RigidBody3D = _resolve_ball() as RigidBody3D
+	if aim_arrow == null or ball == null or !is_instance_valid(ball) or !aim_active:
+		_show_arrow(false)
 		return
-	if not aim_active:
-		_show_arrow(false); return
 
-	var vec := aim_contact - global_transform.origin
+	# Interpolated poses for smooth visuals
+	var pxf: Transform3D = get_global_transform_interpolated()
+	var bxf: Transform3D = ball.get_global_transform_interpolated()
+	var P: Vector3 = pxf.origin
+	var C: Vector3 = bxf.origin
+	var R: float = _get_ball_radius(ball)
+
+	var contact: Vector3 = Vector3.ZERO
+	var cam: Camera3D = get_viewport().get_camera_3d()
+
+	if _is_aiming() and cam != null:
+		# Mouse-driven contact (ray → sphere)
+		var mp: Vector2 = get_viewport().get_mouse_position()
+		var ro: Vector3 = cam.project_ray_origin(mp)
+		var rd: Vector3 = cam.project_ray_normal(mp).normalized()
+
+		var oc: Vector3 = ro - C
+		var bq: float = 2.0 * rd.dot(oc)
+		var cq: float = oc.dot(oc) - R * R
+		var disc: float = bq * bq - 4.0 * cq
+
+		var hit: Vector3 = Vector3.ZERO
+		if disc >= 0.0:
+			var sd: float = sqrt(disc)
+			var t1: float = (-bq - sd) * 0.5
+			var t2: float = (-bq + sd) * 0.5
+			var t: float = -1.0
+			if t1 > 0.0:
+				t = t1
+			elif t2 > 0.0:
+				t = t2
+			if t > 0.0:
+				hit = ro + rd * t
+
+		if hit != Vector3.ZERO:
+			contact = hit
+		else:
+			# Fallback: closest point on ray, projected to sphere surface
+			var t_closest: float = maxf(-rd.dot(oc), 0.0)
+			var closest: Vector3 = ro + rd * t_closest
+			var dir_to: Vector3 = closest - C
+			if dir_to == Vector3.ZERO:
+				dir_to = P - C
+			contact = C + dir_to.normalized() * R
+	else:
+		# Front-facing surface toward the player (no mouse aim)
+		var dir: Vector3 = (C - P).normalized()
+		contact = C - dir * R
+
+	# Exponential-style smoothing (frame-rate friendly)
+	var smooth: float = 1.0 - pow(1.0 - 0.14, maxf(delta * 60.0, 0.0))
+	aim_contact = aim_contact.lerp(contact, clamp(smooth, 0.0, 1.0))
+
+	var vec: Vector3 = aim_contact - P
 	if vec == Vector3.ZERO:
-		_show_arrow(false); return
+		_show_arrow(false)
+		return
 
-	var dist := maxf(vec.length(), aim_min_len)
-	var n := vec.normalized()
-	if get_tree().get_multiplayer().get_unique_id() == owner_peer_id:
-		_show_arrow(true)
-	aim_arrow.global_transform.origin = global_transform.origin
-	aim_arrow.look_at(aim_arrow.global_transform.origin + n, Vector3.UP)
-	aim_arrow.scale = Vector3(1.0, 1.0, dist)
+	_show_arrow(multiplayer.get_unique_id() == owner_peer_id)
+
+	# Prefer world-space arrow to avoid parent-induced jitter
+	aim_arrow.global_position = P
+	aim_arrow.look_at(P + vec.normalized(), Vector3.UP)
+	aim_arrow.scale = Vector3(1.0, 1.0, maxf(vec.length(), aim_min_len))
+func _ray_sphere_contact(ro: Vector3, rd: Vector3, center: Vector3, radius: float) -> Vector3:
+	var oc: Vector3 = ro - center
+	var b: float = 2.0 * rd.dot(oc)
+	var c: float = oc.dot(oc) - radius * radius
+	var disc: float = b * b - 4.0 * c
+
+	if disc >= 0.0:
+		var sd: float = sqrt(disc)
+		var t1: float = (-b - sd) * 0.5
+		var t2: float = (-b + sd) * 0.5
+		var t: float = -1.0
+		if t1 > 0.0:
+			t = t1
+		elif t2 > 0.0:
+			t = t2
+		if t > 0.0:
+			return ro + rd * t
+
+	# ---- your lines, with types + maxf() ----
+	var t_closest: float = -rd.dot(oc)
+	var closest: Vector3 = ro + rd * maxf(t_closest, 0.0)
+	var dir_to: Vector3 = closest - center
+	# -----------------------------------------
+
+	if dir_to == Vector3.ZERO:
+		dir_to = ro - center
+	return center + dir_to.normalized() * radius
+
+func _resolve_ball() -> RigidBody3D:
+	if String(current_ball_path) == "":
+		current_ball = null
+		return null
+	# If cached and still valid, reuse
+	if current_ball != null and is_instance_valid(current_ball):
+		if current_ball.get_path() == current_ball_path:
+			return current_ball
+	# Resolve fresh
+	current_ball = get_node_or_null(current_ball_path) as RigidBody3D
+	return current_ball
+
 # --- Server gameplay loop (moved out of _physics_process for clarity) ---
 func _is_local_owner() -> bool:
 	return get_tree().get_multiplayer().get_unique_id() == owner_peer_id
-func _update_local_changes(delta: float) -> void:
+func _local_process(delta: float) -> void:
 	if _charge_bar :
 		_update_charge_ui_from_replication()
 	if _stam_bar:
 		_update_stamina_ui_from_replication()
-
+	_update_arrow_position(delta)
 func _update_charge_ui_from_replication() -> void:
 	# _charge here is replicated from the server via MultiplayerSynchronizer
 	_charge_bar.value = _charge * 100.0
 	_charge_bar.visible = _charge > 0.001 or _net["shoot_down"]
 
 func simulate_server(delta: float) -> void:
+	if current_ball_path:
+		_resolve_ball() 
 	_update_cooldowns(delta)
 	_update_charge_server(delta)
 	apply_gravity(delta)
@@ -280,7 +394,7 @@ func simulate_server(delta: float) -> void:
 	_pre_move_vel = velocity
 	_handle_tackle_input_server(delta)
 	_handle_action_server(input_dir, delta)
-	_update_aim_server(delta)
+	#_update_aim_server(delta)
 	_update_stamina_server(delta)
 
 func _can_perform(action: String, stamina_required : float) -> bool:
@@ -786,40 +900,45 @@ func _update_aim_server(delta: float) -> void:
 				dir_to = global_transform.origin - C
 			contact = C + dir_to.normalized() * R
 		aim_contact = contact
-	else:
-		# --- Fixed contact: front-facing surface toward the player (no mouse)
-		var dir := (C - global_transform.origin).normalized()
-		aim_contact = C - dir * R
-
-	# Common: drive the arrow from player -> contact
-	var vec: Vector3 = aim_contact - global_transform.origin
-	if vec == Vector3.ZERO:
-		_show_arrow(false)
-		return
-	var dist: float = maxf(vec.length(), aim_min_len)  # no upper clamp
-	aim_dir = vec.normalized()
-
-	if get_tree().get_multiplayer().get_unique_id() == owner_peer_id: _show_arrow(true)
-	aim_arrow.global_transform.origin = global_transform.origin
-	aim_arrow.look_at(aim_arrow.global_transform.origin + aim_dir, Vector3.UP)
-	aim_arrow.scale = Vector3(1.0, 1.0, dist)
+	#else:
+		## --- Fixed contact: front-facing surface toward the player (no mouse)
+		#var dir := (C - global_transform.origin).normalized()
+		#aim_contact = C - dir * R
+#
+	## Common: drive the arrow from player -> contact
+	#var vec: Vector3 = aim_contact - global_transform.origin
+	#if vec == Vector3.ZERO:
+		#_show_arrow(false)
+		#return
+	#var dist: float = maxf(vec.length(), aim_min_len)  # no upper clamp
+	#aim_dir = vec.normalized()
+#
+	#if get_tree().get_multiplayer().get_unique_id() == owner_peer_id: _show_arrow(true)
+	#aim_arrow.global_transform.origin = global_transform.origin
+	#aim_arrow.look_at(aim_arrow.global_transform.origin + aim_dir, Vector3.UP)
+	#aim_arrow.scale = Vector3(1.0, 1.0, dist)
 func _is_aiming() -> bool:
-	return aim_active and _net["rmb"]
+	return aim_active and Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)
 # KickArea hooks
 func _on_kick_area_body_entered(body: Node) -> void:
-	if not multiplayer.is_server(): return
+	if not multiplayer.is_server():
+		return
 	if body is RigidBody3D and body.is_in_group("ball"):
-		current_ball = body
-		aim_active = true
-		var C := current_ball.global_transform.origin
-		var R := _get_ball_radius(current_ball)
-		var dir := (C - global_transform.origin).normalized()
-		aim_contact = C - dir * R
-		aim_dir = (aim_contact - global_transform.origin).normalized()
+		var ball := body as RigidBody3D
 
+		#var C: Vector3 = ball.global_transform.origin
+		#var P: Vector3 = global_transform.origin
+		#var dir: Vector3 = (C - P).normalized()
+
+		current_ball_path = ball.get_path()
+		aim_active = true
+		#var R: float = _get_ball_radius(ball)
+		#aim_contact = C - dir * R
+		#aim_dir = (aim_contact - P).normalized()
 func _on_kick_area_body_exited(body: Node) -> void:
 	if not multiplayer.is_server(): return
 	if body == current_ball:
 		current_ball = null
+		current_ball_path = NodePath("")
 		aim_active = false
 		_show_arrow(false)
