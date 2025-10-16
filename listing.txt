@@ -1,0 +1,1573 @@
+ Volume in drive C is WINDOWS
+ Volume Serial Number is D122-C5F7
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo
+
+09/23/2025  03:50 PM    <DIR>          .
+09/23/2025  03:50 PM    <DIR>          ..
+09/17/2025  03:16 PM                80 .gitattributes
+09/17/2025  07:12 PM               258 .gitignore
+09/23/2025  03:26 PM    <DIR>          .godot
+09/17/2025  03:16 PM    <DIR>          docs
+09/17/2025  03:16 PM               950 icon.svg
+09/17/2025  03:18 PM               842 icon.svg.import
+09/23/2025  03:50 PM                 0 listing.txt
+09/23/2025  03:26 PM             1,050 Network.gd
+09/23/2025  03:26 PM                20 Network.gd.uid
+09/17/2025  03:16 PM               960 Player.gd
+09/20/2025  09:27 AM                20 Player.gd.uid
+09/23/2025  03:26 PM             4,760 project.godot
+09/17/2025  03:16 PM               927 README.md
+09/23/2025  11:17 AM    <DIR>          scripts
+09/23/2025  02:53 PM             3,859 world.tscn
+              12 File(s)         13,726 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.git
+
+09/23/2025  11:21 AM                26 COMMIT_EDITMSG
+09/23/2025  11:20 AM               531 config
+09/17/2025  03:16 PM                73 description
+09/19/2025  06:01 PM               237 FETCH_HEAD
+09/19/2025  05:41 PM                41 HEAD
+09/17/2025  03:16 PM    <DIR>          hooks
+09/23/2025  11:21 AM             1,519 index
+09/17/2025  03:16 PM    <DIR>          info
+09/17/2025  03:16 PM    <DIR>          logs
+09/23/2025  11:21 AM    <DIR>          objects
+09/19/2025  06:02 PM                41 ORIG_HEAD
+09/17/2025  07:18 PM                46 packed-refs
+09/17/2025  03:16 PM    <DIR>          refs
+               8 File(s)          2,514 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.git\hooks
+
+09/17/2025  03:16 PM    <DIR>          .
+09/17/2025  03:16 PM    <DIR>          ..
+09/17/2025  03:16 PM               478 applypatch-msg.sample
+09/17/2025  03:16 PM               896 commit-msg.sample
+09/17/2025  03:16 PM             4,726 fsmonitor-watchman.sample
+09/17/2025  03:16 PM               189 post-update.sample
+09/17/2025  03:16 PM               424 pre-applypatch.sample
+09/17/2025  03:16 PM             1,643 pre-commit.sample
+09/17/2025  03:16 PM               416 pre-merge-commit.sample
+09/17/2025  03:16 PM             1,374 pre-push.sample
+09/17/2025  03:16 PM             4,898 pre-rebase.sample
+09/17/2025  03:16 PM               544 pre-receive.sample
+09/17/2025  03:16 PM             1,492 prepare-commit-msg.sample
+09/17/2025  03:16 PM             2,783 push-to-checkout.sample
+09/17/2025  03:16 PM             3,650 update.sample
+              13 File(s)         23,513 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.git\info
+
+09/17/2025  03:16 PM    <DIR>          .
+09/17/2025  03:16 PM    <DIR>          ..
+09/17/2025  03:16 PM               240 exclude
+               1 File(s)            240 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.git\logs
+
+09/17/2025  03:16 PM    <DIR>          .
+09/17/2025  03:16 PM    <DIR>          ..
+09/23/2025  11:21 AM             3,089 HEAD
+09/17/2025  07:18 PM    <DIR>          refs
+               1 File(s)          3,089 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.git\logs\refs
+
+09/17/2025  07:18 PM    <DIR>          .
+09/17/2025  07:18 PM    <DIR>          ..
+09/19/2025  05:38 PM    <DIR>          heads
+09/17/2025  07:18 PM    <DIR>          remotes
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.git\logs\refs\heads
+
+09/19/2025  05:38 PM    <DIR>          .
+09/19/2025  05:38 PM    <DIR>          ..
+09/19/2025  05:38 PM               177 backup-before-restore
+09/17/2025  07:19 PM    <DIR>          feature
+09/17/2025  07:18 PM               593 main
+               2 File(s)            770 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.git\logs\refs\heads\feature
+
+09/17/2025  07:19 PM    <DIR>          .
+09/17/2025  07:19 PM    <DIR>          ..
+09/23/2025  11:21 AM             1,619 player-abilities
+               1 File(s)          1,619 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.git\logs\refs\remotes
+
+09/17/2025  07:18 PM    <DIR>          .
+09/17/2025  07:18 PM    <DIR>          ..
+09/17/2025  07:19 PM    <DIR>          origin
+09/17/2025  07:18 PM    <DIR>          upstream
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.git\logs\refs\remotes\origin
+
+09/17/2025  07:19 PM    <DIR>          .
+09/17/2025  07:19 PM    <DIR>          ..
+09/17/2025  07:19 PM    <DIR>          feature
+09/17/2025  07:18 PM               166 main
+               1 File(s)            166 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.git\logs\refs\remotes\origin\feature
+
+09/17/2025  07:19 PM    <DIR>          .
+09/17/2025  07:19 PM    <DIR>          ..
+09/23/2025  11:21 AM             1,328 player-abilities
+               1 File(s)          1,328 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.git\logs\refs\remotes\upstream
+
+09/17/2025  07:18 PM    <DIR>          .
+09/17/2025  07:18 PM    <DIR>          ..
+09/17/2025  07:18 PM               222 HEAD
+09/17/2025  07:18 PM               222 main
+               2 File(s)            444 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.git\objects
+
+09/23/2025  11:21 AM    <DIR>          .
+09/23/2025  11:21 AM    <DIR>          ..
+09/19/2025  07:17 PM    <DIR>          02
+09/20/2025  02:26 PM    <DIR>          09
+09/19/2025  12:58 PM    <DIR>          15
+09/19/2025  11:16 AM    <DIR>          17
+09/19/2025  11:16 AM    <DIR>          18
+09/19/2025  04:31 PM    <DIR>          19
+09/19/2025  07:16 PM    <DIR>          1f
+09/19/2025  04:31 PM    <DIR>          20
+09/23/2025  11:21 AM    <DIR>          22
+09/17/2025  07:13 PM    <DIR>          3a
+09/20/2025  02:26 PM    <DIR>          3c
+09/19/2025  12:58 PM    <DIR>          3e
+09/23/2025  11:21 AM    <DIR>          47
+09/19/2025  04:32 PM    <DIR>          4a
+09/20/2025  03:52 PM    <DIR>          4d
+09/19/2025  11:16 AM    <DIR>          53
+09/19/2025  07:17 PM    <DIR>          59
+09/19/2025  12:58 PM    <DIR>          5c
+09/23/2025  11:21 AM    <DIR>          5e
+09/17/2025  07:13 PM    <DIR>          61
+09/20/2025  03:52 PM    <DIR>          67
+09/20/2025  02:26 PM    <DIR>          69
+09/23/2025  11:21 AM    <DIR>          77
+09/19/2025  11:16 AM    <DIR>          7c
+09/19/2025  12:58 PM    <DIR>          7d
+09/23/2025  11:21 AM    <DIR>          7e
+09/20/2025  02:26 PM    <DIR>          93
+09/19/2025  11:16 AM    <DIR>          95
+09/23/2025  11:21 AM    <DIR>          a9
+09/19/2025  12:58 PM    <DIR>          b8
+09/19/2025  12:58 PM    <DIR>          b9
+09/20/2025  02:26 PM    <DIR>          c6
+09/19/2025  04:32 PM    <DIR>          c7
+09/19/2025  07:17 PM    <DIR>          cd
+09/17/2025  07:13 PM    <DIR>          ce
+09/20/2025  03:52 PM    <DIR>          db
+09/17/2025  07:13 PM    <DIR>          e0
+09/20/2025  03:51 PM    <DIR>          e4
+09/20/2025  03:51 PM    <DIR>          ee
+09/19/2025  04:32 PM    <DIR>          f2
+09/20/2025  02:26 PM    <DIR>          f4
+09/17/2025  07:13 PM    <DIR>          fb
+09/17/2025  03:16 PM    <DIR>          info
+09/17/2025  03:16 PM    <DIR>          pack
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.git\objects\02
+
+09/19/2025  07:17 PM    <DIR>          .
+09/19/2025  07:17 PM    <DIR>          ..
+09/19/2025  07:17 PM               224 5cbbf3f58f0147878f3bc0e2c063bccfafc727
+               1 File(s)            224 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.git\objects\09
+
+09/20/2025  02:26 PM    <DIR>          .
+09/20/2025  02:26 PM    <DIR>          ..
+09/20/2025  02:26 PM               382 8bc6fec9ce738287c7202d39d5b097e406c301
+               1 File(s)            382 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.git\objects\15
+
+09/19/2025  12:58 PM    <DIR>          .
+09/19/2025  12:58 PM    <DIR>          ..
+09/19/2025  12:58 PM               382 d0fc8def4bb63e06cdfd745616a6800e8584ce
+               1 File(s)            382 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.git\objects\17
+
+09/19/2025  11:16 AM    <DIR>          .
+09/19/2025  11:16 AM    <DIR>          ..
+09/19/2025  11:16 AM               383 26a65c35c20806859bf9b7c70179b252b000fe
+               1 File(s)            383 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.git\objects\18
+
+09/19/2025  11:16 AM    <DIR>          .
+09/19/2025  11:16 AM    <DIR>          ..
+09/19/2025  11:16 AM                82 0802373576ff7e983db1415b5305bccdf13d18
+               1 File(s)             82 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.git\objects\19
+
+09/19/2025  04:31 PM    <DIR>          .
+09/19/2025  04:31 PM    <DIR>          ..
+09/19/2025  04:31 PM             3,611 cc24873dcc969345a5881389fd273dbea84efe
+               1 File(s)          3,611 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.git\objects\1f
+
+09/19/2025  07:16 PM    <DIR>          .
+09/19/2025  07:16 PM    <DIR>          ..
+09/19/2025  07:16 PM             1,840 002a8ab495d8d0777030c15ae6d04884dbef0f
+               1 File(s)          1,840 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.git\objects\20
+
+09/19/2025  04:31 PM    <DIR>          .
+09/19/2025  04:31 PM    <DIR>          ..
+09/19/2025  04:31 PM             1,815 4cec6aea14787a5309eb1bb72d252115ae6a5b
+               1 File(s)          1,815 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.git\objects\22
+
+09/23/2025  11:21 AM    <DIR>          .
+09/23/2025  11:21 AM    <DIR>          ..
+09/23/2025  11:21 AM             8,618 ee710319cdc3b7941d15f7124aa3b3c2a01e1f
+               1 File(s)          8,618 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.git\objects\3a
+
+09/17/2025  07:13 PM    <DIR>          .
+09/17/2025  07:13 PM    <DIR>          ..
+09/17/2025  07:13 PM               346 9129966302d71fd10abc9d99966dd5ee99bcd7
+               1 File(s)            346 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.git\objects\3c
+
+09/20/2025  02:26 PM    <DIR>          .
+09/20/2025  02:26 PM    <DIR>          ..
+09/20/2025  02:26 PM             1,115 1f4498466f31dd63a01a52cca49053e0522b32
+               1 File(s)          1,115 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.git\objects\3e
+
+09/19/2025  12:58 PM    <DIR>          .
+09/19/2025  12:58 PM    <DIR>          ..
+09/19/2025  12:58 PM             1,238 b78f7bac09528b3fbf2d871bcf0802e58ee703
+               1 File(s)          1,238 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.git\objects\47
+
+09/23/2025  11:21 AM    <DIR>          .
+09/23/2025  11:21 AM    <DIR>          ..
+09/23/2025  11:21 AM               794 4ed9a74baad76546b32c71d3df45196545947f
+09/19/2025  07:16 PM             1,070 e6335df06e9aea7110d71fcf0f0843e4a6e37f
+               2 File(s)          1,864 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.git\objects\4a
+
+09/19/2025  04:32 PM    <DIR>          .
+09/19/2025  04:32 PM    <DIR>          ..
+09/19/2025  04:32 PM               382 e0faeb7140c0e4d60b5b2d8cb2a87fa1695463
+               1 File(s)            382 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.git\objects\4d
+
+09/20/2025  03:52 PM    <DIR>          .
+09/20/2025  03:52 PM    <DIR>          ..
+09/20/2025  03:52 PM               383 240b6a14f7ee63fafea94e471d1a66fcb7254d
+               1 File(s)            383 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.git\objects\53
+
+09/19/2025  11:16 AM    <DIR>          .
+09/19/2025  11:16 AM    <DIR>          ..
+09/20/2025  03:51 PM               738 ae9f5aeba7ee25930f839c852be5bcbc1f77c5
+               1 File(s)            738 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.git\objects\59
+
+09/19/2025  07:17 PM    <DIR>          .
+09/19/2025  07:17 PM    <DIR>          ..
+09/19/2025  07:17 PM               143 6f3eb4ef97e4e4e8de136e41f03eaeefa4503e
+               1 File(s)            143 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.git\objects\5c
+
+09/19/2025  12:58 PM    <DIR>          .
+09/19/2025  12:58 PM    <DIR>          ..
+09/19/2025  11:16 AM               185 19044b06e290ad7aa4a3a62a58a640adfe35e5
+09/19/2025  12:58 PM               180 9328a029af7ffd9ec6de58797c843bf47f0e3d
+               2 File(s)            365 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.git\objects\5e
+
+09/23/2025  11:21 AM    <DIR>          .
+09/23/2025  11:21 AM    <DIR>          ..
+09/23/2025  11:21 AM               181 a3dc3410837cf75f471e342065b52bbb67d5d6
+               1 File(s)            181 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.git\objects\61
+
+09/17/2025  07:13 PM    <DIR>          .
+09/17/2025  07:13 PM    <DIR>          ..
+09/17/2025  07:13 PM                29 510e14cd75b8840807846a94b864f5acc1f39e
+               1 File(s)             29 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.git\objects\67
+
+09/20/2025  03:52 PM    <DIR>          .
+09/20/2025  03:52 PM    <DIR>          ..
+09/20/2025  03:52 PM               198 18c242ca198ef7b82e3fa2e0413a599e717ab4
+               1 File(s)            198 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.git\objects\69
+
+09/20/2025  02:26 PM    <DIR>          .
+09/20/2025  02:26 PM    <DIR>          ..
+09/20/2025  02:26 PM               141 3c747762e03928abd772e43055506ff4bdd199
+               1 File(s)            141 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.git\objects\77
+
+09/23/2025  11:21 AM    <DIR>          .
+09/23/2025  11:21 AM    <DIR>          ..
+09/23/2025  11:21 AM               382 320485debb5036779e5fd0093daba146c57049
+09/19/2025  07:16 PM             3,619 765ce04c68df3f68a684564ef2c73ee6bcd6e0
+               2 File(s)          4,001 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.git\objects\7c
+
+09/19/2025  11:16 AM    <DIR>          .
+09/19/2025  11:16 AM    <DIR>          ..
+09/19/2025  11:16 AM             1,492 e1eef2a70bdc29512e98a2c91805e7fbfa2f95
+               1 File(s)          1,492 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.git\objects\7d
+
+09/19/2025  12:58 PM    <DIR>          .
+09/19/2025  12:58 PM    <DIR>          ..
+09/19/2025  04:31 PM             1,062 7e93ec2a9d8ca26838046076656b5fd75d9db4
+               1 File(s)          1,062 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.git\objects\7e
+
+09/23/2025  11:21 AM    <DIR>          .
+09/23/2025  11:21 AM    <DIR>          ..
+09/23/2025  11:21 AM               142 0b482f57478170e4695af393ac7050c1d3aac8
+               1 File(s)            142 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.git\objects\93
+
+09/20/2025  02:26 PM    <DIR>          .
+09/20/2025  02:26 PM    <DIR>          ..
+09/20/2025  02:26 PM             4,386 b36d75984533aade463bf777037e13d41e9404
+               1 File(s)          4,386 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.git\objects\95
+
+09/19/2025  11:16 AM    <DIR>          .
+09/19/2025  11:16 AM    <DIR>          ..
+09/19/2025  11:16 AM               999 16b901ae9bd1529ed0d95b8666b0a862ada6bd
+               1 File(s)            999 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.git\objects\a9
+
+09/23/2025  11:21 AM    <DIR>          .
+09/23/2025  11:21 AM    <DIR>          ..
+09/23/2025  11:21 AM             1,186 a41817f85bcc7d4d3b3706e26489120183da17
+               1 File(s)          1,186 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.git\objects\b8
+
+09/19/2025  12:58 PM    <DIR>          .
+09/19/2025  12:58 PM    <DIR>          ..
+09/19/2025  12:58 PM               142 9c3952e1ad98c6a2da39cd52380aba55583be7
+               1 File(s)            142 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.git\objects\b9
+
+09/19/2025  12:58 PM    <DIR>          .
+09/19/2025  12:58 PM    <DIR>          ..
+09/19/2025  12:58 PM             3,570 cc0d85378d761a847ecfea3d036dae53debaaa
+               1 File(s)          3,570 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.git\objects\c6
+
+09/20/2025  02:26 PM    <DIR>          .
+09/20/2025  02:26 PM    <DIR>          ..
+09/20/2025  02:26 PM               178 0bbf319601b4bcae208d83f1fbe291549708e0
+               1 File(s)            178 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.git\objects\c7
+
+09/19/2025  04:32 PM    <DIR>          .
+09/19/2025  04:32 PM    <DIR>          ..
+09/19/2025  04:32 PM               142 e42e0a20d0d7bdfb8b9c5cc10b8cea010fac5e
+               1 File(s)            142 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.git\objects\cd
+
+09/19/2025  07:17 PM    <DIR>          .
+09/19/2025  07:17 PM    <DIR>          ..
+09/19/2025  07:17 PM               354 34df78b02c369fc380f68c74a69ce7d2e9bb30
+               1 File(s)            354 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.git\objects\ce
+
+09/17/2025  07:13 PM    <DIR>          .
+09/17/2025  07:13 PM    <DIR>          ..
+09/17/2025  07:13 PM               383 062158734b4fec79086fcc5795dba0b61b7ca8
+09/17/2025  07:13 PM                82 11fb7d9599333650342fa5d5d1445ee6eefd89
+               2 File(s)            465 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.git\objects\db
+
+09/20/2025  03:52 PM    <DIR>          .
+09/20/2025  03:52 PM    <DIR>          ..
+09/20/2025  03:52 PM               141 225505354b1210438bc0bdb550bd7cfac30c1d
+               1 File(s)            141 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.git\objects\e0
+
+09/17/2025  07:13 PM    <DIR>          .
+09/17/2025  07:13 PM    <DIR>          ..
+09/17/2025  07:13 PM               181 0df843c3f0e460ff1373e6084b3826374496ef
+               1 File(s)            181 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.git\objects\e4
+
+09/20/2025  03:51 PM    <DIR>          .
+09/20/2025  03:51 PM    <DIR>          ..
+09/20/2025  03:51 PM             5,209 82001e39ccd2435e6e526534d1248d274de076
+               1 File(s)          5,209 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.git\objects\ee
+
+09/20/2025  03:51 PM    <DIR>          .
+09/20/2025  03:51 PM    <DIR>          ..
+09/17/2025  07:13 PM               858 59c1db60d60896c124e78ed11f14a58f2c72ff
+09/20/2025  03:51 PM             1,118 cc71dfbbf8bcfd396fe4c5673ed9a95bf8cbc3
+               2 File(s)          1,976 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.git\objects\f2
+
+09/19/2025  04:32 PM    <DIR>          .
+09/19/2025  04:32 PM    <DIR>          ..
+09/17/2025  07:13 PM                36 355182d57132aa96396faf13d3182cde2b8078
+09/19/2025  04:32 PM               213 a903e03771689b920bc11981823fa393830813
+               2 File(s)            249 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.git\objects\f4
+
+09/20/2025  02:26 PM    <DIR>          .
+09/20/2025  02:26 PM    <DIR>          ..
+09/20/2025  02:26 PM             1,921 25bf96b9a180dd5251174d0e86c42b5b71efbf
+09/20/2025  02:26 PM                36 4dbc8e79dee8111f950b42de9720eb2e951296
+09/19/2025  12:58 PM                36 5316bb631cf6e89ddeeea473c93252b30f7945
+               3 File(s)          1,993 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.git\objects\fb
+
+09/17/2025  07:13 PM    <DIR>          .
+09/17/2025  07:13 PM    <DIR>          ..
+09/17/2025  07:13 PM               171 2bbb0f628623d914b4f00d22ba5881b951c067
+               1 File(s)            171 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.git\objects\info
+
+09/17/2025  03:16 PM    <DIR>          .
+09/17/2025  03:16 PM    <DIR>          ..
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.git\objects\pack
+
+09/17/2025  03:16 PM    <DIR>          .
+09/17/2025  03:16 PM    <DIR>          ..
+09/17/2025  03:16 PM             1,688 pack-de93460516d47cba068b5ddb1654471d9654482e.idx
+09/17/2025  07:13 PM         3,490,785 pack-de93460516d47cba068b5ddb1654471d9654482e.pack
+               2 File(s)      3,492,473 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.git\refs
+
+09/17/2025  03:16 PM    <DIR>          .
+09/17/2025  03:16 PM    <DIR>          ..
+09/19/2025  05:38 PM    <DIR>          heads
+09/17/2025  07:18 PM    <DIR>          remotes
+09/17/2025  03:16 PM    <DIR>          tags
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.git\refs\heads
+
+09/19/2025  05:38 PM    <DIR>          .
+09/19/2025  05:38 PM    <DIR>          ..
+09/19/2025  05:38 PM                41 backup-before-restore
+09/23/2025  11:21 AM    <DIR>          feature
+09/17/2025  07:18 PM                41 main
+               2 File(s)             82 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.git\refs\heads\feature
+
+09/23/2025  11:21 AM    <DIR>          .
+09/23/2025  11:21 AM    <DIR>          ..
+09/23/2025  11:21 AM                41 player-abilities
+               1 File(s)             41 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.git\refs\remotes
+
+09/17/2025  07:18 PM    <DIR>          .
+09/17/2025  07:18 PM    <DIR>          ..
+09/17/2025  07:19 PM    <DIR>          origin
+09/17/2025  07:18 PM    <DIR>          upstream
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.git\refs\remotes\origin
+
+09/17/2025  07:19 PM    <DIR>          .
+09/17/2025  07:19 PM    <DIR>          ..
+09/23/2025  11:21 AM    <DIR>          feature
+09/17/2025  07:18 PM                41 main
+               1 File(s)             41 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.git\refs\remotes\origin\feature
+
+09/23/2025  11:21 AM    <DIR>          .
+09/23/2025  11:21 AM    <DIR>          ..
+09/23/2025  11:21 AM                41 player-abilities
+               1 File(s)             41 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.git\refs\remotes\upstream
+
+09/17/2025  07:18 PM    <DIR>          .
+09/17/2025  07:18 PM    <DIR>          ..
+09/17/2025  07:18 PM                32 HEAD
+09/17/2025  07:18 PM                41 main
+               2 File(s)             73 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.git\refs\tags
+
+09/17/2025  03:16 PM    <DIR>          .
+09/17/2025  03:16 PM    <DIR>          ..
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot
+
+09/23/2025  03:26 PM    <DIR>          .
+09/23/2025  03:26 PM    <DIR>          ..
+09/17/2025  03:18 PM                 1 .gdignore
+09/23/2025  03:26 PM    <DIR>          editor
+09/23/2025  03:26 PM                 8 global_script_class_cache.cfg
+09/17/2025  03:18 PM    <DIR>          imported
+09/23/2025  02:53 PM                37 scene_groups_cache.cfg
+09/17/2025  03:18 PM    <DIR>          shader_cache
+09/23/2025  03:26 PM               186 uid_cache.bin
+               4 File(s)            232 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\editor
+
+09/23/2025  03:26 PM    <DIR>          .
+09/23/2025  03:26 PM    <DIR>          ..
+09/19/2025  12:29 PM                49 camera_3d.gd-folding-4cafcfdbe4d11282fd6625d3ec69a242.cfg
+09/19/2025  07:23 PM                49 camera_3d.gd-folding-5b62fba510effabe0c62d88b7bf0eacf.cfg
+09/21/2025  02:31 PM                24 create_recent.Node
+09/23/2025  03:26 PM             1,745 editor_layout.cfg
+09/19/2025  12:29 PM                 0 favorites
+09/21/2025  02:31 PM                 0 favorites.Node
+09/19/2025  12:29 PM                 0 favorite_properties
+09/21/2025  02:48 PM               872 filesystem_cache10
+09/23/2025  03:26 PM                58 filesystem_update4
+09/23/2025  03:26 PM                49 Network.gd-folding-ca9ce96621c34b914a2b1ce78b56125c.cfg
+09/23/2025  11:17 AM                49 player.gd-folding-266cf4afe7fb1a19e644760043b6046a.cfg
+09/19/2025  05:32 PM                49 Player.gd-folding-8e1f9fed6067558c5d7d6d94032530c3.cfg
+09/23/2025  03:26 PM               630 project_metadata.cfg
+09/23/2025  03:26 PM             1,308 script_editor_cache.cfg
+09/23/2025  02:53 PM             4,582 world.tscn-editstate-76e0adcbc83681695885bae615f516ae.cfg
+09/23/2025  02:53 PM             1,109 world.tscn-folding-76e0adcbc83681695885bae615f516ae.cfg
+              16 File(s)         10,573 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\imported
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM             3,430 icon.svg-218a8f2b3041327d8a5756f3a245f83b.ctex
+09/17/2025  03:18 PM                91 icon.svg-218a8f2b3041327d8a5756f3a245f83b.md5
+               2 File(s)          3,521 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM    <DIR>          BestFitNormalShaderRD
+09/17/2025  03:18 PM    <DIR>          BlitShaderRD
+09/17/2025  03:18 PM    <DIR>          BokehDofShaderRD
+09/17/2025  03:18 PM    <DIR>          CanvasOcclusionShaderRD
+09/17/2025  03:18 PM    <DIR>          CanvasSdfShaderRD
+09/17/2025  03:18 PM    <DIR>          CanvasShaderRD
+09/17/2025  03:18 PM    <DIR>          ClusterDebugShaderRD
+09/17/2025  03:18 PM    <DIR>          ClusterRenderShaderRD
+09/17/2025  03:18 PM    <DIR>          ClusterStoreShaderRD
+09/17/2025  03:18 PM    <DIR>          CopyShaderRD
+09/17/2025  03:18 PM    <DIR>          CopyToFbShaderRD
+09/17/2025  03:18 PM    <DIR>          CubemapDownsamplerShaderRD
+09/17/2025  03:18 PM    <DIR>          CubemapFilterShaderRD
+09/17/2025  03:18 PM    <DIR>          CubemapRoughnessShaderRD
+09/17/2025  03:18 PM    <DIR>          CubeToDpShaderRD
+09/17/2025  03:18 PM    <DIR>          Fsr2AccumulatePassShaderRD
+09/17/2025  03:18 PM    <DIR>          Fsr2AutogenReactivePassShaderRD
+09/17/2025  03:18 PM    <DIR>          Fsr2ComputeLuminancePyramidPassShaderRD
+09/17/2025  03:18 PM    <DIR>          Fsr2DepthClipPassShaderRD
+09/17/2025  03:18 PM    <DIR>          Fsr2LockPassShaderRD
+09/17/2025  03:18 PM    <DIR>          Fsr2RcasPassShaderRD
+09/17/2025  03:18 PM    <DIR>          Fsr2ReconstructPreviousDepthPassShaderRD
+09/17/2025  03:18 PM    <DIR>          Fsr2TcrAutogenPassShaderRD
+09/17/2025  03:18 PM    <DIR>          FsrUpscaleShaderRD
+09/17/2025  03:18 PM    <DIR>          GiShaderRD
+09/17/2025  03:18 PM    <DIR>          LuminanceReduceShaderRD
+09/17/2025  03:18 PM    <DIR>          MotionVectorsShaderRD
+09/17/2025  03:18 PM    <DIR>          ParticlesCopyShaderRD
+09/17/2025  03:18 PM    <DIR>          ParticlesShaderRD
+09/17/2025  03:18 PM    <DIR>          ResolveShaderRD
+09/17/2025  03:18 PM    <DIR>          SceneForwardClusteredShaderRD
+09/17/2025  03:18 PM    <DIR>          ScreenSpaceReflectionFilterShaderRD
+09/17/2025  03:18 PM    <DIR>          ScreenSpaceReflectionScaleShaderRD
+09/17/2025  03:18 PM    <DIR>          ScreenSpaceReflectionShaderRD
+09/17/2025  03:18 PM    <DIR>          SdfgiDebugProbesShaderRD
+09/17/2025  03:18 PM    <DIR>          SdfgiDebugShaderRD
+09/17/2025  03:18 PM    <DIR>          SdfgiDirectLightShaderRD
+09/17/2025  03:18 PM    <DIR>          SdfgiIntegrateShaderRD
+09/17/2025  03:18 PM    <DIR>          SdfgiPreprocessShaderRD
+09/17/2025  03:18 PM    <DIR>          ShadowFrustumShaderRD
+09/17/2025  03:18 PM    <DIR>          SkeletonShaderRD
+09/17/2025  03:18 PM    <DIR>          SkyShaderRD
+09/17/2025  03:18 PM    <DIR>          SortShaderRD
+09/17/2025  03:18 PM    <DIR>          SpecularMergeShaderRD
+09/17/2025  03:18 PM    <DIR>          SsaoBlurShaderRD
+09/17/2025  03:18 PM    <DIR>          SsaoImportanceMapShaderRD
+09/17/2025  03:18 PM    <DIR>          SsaoInterleaveShaderRD
+09/17/2025  03:18 PM    <DIR>          SsaoShaderRD
+09/17/2025  03:18 PM    <DIR>          SsEffectsDownsampleShaderRD
+09/17/2025  03:18 PM    <DIR>          SsilBlurShaderRD
+09/17/2025  03:18 PM    <DIR>          SsilImportanceMapShaderRD
+09/17/2025  03:18 PM    <DIR>          SsilInterleaveShaderRD
+09/17/2025  03:18 PM    <DIR>          SsilShaderRD
+09/17/2025  03:18 PM    <DIR>          SubsurfaceScatteringShaderRD
+09/17/2025  03:18 PM    <DIR>          TaaResolveShaderRD
+09/17/2025  03:18 PM    <DIR>          TonemapShaderRD
+09/17/2025  03:18 PM    <DIR>          VolumetricFogProcessShaderRD
+09/17/2025  03:18 PM    <DIR>          VolumetricFogShaderRD
+09/17/2025  03:18 PM    <DIR>          VoxelGiDebugShaderRD
+09/17/2025  03:18 PM    <DIR>          VoxelGiShaderRD
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\BestFitNormalShaderRD
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM    <DIR>          f445b3e4e38ca935e36b0935b4795cf8c4bf4708abcc3cb8598458df8d0d8689
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\BestFitNormalShaderRD\f445b3e4e38ca935e36b0935b4795cf8c4bf4708abcc3cb8598458df8d0d8689
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM             1,032 087916079fba7c625e62b0c2cca570e0fb87c99a.vulkan.cache
+               1 File(s)          1,032 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\BlitShaderRD
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM    <DIR>          d73e865ef14019fa2911f9972cf9fcd778f62c945b516a3a96c41bc02b007586
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\BlitShaderRD\d73e865ef14019fa2911f9972cf9fcd778f62c945b516a3a96c41bc02b007586
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM             7,016 087916079fba7c625e62b0c2cca570e0fb87c99a.vulkan.cache
+               1 File(s)          7,016 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\BokehDofShaderRD
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM    <DIR>          77f28f4a5df4bd43b70462ba9db534cf3dc47ba79229ab6e4b9a67b8d2a41428
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\BokehDofShaderRD\77f28f4a5df4bd43b70462ba9db534cf3dc47ba79229ab6e4b9a67b8d2a41428
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM             8,060 087916079fba7c625e62b0c2cca570e0fb87c99a.vulkan.cache
+               1 File(s)          8,060 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\CanvasOcclusionShaderRD
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM    <DIR>          dfde862520bf0721c44cd65499b7cd225db7382faf58178bab82d6582aba4bf9
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\CanvasOcclusionShaderRD\dfde862520bf0721c44cd65499b7cd225db7382faf58178bab82d6582aba4bf9
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM             4,000 087916079fba7c625e62b0c2cca570e0fb87c99a.vulkan.cache
+               1 File(s)          4,000 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\CanvasSdfShaderRD
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM    <DIR>          31aa88f2dad037ba070bae5a112eeb91c6ead40142fb90f83d1c942c7f974384
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\CanvasSdfShaderRD\31aa88f2dad037ba070bae5a112eeb91c6ead40142fb90f83d1c942c7f974384
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM             5,864 087916079fba7c625e62b0c2cca570e0fb87c99a.vulkan.cache
+               1 File(s)          5,864 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\CanvasShaderRD
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/19/2025  12:13 PM    <DIR>          5dbef7fc80f0ac607fea97298b967936b85b5daec3a4e39249d9776cfd085ec7
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\CanvasShaderRD\5dbef7fc80f0ac607fea97298b967936b85b5daec3a4e39249d9776cfd085ec7
+
+09/19/2025  12:13 PM    <DIR>          .
+09/19/2025  12:13 PM    <DIR>          ..
+09/17/2025  03:18 PM            58,936 087916079fba7c625e62b0c2cca570e0fb87c99a.vulkan.cache
+09/17/2025  03:18 PM            39,688 45fb1ddc6499e56682916a355ce2839e61f42dfe.vulkan.cache
+09/17/2025  03:18 PM            39,980 8a7277c8d3ac029b087c3fa9c55de85560be5119.vulkan.cache
+09/17/2025  03:18 PM            62,896 b585f2cdc5a17ed2e467f8af814098acbdc2006f.vulkan.cache
+09/17/2025  03:18 PM            62,616 c0a681ae42aa3e0b5abba232ccae0b036be455e4.vulkan.cache
+09/17/2025  03:18 PM            62,332 ddbe30d4d1be5d69b00075293fd27da8decd4af2.vulkan.cache
+09/17/2025  03:18 PM            60,600 f3e258e8f7ec2e7e740b62f3bc48ecf5c99fb0db.vulkan.cache
+09/19/2025  12:13 PM            62,132 fcaf7722e8788d18ced35c64379516ec85dcae18.vulkan.cache
+               8 File(s)        449,180 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\ClusterDebugShaderRD
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM    <DIR>          5a0ccfb2daafa64764d9607f55c2b9e81bfcbefbd0655668ed371682bd563840
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\ClusterDebugShaderRD\5a0ccfb2daafa64764d9607f55c2b9e81bfcbefbd0655668ed371682bd563840
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM             2,084 087916079fba7c625e62b0c2cca570e0fb87c99a.vulkan.cache
+               1 File(s)          2,084 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\ClusterRenderShaderRD
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM    <DIR>          9fee2e4ec7c27d1f616e40998b46ce7edfd1fce6af3222b59df4dc1078a94282
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\ClusterRenderShaderRD\9fee2e4ec7c27d1f616e40998b46ce7edfd1fce6af3222b59df4dc1078a94282
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM             2,292 087916079fba7c625e62b0c2cca570e0fb87c99a.vulkan.cache
+               1 File(s)          2,292 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\ClusterStoreShaderRD
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM    <DIR>          982b271cabf6072e388aaff8ddac649deabbf2c8f8204d184e8bf747d06d8b83
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\ClusterStoreShaderRD\982b271cabf6072e388aaff8ddac649deabbf2c8f8204d184e8bf747d06d8b83
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM             1,684 087916079fba7c625e62b0c2cca570e0fb87c99a.vulkan.cache
+               1 File(s)          1,684 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\CopyShaderRD
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM    <DIR>          0585552a13c4e1fbd943e3d07b01b3c1c9caf202633165c88e1ec49a262f6f93
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\CopyShaderRD\0585552a13c4e1fbd943e3d07b01b3c1c9caf202633165c88e1ec49a262f6f93
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM            17,508 087916079fba7c625e62b0c2cca570e0fb87c99a.vulkan.cache
+               1 File(s)         17,508 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\CopyToFbShaderRD
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM    <DIR>          b1d93669df60c5964e990c8ac52f5e07b301a6182bcac31f48dedf82323db998
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\CopyToFbShaderRD\b1d93669df60c5964e990c8ac52f5e07b301a6182bcac31f48dedf82323db998
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM             6,972 087916079fba7c625e62b0c2cca570e0fb87c99a.vulkan.cache
+               1 File(s)          6,972 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\CubemapDownsamplerShaderRD
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM    <DIR>          1a719a5b82ae552c1be29024377514583f4e5ccb9edbe5a5dbb88d62bda7a1b1
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\CubemapDownsamplerShaderRD\1a719a5b82ae552c1be29024377514583f4e5ccb9edbe5a5dbb88d62bda7a1b1
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM             2,368 087916079fba7c625e62b0c2cca570e0fb87c99a.vulkan.cache
+               1 File(s)          2,368 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\CubemapFilterShaderRD
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM    <DIR>          ae33667f8d1d44e711a76a6dccfb1588363ea680990d4798375e5d32df1c860c
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\CubemapFilterShaderRD\ae33667f8d1d44e711a76a6dccfb1588363ea680990d4798375e5d32df1c860c
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM            12,104 087916079fba7c625e62b0c2cca570e0fb87c99a.vulkan.cache
+               1 File(s)         12,104 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\CubemapRoughnessShaderRD
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM    <DIR>          06d2b5b9dbaef3d4cd33fac2cf105b906f0b265b5e519103e753b6f1ea199fc6
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\CubemapRoughnessShaderRD\06d2b5b9dbaef3d4cd33fac2cf105b906f0b265b5e519103e753b6f1ea199fc6
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM             2,572 087916079fba7c625e62b0c2cca570e0fb87c99a.vulkan.cache
+               1 File(s)          2,572 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\CubeToDpShaderRD
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM    <DIR>          8a3645d404364d0279e142a90b1a1b56f38c80ad2e7b56fe379b2314a1ac2e4d
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\CubeToDpShaderRD\8a3645d404364d0279e142a90b1a1b56f38c80ad2e7b56fe379b2314a1ac2e4d
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM             1,644 087916079fba7c625e62b0c2cca570e0fb87c99a.vulkan.cache
+               1 File(s)          1,644 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\Fsr2AccumulatePassShaderRD
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM    <DIR>          054947b2788067989a4edca64e7f4f779c078779c2abe439860a14c913a324b5
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\Fsr2AccumulatePassShaderRD\054947b2788067989a4edca64e7f4f779c078779c2abe439860a14c913a324b5
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\Fsr2AutogenReactivePassShaderRD
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM    <DIR>          d6e29d1787a6cc32009df3a928dcd1e4deae25d0b4e13d4ad3b9e018c1d050a6
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\Fsr2AutogenReactivePassShaderRD\d6e29d1787a6cc32009df3a928dcd1e4deae25d0b4e13d4ad3b9e018c1d050a6
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\Fsr2ComputeLuminancePyramidPassShaderRD
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM    <DIR>          b3d03a2ca9fad006a2378049f5978893cd2dc6825576340e576471f89482c23a
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\Fsr2ComputeLuminancePyramidPassShaderRD\b3d03a2ca9fad006a2378049f5978893cd2dc6825576340e576471f89482c23a
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\Fsr2DepthClipPassShaderRD
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM    <DIR>          94b39fcb277786396ffb5c9b9492344808c17a90cbb0f274a27c6af7be45aab3
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\Fsr2DepthClipPassShaderRD\94b39fcb277786396ffb5c9b9492344808c17a90cbb0f274a27c6af7be45aab3
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\Fsr2LockPassShaderRD
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM    <DIR>          0b7ffebb74f2e41bb7b5fd1753ce15e4ed82974a30c5080023f9ca2679d4054b
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\Fsr2LockPassShaderRD\0b7ffebb74f2e41bb7b5fd1753ce15e4ed82974a30c5080023f9ca2679d4054b
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\Fsr2RcasPassShaderRD
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM    <DIR>          f4615b3b0ba64a140bfef2890713daabcc445b0929d0ac32ca5a8acff58ab75b
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\Fsr2RcasPassShaderRD\f4615b3b0ba64a140bfef2890713daabcc445b0929d0ac32ca5a8acff58ab75b
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\Fsr2ReconstructPreviousDepthPassShaderRD
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM    <DIR>          93b4b46b420045f90b1a8ef270463bd7622d3c4d6cdcc11afa9173955fb08836
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\Fsr2ReconstructPreviousDepthPassShaderRD\93b4b46b420045f90b1a8ef270463bd7622d3c4d6cdcc11afa9173955fb08836
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\Fsr2TcrAutogenPassShaderRD
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM    <DIR>          7e484f7c44e4b199a2cc702cfd2c3f81b050fcfa91b362f68c6b44abe04f8540
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\Fsr2TcrAutogenPassShaderRD\7e484f7c44e4b199a2cc702cfd2c3f81b050fcfa91b362f68c6b44abe04f8540
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\FsrUpscaleShaderRD
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM    <DIR>          002c789d43c433d4f437258a4aa90c54e940f212d2280d57067ade9acc915de4
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\FsrUpscaleShaderRD\002c789d43c433d4f437258a4aa90c54e940f212d2280d57067ade9acc915de4
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM             8,680 087916079fba7c625e62b0c2cca570e0fb87c99a.vulkan.cache
+               1 File(s)          8,680 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\GiShaderRD
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM    <DIR>          fa84944d98477f4dea3958eb674f7f7d9d0a02baa89159b8bb7a699d298a2a94
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\GiShaderRD\fa84944d98477f4dea3958eb674f7f7d9d0a02baa89159b8bb7a699d298a2a94
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM            24,900 087916079fba7c625e62b0c2cca570e0fb87c99a.vulkan.cache
+               1 File(s)         24,900 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\LuminanceReduceShaderRD
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM    <DIR>          33670077d4a8096b9a2810712a9a6c053117fa229578c5c59d21f631f8c7c99e
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\LuminanceReduceShaderRD\33670077d4a8096b9a2810712a9a6c053117fa229578c5c59d21f631f8c7c99e
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM             3,376 087916079fba7c625e62b0c2cca570e0fb87c99a.vulkan.cache
+               1 File(s)          3,376 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\MotionVectorsShaderRD
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM    <DIR>          26ac47cc931c6835fac2276d88b1cafff5751417c9ed748866e6de96345ec4f0
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\MotionVectorsShaderRD\26ac47cc931c6835fac2276d88b1cafff5751417c9ed748866e6de96345ec4f0
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM             2,208 087916079fba7c625e62b0c2cca570e0fb87c99a.vulkan.cache
+               1 File(s)          2,208 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\ParticlesCopyShaderRD
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM    <DIR>          6d4b096b7b43f75f778bc4764d866585f8234b8315acf1debfd80f5607e9c7ce
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\ParticlesCopyShaderRD\6d4b096b7b43f75f778bc4764d866585f8234b8315acf1debfd80f5607e9c7ce
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM            44,112 087916079fba7c625e62b0c2cca570e0fb87c99a.vulkan.cache
+               1 File(s)         44,112 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\ParticlesShaderRD
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM    <DIR>          2860cdddeb8222ba114256d03b14312eaf3ed3d6c610522e9c7b76920c629452
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\ParticlesShaderRD\2860cdddeb8222ba114256d03b14312eaf3ed3d6c610522e9c7b76920c629452
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM             7,916 f128cab0b22fb7e0d9f023d6cdb81309be392d95.vulkan.cache
+               1 File(s)          7,916 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\ResolveShaderRD
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM    <DIR>          5456ff200fef415d6f1a62789f98e46e63196b93cdfd3a74b222479cb29bc617
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\ResolveShaderRD\5456ff200fef415d6f1a62789f98e46e63196b93cdfd3a74b222479cb29bc617
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM             4,648 087916079fba7c625e62b0c2cca570e0fb87c99a.vulkan.cache
+               1 File(s)          4,648 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\SceneForwardClusteredShaderRD
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM    <DIR>          2c0cab6010c6485cccf288901f08ded7ea24af2e1ac87519831a6c03d7331c33
+09/17/2025  03:18 PM    <DIR>          7c7371316a17eed8979e8c045765fc8cf646b6d16c94326ded7981319b517de4
+09/17/2025  03:18 PM    <DIR>          86ca2658294aaf3a3a008c3f34ad69d65cb3e6dd7592340af8d0669bc747a90a
+09/17/2025  03:18 PM    <DIR>          b8cae3540c2170327003172ca0dc42cc1661bd06d05b0e7cce5f6e414e3b0137
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\SceneForwardClusteredShaderRD\2c0cab6010c6485cccf288901f08ded7ea24af2e1ac87519831a6c03d7331c33
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\SceneForwardClusteredShaderRD\7c7371316a17eed8979e8c045765fc8cf646b6d16c94326ded7981319b517de4
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM           129,756 0f1bcf11b9f7757773a7866f1cd2e297cb2acf5f.vulkan.cache
+09/17/2025  03:18 PM           139,152 218e36a984b0c78c760adc7bcda857a77b17ad85.vulkan.cache
+09/17/2025  03:18 PM           139,416 2b50e38e5fd009c28175cc76423501d3f1de866f.vulkan.cache
+09/17/2025  03:18 PM           136,700 5f3097572932b33c93eebb3c968bad4acf0a97a9.vulkan.cache
+09/17/2025  03:18 PM           136,504 618494189447b24dfbb3e43c9f38e6d9f04604b0.vulkan.cache
+09/17/2025  03:18 PM           138,920 6ee0392e6ccb46d27eb7b08ea14ec6d5cf221168.vulkan.cache
+09/17/2025  03:18 PM           139,652 757ab33d4789b9457fab88a7a982d67d6209d600.vulkan.cache
+09/17/2025  03:18 PM           138,480 7b3dadb0d33a464bbb0a7962224c158af07f1381.vulkan.cache
+09/17/2025  03:18 PM           175,984 7fb66440f65dac23b75016fc52fb82ae26e9393f.vulkan.cache
+09/17/2025  03:18 PM           138,808 86e1b93c3d7bd17d2e21c13871086aa19aa333e7.vulkan.cache
+09/17/2025  03:18 PM           140,768 964e2bf8e1eed26e7e9ed4b223d256b6a0bda12a.vulkan.cache
+09/17/2025  03:18 PM           139,420 9f9294903cdaab4eeb10f39defaee7f48b9ad675.vulkan.cache
+09/17/2025  03:18 PM           138,860 a6d99b637dfee75712ae57f13dc63ae39e299a45.vulkan.cache
+09/17/2025  03:18 PM           137,296 ab60f8b228c0dad11d9d882c2ab4f61eb6ca2f20.vulkan.cache
+09/17/2025  03:18 PM           141,140 b396ad98c064d54194bbfe9f2c4d30adaaa1f6af.vulkan.cache
+09/17/2025  03:18 PM           135,528 b7b2f398c116e26c751517dd8d44535f700f825f.vulkan.cache
+09/17/2025  03:18 PM           136,828 bb38165ecd6242eb97573e5f293c2d3c40d25eee.vulkan.cache
+09/17/2025  03:18 PM           139,340 c4c828897f8a3fe72e3713d35b4ba452d7ed9acf.vulkan.cache
+09/17/2025  03:18 PM           173,072 c911b2eb203b7525047b1fc26929407fb3d4191d.vulkan.cache
+              19 File(s)      2,695,624 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\SceneForwardClusteredShaderRD\86ca2658294aaf3a3a008c3f34ad69d65cb3e6dd7592340af8d0669bc747a90a
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\SceneForwardClusteredShaderRD\b8cae3540c2170327003172ca0dc42cc1661bd06d05b0e7cce5f6e414e3b0137
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\ScreenSpaceReflectionFilterShaderRD
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM    <DIR>          e431a18b329c8f130a4936f1b500453d40ed076f20b6450c0cfcc42965198e10
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\ScreenSpaceReflectionFilterShaderRD\e431a18b329c8f130a4936f1b500453d40ed076f20b6450c0cfcc42965198e10
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM             5,860 087916079fba7c625e62b0c2cca570e0fb87c99a.vulkan.cache
+               1 File(s)          5,860 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\ScreenSpaceReflectionScaleShaderRD
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM    <DIR>          e18e596064c6f85262a4992de84c175efe8d55e8e1a61d4b0f12a21a09554c71
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\ScreenSpaceReflectionScaleShaderRD\e18e596064c6f85262a4992de84c175efe8d55e8e1a61d4b0f12a21a09554c71
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM             1,824 087916079fba7c625e62b0c2cca570e0fb87c99a.vulkan.cache
+               1 File(s)          1,824 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\ScreenSpaceReflectionShaderRD
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM    <DIR>          a30622fa1587efa6d1ce2103e3a7b435319e2b8d91c930aec49ac06f068bbdc4
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\ScreenSpaceReflectionShaderRD\a30622fa1587efa6d1ce2103e3a7b435319e2b8d91c930aec49ac06f068bbdc4
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM             8,704 087916079fba7c625e62b0c2cca570e0fb87c99a.vulkan.cache
+               1 File(s)          8,704 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\SdfgiDebugProbesShaderRD
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM    <DIR>          f47deed28ae7a576ecf2b6c706e65d138e4cc3129802dd6ef7efdebadfea19fe
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\SdfgiDebugProbesShaderRD\f47deed28ae7a576ecf2b6c706e65d138e4cc3129802dd6ef7efdebadfea19fe
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM            11,076 087916079fba7c625e62b0c2cca570e0fb87c99a.vulkan.cache
+               1 File(s)         11,076 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\SdfgiDebugShaderRD
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM    <DIR>          51be635ba13c61a2261636860bf6be8b8632283ca238edd64be1ec75c8b680e5
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\SdfgiDebugShaderRD\51be635ba13c61a2261636860bf6be8b8632283ca238edd64be1ec75c8b680e5
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM             2,844 087916079fba7c625e62b0c2cca570e0fb87c99a.vulkan.cache
+               1 File(s)          2,844 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\SdfgiDirectLightShaderRD
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM    <DIR>          9bf4e5e182bc3acd9aa4ed6df16364b8d7c98a5d885cb7fb2e6d324165086449
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\SdfgiDirectLightShaderRD\9bf4e5e182bc3acd9aa4ed6df16364b8d7c98a5d885cb7fb2e6d324165086449
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM            11,824 087916079fba7c625e62b0c2cca570e0fb87c99a.vulkan.cache
+               1 File(s)         11,824 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\SdfgiIntegrateShaderRD
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM    <DIR>          1e2438acd55bbf4b0b5d0b9eea6766c3c3da074ba342ce7a0bffd365eee02049
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\SdfgiIntegrateShaderRD\1e2438acd55bbf4b0b5d0b9eea6766c3c3da074ba342ce7a0bffd365eee02049
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM            15,212 087916079fba7c625e62b0c2cca570e0fb87c99a.vulkan.cache
+               1 File(s)         15,212 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\SdfgiPreprocessShaderRD
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM    <DIR>          68ed227059cefc59e4d1481b526080785e1264fa8503dc9465f11780ab8a1b78
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\SdfgiPreprocessShaderRD\68ed227059cefc59e4d1481b526080785e1264fa8503dc9465f11780ab8a1b78
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM            17,644 087916079fba7c625e62b0c2cca570e0fb87c99a.vulkan.cache
+               1 File(s)         17,644 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\ShadowFrustumShaderRD
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM    <DIR>          e957a1f1de02c89a5ad5e1f94ecd26ff29154cddf53aeef56ddbd96e2e4703fb
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\ShadowFrustumShaderRD\e957a1f1de02c89a5ad5e1f94ecd26ff29154cddf53aeef56ddbd96e2e4703fb
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM               884 087916079fba7c625e62b0c2cca570e0fb87c99a.vulkan.cache
+               1 File(s)            884 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\SkeletonShaderRD
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM    <DIR>          ea6a31297ecd2d7c45249f09fa14bdfbb28a8d9ac22276be7927ab5c9a0d957d
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\SkeletonShaderRD\ea6a31297ecd2d7c45249f09fa14bdfbb28a8d9ac22276be7927ab5c9a0d957d
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM             6,556 087916079fba7c625e62b0c2cca570e0fb87c99a.vulkan.cache
+               1 File(s)          6,556 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\SkyShaderRD
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM    <DIR>          8a5a1a07228c4198487f2f5734dcc6f0fdd1479521a6b77fa968e23f465dcad1
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\SkyShaderRD\8a5a1a07228c4198487f2f5734dcc6f0fdd1479521a6b77fa968e23f465dcad1
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM            19,788 03e3b11c69e24394b2d955a8c0ba85587bb70839.vulkan.cache
+09/17/2025  03:18 PM            25,824 0a0fb987bd6ede673a5edeb59834f887758ae2a6.vulkan.cache
+09/17/2025  03:18 PM            29,268 1ec4b939427d7d13a35915081fffc339985e7d72.vulkan.cache
+09/17/2025  03:18 PM            27,096 301c34f080b0d9fb9ff1c17636ea175173a43e1c.vulkan.cache
+09/17/2025  03:18 PM            28,032 b5b8e4ba80a00c01ba3057eaf7b6778733fb4cd6.vulkan.cache
+09/17/2025  03:18 PM            19,320 de678811d1bad3cad4892a8db7b6ea0be197d51d.vulkan.cache
+               6 File(s)        149,328 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\SortShaderRD
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM    <DIR>          f0334d42aa0627f32dbe7f9cc5d74d5f7d6f729311c6b3938b5df597ff02abda
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\SortShaderRD\f0334d42aa0627f32dbe7f9cc5d74d5f7d6f729311c6b3938b5df597ff02abda
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM             3,856 087916079fba7c625e62b0c2cca570e0fb87c99a.vulkan.cache
+               1 File(s)          3,856 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\SpecularMergeShaderRD
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM    <DIR>          a35ec916d4589dcd48a7413e9fae4dd9f75931af94d9500df6828687787b564e
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\SpecularMergeShaderRD\a35ec916d4589dcd48a7413e9fae4dd9f75931af94d9500df6828687787b564e
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM             4,016 087916079fba7c625e62b0c2cca570e0fb87c99a.vulkan.cache
+               1 File(s)          4,016 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\SsaoBlurShaderRD
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM    <DIR>          788193da1d99c0dca2bc530c9b93b58f5705ec7a478ad1b3235332739fb54a04
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\SsaoBlurShaderRD\788193da1d99c0dca2bc530c9b93b58f5705ec7a478ad1b3235332739fb54a04
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM             4,188 087916079fba7c625e62b0c2cca570e0fb87c99a.vulkan.cache
+               1 File(s)          4,188 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\SsaoImportanceMapShaderRD
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM    <DIR>          f7bb45d36e786328faf498618de72670bd15b026ef7cff7493428b325cecf2b2
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\SsaoImportanceMapShaderRD\f7bb45d36e786328faf498618de72670bd15b026ef7cff7493428b325cecf2b2
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM             3,112 087916079fba7c625e62b0c2cca570e0fb87c99a.vulkan.cache
+               1 File(s)          3,112 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\SsaoInterleaveShaderRD
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM    <DIR>          4139bfc097c96c01e0933093b5c7083536563d152c18e6a8788f763c7882dd2e
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\SsaoInterleaveShaderRD\4139bfc097c96c01e0933093b5c7083536563d152c18e6a8788f763c7882dd2e
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM             3,420 087916079fba7c625e62b0c2cca570e0fb87c99a.vulkan.cache
+               1 File(s)          3,420 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\SsaoShaderRD
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM    <DIR>          8a404f41e2ad5761ac5967728ca90a8c17e7cb0a7aa2ee224383e3b462c4c657
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\SsaoShaderRD\8a404f41e2ad5761ac5967728ca90a8c17e7cb0a7aa2ee224383e3b462c4c657
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM            20,632 087916079fba7c625e62b0c2cca570e0fb87c99a.vulkan.cache
+               1 File(s)         20,632 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\SsEffectsDownsampleShaderRD
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM    <DIR>          5271d7473f0efb5f366e39eca3016993e8550ddbd9f09618e12fe09646cc067d
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\SsEffectsDownsampleShaderRD\5271d7473f0efb5f366e39eca3016993e8550ddbd9f09618e12fe09646cc067d
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM            12,516 087916079fba7c625e62b0c2cca570e0fb87c99a.vulkan.cache
+               1 File(s)         12,516 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\SsilBlurShaderRD
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM    <DIR>          619503febf014ea3c728cec4843a0db3de746a7871924ae419186265022efdf3
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\SsilBlurShaderRD\619503febf014ea3c728cec4843a0db3de746a7871924ae419186265022efdf3
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM             4,260 087916079fba7c625e62b0c2cca570e0fb87c99a.vulkan.cache
+               1 File(s)          4,260 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\SsilImportanceMapShaderRD
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM    <DIR>          9480476ae3aac5424cf9c79c4ca802479536ca2e0cc7508fd2ed63c7e4a7bba4
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\SsilImportanceMapShaderRD\9480476ae3aac5424cf9c79c4ca802479536ca2e0cc7508fd2ed63c7e4a7bba4
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM             3,204 087916079fba7c625e62b0c2cca570e0fb87c99a.vulkan.cache
+               1 File(s)          3,204 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\SsilInterleaveShaderRD
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM    <DIR>          db1748fc5d52c75b4e9c6a9214aafdda7a875c46968342296e72a668fd170925
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\SsilInterleaveShaderRD\db1748fc5d52c75b4e9c6a9214aafdda7a875c46968342296e72a668fd170925
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM             3,588 087916079fba7c625e62b0c2cca570e0fb87c99a.vulkan.cache
+               1 File(s)          3,588 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\SsilShaderRD
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM    <DIR>          352bb5d4f731e0ca9b1f50182eba20f390dfb1c27c22177cc866f24b41cfb477
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\SsilShaderRD\352bb5d4f731e0ca9b1f50182eba20f390dfb1c27c22177cc866f24b41cfb477
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM            20,112 087916079fba7c625e62b0c2cca570e0fb87c99a.vulkan.cache
+               1 File(s)         20,112 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\SubsurfaceScatteringShaderRD
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM    <DIR>          461859c1ab6a7d4abaa3a7de825c6d3a29408f7baf5ef8710dbec2983b9a1b79
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\SubsurfaceScatteringShaderRD\461859c1ab6a7d4abaa3a7de825c6d3a29408f7baf5ef8710dbec2983b9a1b79
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM             6,412 087916079fba7c625e62b0c2cca570e0fb87c99a.vulkan.cache
+               1 File(s)          6,412 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\TaaResolveShaderRD
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM    <DIR>          565bedf5c316c96d80050ac7155b0d9eeaae2075186f86b442958223c76c3329
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\TaaResolveShaderRD\565bedf5c316c96d80050ac7155b0d9eeaae2075186f86b442958223c76c3329
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM             5,172 087916079fba7c625e62b0c2cca570e0fb87c99a.vulkan.cache
+               1 File(s)          5,172 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\TonemapShaderRD
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM    <DIR>          69b2ec2026e8852eb94cb4b9a2852ec0c93d6c5600a2587378c92e463650fc23
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\TonemapShaderRD\69b2ec2026e8852eb94cb4b9a2852ec0c93d6c5600a2587378c92e463650fc23
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM            31,540 087916079fba7c625e62b0c2cca570e0fb87c99a.vulkan.cache
+               1 File(s)         31,540 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\VolumetricFogProcessShaderRD
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM    <DIR>          a1de30ce3888a2904dea0a08672d4a4d32e725cfa23dd6b4ec8063ac28ec4151
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\VolumetricFogProcessShaderRD\a1de30ce3888a2904dea0a08672d4a4d32e725cfa23dd6b4ec8063ac28ec4151
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM            27,716 087916079fba7c625e62b0c2cca570e0fb87c99a.vulkan.cache
+               1 File(s)         27,716 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\VolumetricFogShaderRD
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM    <DIR>          7196fdb9593e16a740c0faf8c524fd682aa62fff49b7860c8b974a49c6334710
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\VolumetricFogShaderRD\7196fdb9593e16a740c0faf8c524fd682aa62fff49b7860c8b974a49c6334710
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM             4,136 9a227745af2d65830f930370a9fbba551fbd6f60.vulkan.cache
+               1 File(s)          4,136 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\VoxelGiDebugShaderRD
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM    <DIR>          444a36500df629d48ceec4659503728ff7a2d311d1873a51e2ca79347e360ee3
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\VoxelGiDebugShaderRD\444a36500df629d48ceec4659503728ff7a2d311d1873a51e2ca79347e360ee3
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM             6,412 087916079fba7c625e62b0c2cca570e0fb87c99a.vulkan.cache
+               1 File(s)          6,412 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\VoxelGiShaderRD
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM    <DIR>          cad8e2413bfa7c388a330fc2181edaf31e4e1f09559ba876fe96ad52f0a73cef
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\.godot\shader_cache\VoxelGiShaderRD\cad8e2413bfa7c388a330fc2181edaf31e4e1f09559ba876fe96ad52f0a73cef
+
+09/17/2025  03:18 PM    <DIR>          .
+09/17/2025  03:18 PM    <DIR>          ..
+09/17/2025  03:18 PM            19,400 087916079fba7c625e62b0c2cca570e0fb87c99a.vulkan.cache
+               1 File(s)         19,400 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\docs
+
+09/17/2025  03:16 PM    <DIR>          .
+09/17/2025  03:16 PM    <DIR>          ..
+09/17/2025  03:16 PM           671,599 soccer_after.gif
+09/17/2025  03:16 PM           603,152 soccer_after.mp4
+09/17/2025  03:16 PM         2,210,958 soccer_before.gif
+09/17/2025  03:16 PM         1,706,021 soccer_before.mp4
+               4 File(s)      5,191,730 bytes
+
+ Directory of C:\Users\Faisal Eamani\Desktop\godot-soccer-demo\scripts
+
+09/23/2025  11:17 AM    <DIR>          .
+09/23/2025  11:17 AM    <DIR>          ..
+09/19/2025  07:23 PM             4,852 camera_3d.gd
+09/19/2025  12:16 PM                20 camera_3d.gd.uid
+09/23/2025  11:17 AM            25,443 player.gd
+09/17/2025  04:25 PM                20 Player.gd.uid
+               4 File(s)         30,335 bytes
+
+     Total Files Listed:
+             213 File(s)     12,560,342 bytes
+             578 Dir(s)  25,530,486,784 bytes free
