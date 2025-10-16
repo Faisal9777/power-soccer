@@ -151,8 +151,10 @@ func _spawn_player_for(id: int) -> void:
 	p = player_scene.instantiate()
 	p.name = "Player_%d" % id
 	# Put at a spawn point if you have one
-	var sp := spawn_points.get_node_or_null("Marker3D%d" % ((id - 1) % max(1, spawn_points.get_child_count())))
+	#var sp := spawn_points.get_node_or_null("Marker3D%d" % ((id - 1) % max(1, spawn_points.get_child_count())))
+	var sp := spawn_points.get_node_or_null("Marker3D")
 	if sp: p.global_transform = sp.global_transform
+
 		
 
 	p.set_multiplayer_authority(1)  # SERVER owns/simulates in server-auth

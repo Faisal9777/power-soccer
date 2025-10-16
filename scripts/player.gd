@@ -82,6 +82,7 @@ var _can_stamina_regen : bool = true
 # --- Runtime state ---
 var current_ball_path: NodePath = NodePath("")
 var current_ball: RigidBody3D = null
+
 var aim_active: bool = false
 var aim_dir: Vector3 = Vector3.ZERO
 var aim_contact: Vector3 = Vector3.ZERO
@@ -210,6 +211,7 @@ func _btn_just_released(name: String) -> bool:
 # --- Engine callbacks ---
 
 func _ready() -> void:
+	print("current position is: ", global_transform.origin)
 	if $KickArea:
 		$KickArea.body_entered.connect(_on_kick_area_body_entered)
 		$KickArea.body_exited.connect(_on_kick_area_body_exited)
@@ -233,13 +235,17 @@ func _client_side_setup() -> void:
 	physics_interpolation_mode = Node3D.PHYSICS_INTERPOLATION_MODE_ON
 
 func _physics_process(delta: float) -> void:
-	# Approach #2: only the SERVER simulates gameplay.
+	if current_ball and current_ball.linear_velocity.x != 0:
+		#print("the velocity of the ball is: ", current_ball.linear_velocity)
+		current_ball.contact_monitor = true
+		current_ball.max_contacts_reported = 16
+		# Approach #2: only the SERVER simulates gameplay.
 	if !multiplayer.is_server():
 		return
 	simulate_server(delta)
 
+
 func _process(delta: float) -> void:
-	
 	if get_tree().get_multiplayer().get_unique_id() == owner_peer_id: 
 		_local_process(delta)
 
@@ -329,33 +335,6 @@ func _update_arrow_position(delta: float) -> void:
 	aim_arrow.global_position = P
 	aim_arrow.look_at(P + vec.normalized(), Vector3.UP)
 	aim_arrow.scale = Vector3(1.0, 1.0, maxf(vec.length(), aim_min_len))
-func _ray_sphere_contact(ro: Vector3, rd: Vector3, center: Vector3, radius: float) -> Vector3:
-	var oc: Vector3 = ro - center
-	var b: float = 2.0 * rd.dot(oc)
-	var c: float = oc.dot(oc) - radius * radius
-	var disc: float = b * b - 4.0 * c
-
-	if disc >= 0.0:
-		var sd: float = sqrt(disc)
-		var t1: float = (-b - sd) * 0.5
-		var t2: float = (-b + sd) * 0.5
-		var t: float = -1.0
-		if t1 > 0.0:
-			t = t1
-		elif t2 > 0.0:
-			t = t2
-		if t > 0.0:
-			return ro + rd * t
-
-	# ---- your lines, with types + maxf() ----
-	var t_closest: float = -rd.dot(oc)
-	var closest: Vector3 = ro + rd * maxf(t_closest, 0.0)
-	var dir_to: Vector3 = closest - center
-	# -----------------------------------------
-
-	if dir_to == Vector3.ZERO:
-		dir_to = ro - center
-	return center + dir_to.normalized() * radius
 
 func _resolve_ball() -> RigidBody3D:
 	if String(current_ball_path) == "":
@@ -384,6 +363,8 @@ func _update_charge_ui_from_replication() -> void:
 	_charge_bar.visible = _charge > 0.001 or _net["shoot_down"]
 
 func simulate_server(delta: float) -> void:
+	#if is_instance_valid(current_ball) and current_ball.linear_velocity.length() > 0.1:
+		#log_ball_velocity()
 	if current_ball_path:
 		_resolve_ball() 
 	_update_cooldowns(delta)
@@ -542,76 +523,79 @@ func perform_dribble_server(direction: int) -> void:
 	var approx_contact := ball_pos - fwd * radius
 	var local_contact := current_ball.to_local(approx_contact).lerp(Vector3.ZERO, 0.4)
 	current_ball.sleeping = false
+	print("about to apply impulse in dribble with values: ", J)
 	current_ball.apply_impulse(J, local_contact)
 
 func _handle_shoot_server() -> void:
 	# Use edge up for the release shot
 	if aim_active and current_ball != null and _btn_just_released("shoot"):
-		print("shoot all conditions have been met")
+		#print("shoot all conditions have been met")
 		_kick_at_contact_server()
 
 func _kick_at_contact_server() -> void:
-	if !is_instance_valid(current_ball):
+	if current_ball == null or !is_instance_valid(current_ball):
 		return
-	if not _can_perform("shoot", stamina_min_to_shoot + _charge*shoot_cost_mul): return
-	var C := current_ball.global_transform.origin
-	var R := _get_ball_radius(current_ball)
+	if aim_arrow == null or !is_instance_valid(aim_arrow):
+		return
+	if _charge <= 0.0:
+		return
 
-	# --- NEW: build hit_point from latest input, clamped to ball surface ---
-	var hit_point: Vector3
-	var target: Variant = _net.get("aim_contact", null)  # may be Vector3 or null
-	if target is Vector3:
-		var dir := (target as Vector3) - C
-		if dir.length() < 1e-5:
-			dir = C - global_transform.origin  # fallback: from player toward ball
-		dir = dir.normalized()
-		hit_point = C - dir * R              # clamp onto sphere surface
-	else:
-		var dir2 := C - global_transform.origin
-		if dir2.length() < 1e-5:
-			dir2 = Vector3.FORWARD
-		hit_point = C - dir2.normalized() * R
+	# Ball center and radius
+	var C: Vector3 = current_ball.global_transform.origin
+	var R: float = _get_ball_radius(current_ball)
 
-	# (optional) keep visuals in sync
-	aim_contact = hit_point
-	# ----------------------------------------------------------------------
+	# Ray from the aim arrow (forward is -Z after look_at)
+	var axf: Transform3D = aim_arrow.global_transform
+	var ro: Vector3 = axf.origin
+	var rd: Vector3 = (-axf.basis.z).normalized()
 
-	var impulse_dir := (C - hit_point).normalized()
+	# ---- Ray → sphere (ball) ----
+	var oc: Vector3 = ro - C
+	var bq: float = 2.0 * rd.dot(oc)
+	var cq: float = oc.dot(oc) - R * R
+	var disc: float = bq * bq - 4.0 * cq
 
-	var linear := impulse_dir * kick_force
-	var lift := Vector3.UP * kick_up
+	var hit_point: Vector3 = Vector3.ZERO
+	if disc >= 0.0:
+		var sd: float = sqrt(disc)
+		var t1: float = (-bq - sd) * 0.5
+		var t2: float = (-bq + sd) * 0.5
+		var t: float = -1.0
+		if t1 > 0.0:
+			t = t1
+		elif t2 > 0.0:
+			t = t2
+		if t > 0.0:
+			hit_point = ro + rd * t
 
-	var q := clampf(_charge, 0.0, 1.0)
-	var m := clampf(charge_knee, 0.05, 0.95)
-	var s := maxf(0.001, charge_steepness)
-	var f0 := 1.0 / (1.0 + exp(-s * (0.0 - m)))
-	var f1 := 1.0 / (1.0 + exp(-s * (1.0 - m)))
-	var f  := 1.0 / (1.0 + exp(-s * (q - m)))
-	var q_eased := (f - f0) / maxf(1e-6, (f1 - f0))
-	var charge_mul := lerpf(charge_min_mul, charge_max_mul, q_eased)
+	# Fallback: closest point along the arrow ray projected to the sphere surface
+	if hit_point == Vector3.ZERO:
+		var t_closest: float = maxf(-rd.dot(oc), 0.0)
+		var closest: Vector3 = ro + rd * t_closest
+		var dir_to: Vector3 = closest - C
+		if dir_to == Vector3.ZERO:
+			dir_to = ro - C
+		hit_point = C + dir_to.normalized() * R
 
-	var v_player := (_pre_move_vel if _pre_move_vel != Vector3.ZERO else velocity)
-	var v_along := maxf(v_player.dot(impulse_dir), 0.0)
-	var v_ref := (vel_ref_speed if vel_ref_speed > 0.0 else maxf(0.001, sprint_speed))
-	var v_norm := clampf(v_along / v_ref, 0.0, 1.0)
-	var vel_mul := lerpf(1.0 - vel_influence, 1.0 + vel_influence, v_norm)
+	# Impulse direction from contact → center (pure geometry)
+	var dir: Vector3 = (C - hit_point).normalized()
 
-	var J := (linear + lift) * (charge_mul * vel_mul)
-	if kick_max_impulse > 0.0:
-		var Jlen := J.length()
-		if Jlen > kick_max_impulse:
-			J *= kick_max_impulse / Jlen
+	# Strength from charge (tweak exponent as you like)
+	var q: float = clampf(_charge, 0.0, 1.0)
+	var exponent: float = 2.0
+	var strength: float = kick_force * pow(q, exponent)
 
+	var J: Vector3 = dir * strength
+	J.y += 0.06  # add a little lift; tune/disable if undesired
+	#print("the strength is: ", J)
 	current_ball.sleeping = false
-	var local_contact := current_ball.to_local(hit_point)
-	current_ball.apply_impulse(J, local_contact)
+	current_ball.apply_impulse(J, hit_point)
 
-	_cooldowns["shoot"] = shoot_cooldown + J.length() * cooldown_per_impulse
+	# housekeeping
+	_cooldowns["shoot"] = shoot_cooldown
 	_charge = 0.0
 	if is_instance_valid(_charge_bar):
 		_charge_bar.value = 0.0
-		
-# --- Tackle / latch (server) ---
 
 func _handle_tackle_input_server(delta: float) -> void:
 	

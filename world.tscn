@@ -1,8 +1,9 @@
-[gd_scene load_steps=12 format=3 uid="uid://ex55agd4o2wj"]
+[gd_scene load_steps=13 format=3 uid="uid://ex55agd4o2wj"]
 
 [ext_resource type="Script" uid="uid://garne2t5qlao" path="res://scripts/world.gd" id="1_tlwt5"]
 [ext_resource type="PackedScene" uid="uid://dv5l1qjf5gwfn" path="res://Player.tscn" id="3_aqk2v"]
 [ext_resource type="PackedScene" uid="uid://dpicujbq5yvvi" path="res://PlayerCamera.tscn" id="3_tlwt5"]
+[ext_resource type="Script" uid="uid://dqski1v7ddsi4" path="res://ball.gd" id="4_aqk2v"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_ayaqe"]
 
@@ -67,6 +68,7 @@ collision_layer = 4
 collision_mask = 3
 mass = 0.1
 can_sleep = false
+script = ExtResource("4_aqk2v")
 
 [node name="Mesh" type="MeshInstance3D" parent="Scene/Ball"]
 mesh = SubResource("SphereMesh_djrsh")
@@ -80,9 +82,10 @@ metadata/_edit_lock_ = true
 replication_config = SubResource("SceneReplicationConfig_tlwt5")
 
 [node name="SpawnPoints" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7.1627, 0, 0)
 
 [node name="Marker3D" type="Marker3D" parent="SpawnPoints"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6.76195, -0.0660555, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.71667, -0.0660555, 0)
 
 [node name="Marker3D2" type="Marker3D" parent="SpawnPoints"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.2403, -0.108868, 4.76837e-07)
