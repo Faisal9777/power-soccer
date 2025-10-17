@@ -10,44 +10,63 @@ var _players: Dictionary[int, CharacterBody3D] = {}    # { int: Node }
 # Input pump
 const NET_INPUT_HZ: float = 30.0
 var _input_accum: float = 0.0
+var  tackle_edge_latched := false
+var  stop_ball_edge_latched := false
+var  jump_edge_latched := false
+var  shoot_edge_latched := false
 
 func _ready() -> void:
-	# Ensure a MultiplayerSpawner exists and knows how to spawn players under /Players
+	
+	# If you didn't set the spawner in the editor, do it here:
 	var spawner := players_root.get_node_or_null("MultiplayerSpawner")
 	if spawner == null:
 		spawner = MultiplayerSpawner.new()
 		spawner.name = "MultiplayerSpawner"
 		spawner.spawn_path = players_root.get_path()
-		if player_scene == null:
-			push_error("World.gd: player_scene not assigned"); # early warning
-		else:
-			spawner.add_spawnable_scene(player_scene.resource_path)
+		spawner.add_spawnable_scene(player_scene.resource_path)
 		players_root.add_child(spawner)
+	# 1) Connect to the Network autoload signals (do it here so it works even if not wired in editor)
 
-	# Network autoload signals
 	Network.server_started.connect(_on_server_started)
 	Network.joined_server.connect(_on_joined_server)
 	Network.peer_joined.connect(_on_peer_joined)
 	Network.peer_left.connect(_on_peer_left)
 
-	# If a preplaced Player exists, register it for the host
+	# 2) If a Player is already in the scene (your case), register it for the host
 	var pre := get_node_or_null("Player")
 	if pre != null:
-		pre.set_multiplayer_authority(1)   # server-auth: server simulates everyone
+		# Server must own/simulate every player in server-auth
+		pre.set_multiplayer_authority(1)
 		_players[1] = pre
 		print("Registered preplaced Player as host player; authority=", pre.get_multiplayer_authority())
+func _physics_process(delta: float) -> void:
+	#if  Input.is_action_just_pressed("tackle"): print("tackle input was detected in physics process")
+	#var inputs := _gather_input()
+	#_send_local_input(inputs)
+	_update_inputs() 
+	_input_accum += delta
+	var step: float = 1.0 / NET_INPUT_HZ
+	while _input_accum >= step:
+		_input_accum -= step
+		_send_local_input()
+		_reset_inputs()
 
-	# ---------- CATCH-UP: spawn everyone already connected ----------
-	# When we come here from the Lobby, the server is already hosting and clients are already connected,
-	# so the 'server_started' / 'peer_joined' signals won't fire again. Do it now.
-	if multiplayer.multiplayer_peer is ENetMultiplayerPeer:
-		if multiplayer.is_server():
-			# Host (peer 1)
-			_spawn_player_for(1)
-			# All currently connected clients
-			for id in multiplayer.get_peers():
-				_spawn_player_for(id)
-		# Clients don't spawn themselves; they wait for the server to replicate.
+func _update_inputs() -> void:
+	if Input.is_action_just_pressed("jump") and not jump_edge_latched:
+		jump_edge_latched = true
+	if Input.is_action_just_pressed("tackle") and not tackle_edge_latched:
+		tackle_edge_latched = true			
+	if Input.is_action_just_pressed("stop_ball") and not stop_ball_edge_latched:
+		stop_ball_edge_latched = true		
+	if Input.is_action_just_released("shoot") and not shoot_edge_latched:
+		shoot_edge_latched = true	
+
+func _reset_inputs() -> void:
+	jump_edge_latched = false
+	tackle_edge_latched = false
+	stop_ball_edge_latched = false
+	shoot_edge_latched = false
+
 
 func _process(delta: float) -> void:
 	if Input.is_action_just_pressed("check_user"):
@@ -67,11 +86,11 @@ func _process(delta: float) -> void:
 	#print("am i connected? ", multiplayer.multiplayer_peer != null and multiplayer.is_server())
 	#print("total numbers of players joined: ", multiplayer.get_peers())
 	# Input pump
-	_input_accum += delta
-	var step: float = 1.0 / NET_INPUT_HZ
-	while _input_accum >= step:
-		_input_accum -= step
-		_send_local_input()
+	#_input_accum += delta
+	#var step: float = 1.0 / NET_INPUT_HZ
+	#while _input_accum >= step:
+		#_input_accum -= step
+		#_send_local_input()
 
 func _is_really_hosting() -> bool:
 	return multiplayer.multiplayer_peer is ENetMultiplayerPeer and multiplayer.is_server()
@@ -132,12 +151,12 @@ func _spawn_player_for(id: int) -> void:
 	p = player_scene.instantiate()
 	p.name = "Player_%d" % id
 	# Put at a spawn point if you have one
-	var sp := spawn_points.get_node_or_null("Marker3D%d" % ((id - 1) % max(1, spawn_points.get_child_count())))
-	if sp:
-		p.global_transform = sp.global_transform
-		print("[spawn] peer", id, "at", sp.global_transform.origin)
-	else:
-		print("[spawn] peer", id, "NO MARKER, default to", p.global_transform.origin)
+	#var sp := spawn_points.get_node_or_null("Marker3D%d" % ((id - 1) % max(1, spawn_points.get_child_count())))
+	var sp := spawn_points.get_node_or_null("Marker3D")
+	if sp: p.global_transform = sp.global_transform
+
+		
+
 	p.set_multiplayer_authority(1)  # SERVER owns/simulates in server-auth
 	#print("the id bbeofre setting owner peer id: ", id)
 	p.owner_peer_id = id  # who should see/control this player locally
@@ -166,23 +185,21 @@ func _gather_input() -> Dictionary:
 		var me: CharacterBody3D = _players.get(multiplayer.get_unique_id(), null) as CharacterBody3D
 		if me:
 			yaw = me.rotation.y
-			
-	
 	
 	return {
 		"mvx": mvx,
 		"mvz": mvz,
 		"sprint": Input.is_action_pressed("sprint"),
-		"jump_pressed": Input.is_action_just_pressed("jump"),
-		"tackle_pressed": Input.is_action_just_pressed("tackle"),
+		"jump_pressed": jump_edge_latched,
+		"tackle_pressed": tackle_edge_latched,
 		"dribble": Input.is_action_pressed("dribble"),
-		"stop_ball": Input.is_action_pressed("stop_ball"),
+		"stop_ball": stop_ball_edge_latched,
 		"shoot_down": Input.is_action_pressed("shoot"),
-		"shoot_up": Input.is_action_just_released("shoot"),
+		"shoot_up": shoot_edge_latched,
 		"rmb": Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT),
 		"cam_yaw": yaw
 	}
-
+#
 func _send_local_input() -> void:
 	# 0) If there is no network peer yet (single-player / not joined / not hosting), do nothing
 	if multiplayer.multiplayer_peer == null:
@@ -190,8 +207,10 @@ func _send_local_input() -> void:
 		return
 	var d := _gather_input()
 	if _players.has(1):
+		#print("_players.has(1)")
 		var p: CharacterBody3D = _players[1]
 		if p and p.has_method("apply_net_input"):
+			#print("_players.has(1)2")
 			p.apply_net_input(d)
 	else:
 		# Client: only send if we’re actually connected to the server (peer 1)
@@ -204,82 +223,55 @@ func _send_local_input() -> void:
 @rpc("any_peer")
 func _rpc_client_input(from_id: int, d: Dictionary) -> void:
 	#print("the input is coming from the player: ", from_id)
+	#print("_rpc_client_input")
 	if _players.has(from_id):
+		#print("_rpc_client_input2")
 		var p: CharacterBody3D = _players[from_id]
 		if p and p.has_method("apply_net_input"):
+			#print("_rpc_client_input3")
 			p.apply_net_input(d)
 			
 
 func _notify_client_to_attach_camera(p: Node, peer_id: int) -> void:
-	print("[notify] attach -> peer=", peer_id, " path=", p.get_path(), " my_id=", multiplayer.get_unique_id())
+	# If this machine IS the owner (e.g., listen server’s own player), just do it locally.
 	if multiplayer.get_unique_id() == peer_id:
 		_rpc_attach_cam(p.get_path())
 	else:
 		rpc_id(peer_id, "_rpc_attach_cam", p.get_path())
-#
-#@rpc("any_peer", "call_local")
-#func _rpc_attach_cam(player_path: NodePath) -> void:
-	#var p := get_node_or_null(player_path)
-	#if p == null:
-		## Player may not be ready yet on this client; try a frame later.
-		#await get_tree().process_frame
-		#p = get_node_or_null(player_path)
-	#if p == null:
-		#print("Camera attach: player not found on client")
-		#return
-#
-	## Find your camera (pick whichever suits your project)
-	## Option 1: a global camera in the scene tagged by group
-	##var cam := get_tree().get_first_node_in_group("Camera3D")
-	#var cam := get_node_or_null("/root/World/Scene/Camera3D")
-	## Option 2: a camera under the player
-	#if cam == null:
-		#cam = p.get_node_or_null("Camera3D")
-	#if cam:
-		#cam.set_target(p)
-		#cam.activate()
-	## Assign camera variable on the Player and hook it up
-	#if p.has_method("attach_camera"):
-		#p.attach_camera(cam)
-	##if cam and cam.has_method("set_target"):
-		##cam.call_deferred("set_target", p)  # use deferred in case camera script isn’t ready yet
-	##elif cam:
-		### Fallback: just make it current
-		##if "current" in cam:
-			##cam.current = true
-	#else:
-		#print("No camera found to attach on client")
+
 @rpc("any_peer", "call_local")
 func _rpc_attach_cam(player_path: NodePath) -> void:
 	var p := get_node_or_null(player_path)
 	if p == null:
+		# Player may not be ready yet on this client; try a frame later.
 		await get_tree().process_frame
 		p = get_node_or_null(player_path)
 	if p == null:
-		print("[cam] player not found for:", player_path); return
+		print("Camera attach: player not found on client")
+		return
 
-	# 1) Prefer world camera tagged MainCamera
-	var cam := get_tree().get_first_node_in_group("MainCamera") as Camera3D
-	# 2) Fallback: per-player camera if you add one later
+	# Find your camera (pick whichever suits your project)
+	# Option 1: a global camera in the scene tagged by group
+	#var cam := get_tree().get_first_node_in_group("Camera3D")
+	var cam := get_node_or_null("/root/World/Scene/Camera3D")
+	# Option 2: a camera under the player
 	if cam == null:
-		cam = p.get_node_or_null("Camera3D") as Camera3D
-	if cam == null:
-		print("[cam] no camera (no MainCamera group and no Player/Camera3D)"); return
-
-	# Wire targets
-	if cam.has_method("set_target"):
-		cam.call_deferred("set_target", p)
-	var ball := get_tree().get_first_node_in_group("Ball") as Node3D
-	if cam.has_method("set_ball") and ball:
-		cam.call_deferred("set_ball", ball)
-
-	# Make it current
-	if cam.has_method("activate"):
-		cam.call_deferred("activate")
+		cam = p.get_node_or_null("Camera3D")
+	if cam:
+		cam.set_target(p)
+		cam.activate()
+	# Assign camera variable on the Player and hook it up
+	if p.has_method("attach_camera"):
+		p.attach_camera(cam)
+	#if cam and cam.has_method("set_target"):
+		#cam.call_deferred("set_target", p)  # use deferred in case camera script isn’t ready yet
+	#elif cam:
+		## Fallback: just make it current
+		#if "current" in cam:
+			#cam.current = true
 	else:
-		cam.call_deferred("set", "current", true)
+		print("No camera found to attach on client")
 
-	print("[cam] attached on peer", multiplayer.get_unique_id(), " to player:", p.name, " cam:", cam.get_path())
 func _focus_camera_on_player(p: Node, peer_id: int) -> void:
 	# Find your camera (adjust the path/group/name to your project)
 	var my_id := multiplayer.get_unique_id()

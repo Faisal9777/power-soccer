@@ -26,13 +26,13 @@ properties/1/replication_mode = 1
 properties/2/path = NodePath(".:aim_active")
 properties/2/spawn = true
 properties/2/replication_mode = 1
-properties/3/path = NodePath(".:aim_contact")
+properties/3/path = NodePath(".:_charge")
 properties/3/spawn = true
 properties/3/replication_mode = 1
-properties/4/path = NodePath(".:_charge")
+properties/4/path = NodePath(".:_stamina")
 properties/4/spawn = true
 properties/4/replication_mode = 1
-properties/5/path = NodePath(".:_stamina")
+properties/5/path = NodePath(".:current_ball_path")
 properties/5/spawn = true
 properties/5/replication_mode = 1
 
@@ -43,7 +43,6 @@ script = ExtResource("1_xhfnw")
 sprint_speed = 12.0
 
 [node name="Mesh" type="MeshInstance3D" parent="."]
-layers = 512
 mesh = SubResource("CapsuleMesh_2vmtx")
 
 [node name="PlayerCollision" type="CollisionShape3D" parent="."]
