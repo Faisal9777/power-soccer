@@ -3,7 +3,10 @@ extends Node
 # --- Assign in the inspector or hardcode a PackedScene for clients that join ---
 @export var player_scene: PackedScene
 @onready var spawn_points := $SpawnPoints   # optional, if you have markers named SpawnPoint0/1/2...
-@onready var players_root := $Players 
+@onready var players_root := $Players
+@onready var is_mobile: bool = OS.has_feature("mobile") 
+@export var joystick_path: NodePath
+@onready var joystick: Node = get_node(joystick_path) 
 # Keep a typed map of peer-id -> Player node
 var _players: Dictionary[int, CharacterBody3D] = {}    # { int: Node }
 
@@ -25,13 +28,16 @@ func _ready() -> void:
 		spawner.spawn_path = players_root.get_path()
 		spawner.add_spawnable_scene(player_scene.resource_path)
 		players_root.add_child(spawner)
+	if get_tree().get_multiplayer().is_server():
+		_server_begin_match(GameState.pending_spawn_ids)
+	
 	# 1) Connect to the Network autoload signals (do it here so it works even if not wired in editor)
 
-	Network.server_started.connect(_on_server_started)
-	Network.joined_server.connect(_on_joined_server)
-	Network.peer_joined.connect(_on_peer_joined)
-	Network.peer_left.connect(_on_peer_left)
-
+	#Network.server_started.connect(_on_server_started)
+	#Network.joined_server.connect(_on_joined_server)
+	#Network.peer_joined.connect(_on_peer_joined)
+	#Network.peer_left.connect(_on_peer_left)
+	
 	# 2) If a Player is already in the scene (your case), register it for the host
 	var pre := get_node_or_null("Player")
 	if pre != null:
@@ -39,6 +45,13 @@ func _ready() -> void:
 		pre.set_multiplayer_authority(1)
 		_players[1] = pre
 		print("Registered preplaced Player as host player; authority=", pre.get_multiplayer_authority())
+
+func _server_begin_match(peer_ids: Array[int]) -> void:
+	for id in peer_ids:
+		_log_pid("the id of the current machine: ")
+		print("the id is: ", id)
+		_on_peer_joined(id)  # your existing spawn path
+
 func _physics_process(delta: float) -> void:
 	#if  Input.is_action_just_pressed("tackle"): print("tackle input was detected in physics process")
 	#var inputs := _gather_input()
@@ -50,7 +63,8 @@ func _physics_process(delta: float) -> void:
 		_input_accum -= step
 		_send_local_input()
 		_reset_inputs()
-
+func _shoot_action() -> String:
+	return "shoot_touch" if is_mobile else "shoot"
 func _update_inputs() -> void:
 	if Input.is_action_just_pressed("jump") and not jump_edge_latched:
 		jump_edge_latched = true
@@ -58,7 +72,7 @@ func _update_inputs() -> void:
 		tackle_edge_latched = true			
 	if Input.is_action_just_pressed("stop_ball") and not stop_ball_edge_latched:
 		stop_ball_edge_latched = true		
-	if Input.is_action_just_released("shoot") and not shoot_edge_latched:
+	if Input.is_action_just_released(_shoot_action()) and not shoot_edge_latched:
 		shoot_edge_latched = true	
 
 func _reset_inputs() -> void:
@@ -129,6 +143,12 @@ func _on_peer_joined(id: int) -> void:
 	if multiplayer.is_server():
 		_spawn_player_for(id)
 
+func on_peer_joined(id: int) -> void:
+	print("Peer joined: ", id)
+	if multiplayer.is_server():
+		_spawn_player_for(id)
+
+
 func _on_peer_left(id: int) -> void:
 	print("Peer left: ", id)
 	if _players.has(id):
@@ -173,8 +193,16 @@ func _spawn_player_for(id: int) -> void:
 # -------------------------
 
 func _gather_input() -> Dictionary:
-	var mvx := Input.get_action_strength("move_right") - Input.get_action_strength("move_left")
-	var mvz := Input.get_action_strength("move_forward") - Input.get_action_strength("move_back")
+	var mvx : float = 0.0
+	var mvz : float = 0.0
+	if is_mobile and is_instance_valid(joystick):
+		var v2: Vector2 = joystick.vector
+		if v2.length() > 0.01:
+			mvx = v2.x
+			mvz = v2.y	
+	else: 
+		mvx = Input.get_action_strength("move_right") - Input.get_action_strength("move_left")
+		mvz = Input.get_action_strength("move_forward") - Input.get_action_strength("move_back")
 	
 	var yaw := 0.0
 	var cam := get_viewport().get_camera_3d()
@@ -194,7 +222,7 @@ func _gather_input() -> Dictionary:
 		"tackle_pressed": tackle_edge_latched,
 		"dribble": Input.is_action_pressed("dribble"),
 		"stop_ball": stop_ball_edge_latched,
-		"shoot_down": Input.is_action_pressed("shoot"),
+		"shoot_down": Input.is_action_pressed(_shoot_action()),
 		"shoot_up": shoot_edge_latched,
 		"rmb": Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT),
 		"cam_yaw": yaw
@@ -235,12 +263,12 @@ func _rpc_client_input(from_id: int, d: Dictionary) -> void:
 func _notify_client_to_attach_camera(p: Node, peer_id: int) -> void:
 	# If this machine IS the owner (e.g., listen server’s own player), just do it locally.
 	if multiplayer.get_unique_id() == peer_id:
-		_rpc_attach_cam(p.get_path())
+		_rpc_attach_cam(p.get_path(), joystick)
 	else:
-		rpc_id(peer_id, "_rpc_attach_cam", p.get_path())
+		rpc_id(peer_id, "_rpc_attach_cam", p.get_path(), joystick)
 
 @rpc("any_peer", "call_local")
-func _rpc_attach_cam(player_path: NodePath) -> void:
+func _rpc_attach_cam(player_path: NodePath, joystick : Node) -> void:
 	var p := get_node_or_null(player_path)
 	if p == null:
 		# Player may not be ready yet on this client; try a frame later.
@@ -262,7 +290,7 @@ func _rpc_attach_cam(player_path: NodePath) -> void:
 		cam.activate()
 	# Assign camera variable on the Player and hook it up
 	if p.has_method("attach_camera"):
-		p.attach_camera(cam)
+		p.attach_camera(cam, joystick)
 	#if cam and cam.has_method("set_target"):
 		#cam.call_deferred("set_target", p)  # use deferred in case camera script isn’t ready yet
 	#elif cam:
