@@ -599,16 +599,40 @@ func _kick_at_contact_server() -> void:
 	var strength: float = kick_force * pow(q, exponent)
 
 	var J: Vector3 = dir * strength
-	J.y += 0.06  # add a little lift; tune/disable if undesired
-	#print("the strength is: ", J)
-	current_ball.sleeping = false
-	current_ball.apply_impulse(J, hit_point)
 
+	current_ball.sleeping = false
+	current_ball.apply_impulse(J,  hit_point - C)
 	# housekeeping
 	_cooldowns["shoot"] = shoot_cooldown
 	_charge = 0.0
 	if is_instance_valid(_charge_bar):
 		_charge_bar.value = 0.0
+
+func _debug_red_dot(ball: Node3D,p: Vector3, seconds: float = 1.5, size: float = 0.06) -> void:
+	var mi := MeshInstance3D.new()
+	var sphere := SphereMesh.new()
+	sphere.radius = size
+	sphere.height = size * 2.0
+	sphere.radial_segments = 12
+	sphere.rings = 6
+	mi.mesh = sphere
+
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(1, 0, 0)        # red
+	mat.unshaded = true
+	mat.disable_fog = true
+	mi.material_override = mat
+
+	mi.global_position = p
+
+	# Put it under the current scene / world root
+	#get_tree().current_scene.add_child(mi)
+	current_ball.add_child(mi)
+	# Place at the hit point relative to the ball
+	mi.position = current_ball.to_local(p)
+	# Auto-remove after a moment
+	var t := get_tree().create_timer(seconds)
+	t.timeout.connect(func(): if is_instance_valid(mi): mi.queue_free())
 
 func _handle_tackle_input_server(delta: float) -> void:
 	
