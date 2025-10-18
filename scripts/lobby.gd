@@ -146,7 +146,7 @@ extends Control
 @onready var start_btn: Button     = $PanelContainer/VBoxContainer/HBoxContainer/StartButton
 @onready var leave_btn: Button     = $PanelContainer/VBoxContainer/HBoxContainer/LeaveButton
 @onready var ready_btn: Button     = $PanelContainer/VBoxContainer/HBoxContainer/ReadyButton
-
+var _player_ids: Array[int] = []
 const WORLD_SCENE := "res://World.tscn"
 
 func _ready() -> void:
@@ -169,9 +169,9 @@ func _ready() -> void:
 	start_btn.pressed.connect(_on_start)
 	leave_btn.pressed.connect(_on_leave)
 	ready_btn.pressed.connect(_on_ready_toggle)
-
+	GameState.pending_spawn_ids.append(1)
 	# Keep UI fresh on joins/leaves (host mainly)
-	Network.peer_joined.connect(func(_id): _refresh_ui())
+	Network.peer_joined.connect(func(_id): _refresh_ui(); _add_players(_id))
 	Network.peer_left.connect(func(id):
 		if GameState.is_host and GameState.roster.has(id):
 			GameState.roster.erase(id)
@@ -217,10 +217,14 @@ func _refresh_ui() -> void:
 		player_list.add_item(label)
 
 	status_label.text = "Connected: %d" % int(GameState.roster.size())
+
+func _add_players(id:int) -> void:
+	GameState.pending_spawn_ids.append(id)
+
 func _my_ready() -> bool:
 	var me := multiplayer.get_unique_id()
 	return GameState.roster.has(me) and GameState.roster[me]["ready"]
-
+ 
 func _set_my_ready_local(v: bool) -> void:
 	var me := multiplayer.get_unique_id()
 	if !GameState.roster.has(me):
@@ -267,5 +271,5 @@ func _rpc_set_roster(snapshot: Array) -> void:
 	_refresh_ui()
 
 @rpc("any_peer", "call_local")
-func _rpc_start_match(scene_path: String) -> void:
+func _rpc_start_match(scene_path: String) -> void:     # now valid
 	get_tree().change_scene_to_file(scene_path)

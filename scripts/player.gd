@@ -112,7 +112,8 @@ var _ui_charge := 0.0  # client-only visual charge
 @onready var kick_area: Area3D = $KickArea
 @onready var tackle_field: Area3D = $TackleField
 @onready var ball_latch_anchor: Node3D = Node3D.new()
-
+@onready var is_mobile: bool = OS.has_feature("mobile")
+@onready var joystick: Node = null
 var _cooldowns := {"shoot": 0.0, "move": 0.0, "jump": 0.0}
 
 # --- Net input state (fed by world.gd on the server) ---
@@ -142,7 +143,8 @@ func apply_net_input(d: Dictionary) -> void:
 				#_net[k] = _net[k] + d[k]
 			#else:
 				#_net[k] = d[k]
-func attach_camera(c: Camera3D) -> void:
+func attach_camera(c: Camera3D, j : Node) -> void:
+	joystick = j
 	cam = c
 	if cam and _is_local_owner():
 		#print("hiding mesh for player: ", owner_peer_id)
@@ -225,6 +227,12 @@ func _ready() -> void:
 	_ensure_aim_arrow()
 	if is_local:
 		_client_side_setup()
+	# ⬇️ prevent taps-anywhere from triggering 'shoot'
+	if is_mobile:
+		var ev := InputEventMouseButton.new()
+		ev.button_index = MOUSE_BUTTON_LEFT
+		InputMap.action_erase_event("shoot", ev)   # remove mouse-left binding at runtime
+
 	
 func _log_pid(msg : String) -> void:
 	print(msg, OS.get_process_id())
@@ -444,6 +452,11 @@ func _handle_action_server(input_dir: Vector3, delta: float) -> void:
 	_handle_kick_action_server()
 
 func _move_server(input_dir: Vector3, delta: float) -> void:
+	var mag := 1.0
+	if is_mobile and is_instance_valid(joystick):
+		mag = joystick.mag
+		walk_speed = walk_speed + (sprint_speed - walk_speed) * mag
+
 	var target_speed := sprint_speed if _btn_down("sprint") and _can_perform("sprint", stamina_sprint_drain * delta) else walk_speed
 	var lateral := velocity; lateral.y = 0.0
 	var target_vel := input_dir * target_speed

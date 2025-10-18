@@ -1,21 +1,21 @@
-[gd_scene load_steps=65 format=4 uid="uid://b0autf4kxd4x8"]
+[gd_scene load_steps=66 format=4 uid="uid://ex55agd4o2wj"]
 
 [ext_resource type="Script" uid="uid://nccn213w78dk" path="res://scripts/world.gd" id="1_4h6ng"]
 [ext_resource type="Texture2D" uid="uid://lg2bc8rys6fs" path="res://bg_cliffs.png" id="2_bc84e"]
 [ext_resource type="PackedScene" uid="uid://dv5l1qjf5gwfn" path="res://Player.tscn" id="2_o3ebs"]
 [ext_resource type="Texture2D" uid="uid://bvxkxaod0qfp" path="res://grass.png" id="2_tlwt5"]
 [ext_resource type="Texture2D" uid="uid://iqnucbl6j3qr" path="res://fence.png" id="4_aqk2v"]
-[ext_resource type="Script" uid="uid://2id0s4h5brsa" path="res://scripts/GoalTrigger.gd" id="5_2u3nc"]
-[ext_resource type="Script" uid="uid://llbs0uar3w3u" path="res://scripts/bot.gd" id="6_bo7i5"]
+[ext_resource type="Script" path="res://scripts/GoalTrigger.gd" id="5_2u3nc"]
+[ext_resource type="Script" path="res://scripts/bot.gd" id="6_bo7i5"]
 [ext_resource type="Texture2D" uid="uid://ckyaiflvqt25u" path="res://teleporter.png" id="6_dwbse"]
-[ext_resource type="Script" uid="uid://dik215cvsxd74" path="res://scripts/teleporter_pad.gd" id="6_pkg7o"]
-[ext_resource type="Script" uid="uid://dewcp3wer75qd" path="res://scripts/spring_pad.gd" id="7_pkg7o"]
-[ext_resource type="Script" uid="uid://bpbky3qchyq2t" path="res://scripts/spring_mesh.gd" id="8_gbfbk"]
+[ext_resource type="Script" path="res://scripts/teleporter_pad.gd" id="6_pkg7o"]
+[ext_resource type="Script" path="res://scripts/spring_pad.gd" id="7_pkg7o"]
+[ext_resource type="Script" path="res://scripts/spring_mesh.gd" id="8_gbfbk"]
 [ext_resource type="PackedScene" uid="uid://dpicujbq5yvvi" path="res://PlayerCamera.tscn" id="8_o3ebs"]
-[ext_resource type="Script" uid="uid://citpqyq2an0lc" path="res://scripts/joy_stick.gd" id="9_k3n1d"]
+[ext_resource type="Script" path="res://scripts/joy_stick.gd" id="9_k3n1d"]
 [ext_resource type="Texture2D" uid="uid://cl47ta5h6ne1t" path="res://JumpButtonTexture.png" id="10_ic0uy"]
-[ext_resource type="Script" uid="uid://bxlilwfg5ktbn" path="res://scripts/ui.gd" id="11_wukud"]
-[ext_resource type="Script" uid="uid://dd73weg2gsjs5" path="res://scripts/goal_markers.gd" id="12_70uel"]
+[ext_resource type="Script" path="res://scripts/ui.gd" id="11_wukud"]
+[ext_resource type="Script" path="res://scripts/goal_markers.gd" id="12_70uel"]
 [ext_resource type="Texture2D" uid="uid://q6muixq3msuu" path="res://ShootButtonTexture.png" id="12_k3n1d"]
 [ext_resource type="Texture2D" uid="uid://cj3trlht0ycuh" path="res://BlueMarker.png" id="13_70uel"]
 [ext_resource type="Texture2D" uid="uid://dlck27v585nd0" path="res://StopButtonTexture.png" id="13_cbp6q"]
@@ -23,10 +23,10 @@
 [ext_resource type="Texture2D" uid="uid://sa84j336yugo" path="res://KnobTexture.png" id="13_il2jm"]
 [ext_resource type="Texture2D" uid="uid://cs11ipm60d843" path="res://TackleButtonTexture.png" id="14_26xuy"]
 [ext_resource type="Texture2D" uid="uid://bxp55xgu8bvdm" path="res://DribbleButtonTexture.png" id="15_bc84e"]
-[ext_resource type="Script" uid="uid://dg86aqlcacndc" path="res://scripts/scoreboard.gd" id="15_hiqwa"]
+[ext_resource type="Script" path="res://scripts/scoreboard.gd" id="15_hiqwa"]
 [ext_resource type="Texture2D" uid="uid://b8dabvdjlh5yx" path="res://BallMarker.png" id="19_26xuy"]
 [ext_resource type="Texture2D" uid="uid://b7gmnh5r1vvi1" path="res://FocusTexture.png" id="19_wjb0r"]
-[ext_resource type="Script" uid="uid://bsy8c7k1uyiqc" path="res://scripts/focus.gd" id="20_mc2jv"]
+[ext_resource type="Script" path="res://scripts/focus.gd" id="20_mc2jv"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_ayaqe"]
 sky_top_color = Color(0.403922, 0.72549, 0.776471, 1)
@@ -70,6 +70,17 @@ height = 2.0
 
 [sub_resource type="SphereShape3D" id="SphereShape3D_6tagv"]
 radius = 1.0
+
+[sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_4h6ng"]
+properties/0/path = NodePath(".:global_transform")
+properties/0/spawn = true
+properties/0/replication_mode = 1
+properties/1/path = NodePath(".:linear_velocity")
+properties/1/spawn = true
+properties/1/replication_mode = 1
+properties/2/path = NodePath(".:angular_velocity")
+properties/2/spawn = true
+properties/2/replication_mode = 1
 
 [sub_resource type="CapsuleMesh" id="CapsuleMesh_2vmtx"]
 radius = 1.0
@@ -158,16 +169,16 @@ uv1_scale = Vector3(8, 8, 8)
 
 [sub_resource type="BoxMesh" id="BoxMesh_wse8f"]
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_4h6ng"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_o3ebs"]
 albedo_color = Color(0.85, 0.85, 0.9, 1)
 metallic = 0.9
 roughness = 0.2
 
-[sub_resource type="ArrayMesh" id="ArrayMesh_o3ebs"]
+[sub_resource type="ArrayMesh" id="ArrayMesh_k83mh"]
 _surfaces = [{
 "aabb": AABB(-0.559671, -0.0598102, -0.557261, 1.11934, 1.61962, 1.11452),
 "format": 34359738375,
-"material": SubResource("StandardMaterial3D_4h6ng"),
+"material": SubResource("StandardMaterial3D_o3ebs"),
 "primitive": 3,
 "uv_scale": Vector4(0, 0, 0, 0),
 "vertex_count": 12960,
@@ -231,6 +242,9 @@ metadata/_edit_lock_ = true
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Scene/Ball"]
 shape = SubResource("SphereShape3D_6tagv")
 metadata/_edit_lock_ = true
+
+[node name="BallSynchronizer" type="MultiplayerSynchronizer" parent="Scene/Ball"]
+replication_config = SubResource("SceneReplicationConfig_4h6ng")
 
 [node name="Bot" type="CharacterBody3D" parent="Scene" groups=["player"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5, 5, 0)
@@ -521,7 +535,7 @@ spring_mesh_path = NodePath("SpringMesh")
 top_plate_root_path = NodePath("TopPlateRoot")
 
 [node name="SpringMesh" type="MeshInstance3D" parent="SpringPad"]
-mesh = SubResource("ArrayMesh_o3ebs")
+mesh = SubResource("ArrayMesh_k83mh")
 script = ExtResource("8_gbfbk")
 
 [node name="TopPlateRoot" type="Node3D" parent="SpringPad"]
