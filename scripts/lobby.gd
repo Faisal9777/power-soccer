@@ -1,0 +1,131 @@
+
+extends Control
+
+@onready var status_label: Label   = $PanelContainer/VBoxContainer/StatusLabel
+@onready var player_list: ItemList = $PanelContainer/VBoxContainer/PlayerList
+@onready var start_btn: Button     = $PanelContainer/VBoxContainer/HBoxContainer/StartButton
+@onready var leave_btn: Button     = $PanelContainer/VBoxContainer/HBoxContainer/LeaveButton
+@onready var ready_btn: Button     = $PanelContainer/VBoxContainer/HBoxContainer/ReadyButton
+
+const WORLD_SCENE := "res://world.tscn"
+
+func _ready() -> void:
+	# If you opened via Create Server, ensure host record exists
+	print("[lobby] whoami=", multiplayer.get_unique_id(),
+	  " is_host=", GameState.is_host,
+	  " path=", get_path())
+
+	if GameState.is_host:
+		if !GameState.roster.has(1):
+			GameState.roster[1] = {"name": GameState.player_name, "ready": false}
+	else:
+		# Client: tell host our name on first frame (so Multiplayer is ready)
+		call_deferred("_submit_name_to_host")
+
+	# Buttons
+	start_btn.disabled = !GameState.is_host
+	ready_btn.text = "Unready" if _my_ready() else "Ready"
+
+	start_btn.pressed.connect(_on_start)
+	leave_btn.pressed.connect(_on_leave)
+	ready_btn.pressed.connect(_on_ready_toggle)
+
+	# Keep UI fresh on joins/leaves (host mainly)
+	Network.peer_joined.connect(func(_id): _refresh_ui())
+	Network.peer_left.connect(func(id):
+		if GameState.is_host and GameState.roster.has(id):
+			GameState.roster.erase(id)
+			_broadcast_roster()
+		_refresh_ui()
+	)
+
+	_refresh_ui()
+
+func _submit_name_to_host() -> void:
+	if multiplayer.multiplayer_peer == null: return
+	print("[client] sending name to host…")
+	rpc_id(1, "_rpc_submit_name", GameState.player_name)
+
+func _on_ready_toggle() -> void:
+	var new_ready := !_my_ready()
+	_set_my_ready_local(new_ready)
+	ready_btn.text = "Unready" if new_ready else "Ready"
+	# Tell host (authoritative) to update and broadcast
+	rpc_id(1, "_rpc_set_ready", multiplayer.get_unique_id(), new_ready)
+	_refresh_ui()
+
+func _on_start() -> void:
+	if !GameState.is_host: return
+	# Optional: enforce all-ready here
+	# for id in GameState.roster.keys():
+	# 	if !GameState.roster[id]["ready"]:
+	# 		push_warning("Not everyone is ready."); return
+	rpc("_rpc_start_match", WORLD_SCENE)
+
+func _on_leave() -> void:
+	GameState.reset_lobby()
+	Network.close_connection()
+	get_tree().change_scene_to_file("res://title_screen.tscn")
+
+func _refresh_ui() -> void:
+	player_list.clear()
+	for id in GameState.roster.keys():
+		var e = GameState.roster[id]
+		var host_tag  := " (Host)" if id == 1 else ""
+		var ready_tag := " ✓" if e["ready"] else ""
+		var label := "%s%s%s" % [e["name"], host_tag, ready_tag]
+		player_list.add_item(label)
+
+	status_label.text = "Connected: %d" % int(GameState.roster.size())
+func _my_ready() -> bool:
+	var me := multiplayer.get_unique_id()
+	return GameState.roster.has(me) and GameState.roster[me]["ready"]
+
+func _set_my_ready_local(v: bool) -> void:
+	var me := multiplayer.get_unique_id()
+	if !GameState.roster.has(me):
+		GameState.roster[me] = {"name": GameState.player_name, "ready": v}
+	else:
+		GameState.roster[me]["ready"] = v
+
+# ---------- RPCs ----------
+@rpc("any_peer")
+func _rpc_submit_name(name: String) -> void:
+	if !GameState.is_host:
+		return
+	var from := multiplayer.get_remote_sender_id()
+	print("[host] got name from peer ", from, ": ", name)
+	GameState.roster[from] = {"name": name, "ready": false}
+	_broadcast_roster()
+
+@rpc("any_peer")
+func _rpc_set_ready(peer_id: int, ready: bool) -> void:
+	if !GameState.is_host: return
+	var from := multiplayer.get_remote_sender_id()
+	if from != peer_id: return
+	if GameState.roster.has(peer_id):
+		GameState.roster[peer_id]["ready"] = ready
+	_broadcast_roster()
+
+func _broadcast_roster() -> void:
+	if !GameState.is_host: return
+	var snapshot: Array = []
+	for id in GameState.roster.keys():
+		var e = GameState.roster[id]
+		snapshot.append({"id": id, "name": e["name"], "ready": e["ready"]})
+	print("[host] broadcasting roster: ", snapshot)
+	rpc("_rpc_set_roster", snapshot)
+	_refresh_ui()
+
+@rpc("any_peer", "call_local")
+func _rpc_set_roster(snapshot: Array) -> void:
+	var dict := {}
+	for e in snapshot:
+		dict[int(e["id"])] = {"name": String(e["name"]), "ready": bool(e["ready"])}
+	GameState.roster = dict
+	print("[all] applied roster: ", GameState.roster)
+	_refresh_ui()
+
+@rpc("any_peer", "call_local")
+func _rpc_start_match(scene_path: String) -> void:
+	get_tree().change_scene_to_file(scene_path)
