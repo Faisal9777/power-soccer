@@ -1,5 +1,6 @@
 extends Node
 
+
 # --- Assign in the inspector or hardcode a PackedScene for clients that join ---
 @export var player_scene: PackedScene
 @onready var spawn_points := $SpawnPoints   # optional, if you have markers named SpawnPoint0/1/2...
@@ -12,6 +13,7 @@ var _players: Dictionary[int, CharacterBody3D] = {}    # { int: Node }
 
 # Input pump
 const NET_INPUT_HZ: float = 30.0
+var _my_player: Node = null
 var _input_accum: float = 0.0
 var  tackle_edge_latched := false
 var  stop_ball_edge_latched := false
@@ -225,7 +227,8 @@ func _gather_input() -> Dictionary:
 		"shoot_down": Input.is_action_pressed(_shoot_action()),
 		"shoot_up": shoot_edge_latched,
 		"rmb": Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT),
-		"cam_yaw": yaw
+		"cam_yaw": yaw,
+		"aim_position": _my_player.get_aim_arrow_position() if shoot_edge_latched else null
 	}
 #
 func _send_local_input() -> void:
@@ -269,6 +272,7 @@ func _notify_client_to_attach_camera(p: Node, peer_id: int) -> void:
 
 @rpc("any_peer", "call_local")
 func _rpc_attach_cam(player_path: NodePath, joystick : Node) -> void:
+	_my_player = get_node_or_null(player_path)
 	var p := get_node_or_null(player_path)
 	if p == null:
 		# Player may not be ready yet on this client; try a frame later.
