@@ -148,7 +148,11 @@ extends Control
 @onready var ready_btn: Button     = $PanelContainer/VBoxContainer/HBoxContainer/ReadyButton
 var _player_ids: Array[int] = []
 const WORLD_SCENE := "res://World.tscn"
-
+enum Team { BLUE = 0, RED = 1 }
+const TEAM_COLOR := {
+	GameState.Team.BLUE: Color(0.2, 0.6, 1.0),
+	GameState.Team.RED:  Color(1.0, 0.3, 0.3)
+}
 func _ready() -> void:
 	# If you opened via Create Server, ensure host record exists
 	print("[lobby] whoami=", multiplayer.get_unique_id(),
@@ -156,10 +160,17 @@ func _ready() -> void:
 	  " path=", get_path())
 
 	if GameState.is_host:
-		if !GameState.roster.has(1):
-			GameState.roster[1] = {"name": GameState.player_name, "ready": false}
+		var host: Dictionary = GameState.roster.get(1, {})
+		if host.is_empty():
+			GameState.roster[1] = {
+				"name": GameState.player_name,
+				"ready": false,
+				"team": GameState.pick_balanced_team()
+			}
+		else:
+			if !host.has("team"):
+				GameState.roster[1]["team"] = GameState.pick_balanced_team()
 	else:
-		# Client: tell host our name on first frame (so Multiplayer is ready)
 		call_deferred("_submit_name_to_host")
 
 	# Buttons
@@ -209,17 +220,47 @@ func _on_leave() -> void:
 
 func _refresh_ui() -> void:
 	player_list.clear()
-	for id in GameState.roster.keys():
-		var e = GameState.roster[id]
-		var host_tag  := " (Host)" if id == 1 else ""
-		var ready_tag := " ✓" if e["ready"] else ""
-		var label := "%s%s%s" % [e["name"], host_tag, ready_tag]
-		player_list.add_item(label)
+
+	# Stable order so indices match colors
+	var ids := GameState.roster.keys()  # plain Array is fine
+	ids.sort()
+
+	var i := 0
+	for id in ids:
+		var e: Dictionary = GameState.roster[id]
+
+		var host_tag  := " (Host)" if int(id) == 1 else ""
+		var ready_tag := " ✓" if bool(e.get("ready", false)) else ""
+		var name_str  := String(e.get("name", "Player"))
+		var label := "%s%s%s" % [name_str, host_tag, ready_tag]
+
+		# Team handling: -1 means unassigned (don’t default to BLUE)
+		var team_val := int(e.get("team", -1))
+
+		if team_val == -1:
+			label += " [UNASSIGNED]"
+			player_list.add_item(label)
+			player_list.set_item_custom_fg_color(i, Color(0.8, 0.8, 0.8))  # neutral gray
+		else:
+			label += (" [BLUE]" if team_val == Team.BLUE else " [RED]")
+			player_list.add_item(label)
+			player_list.set_item_custom_fg_color(i, TEAM_COLOR.get(team_val, TEAM_COLOR[Team.BLUE]))
+
+		i += 1
 
 	status_label.text = "Connected: %d" % int(GameState.roster.size())
 
 func _add_players(id:int) -> void:
 	GameState.pending_spawn_ids.append(id)
+
+func _assign_team_for_new_peer(peer_id: int) -> int:
+	var blue_count := 0
+	var red_count  := 0
+	for id in GameState.roster.keys():
+		if GameState.roster[id].has("team"):
+			if GameState.roster[id]["team"] == Team.BLUE: blue_count += 1
+			elif GameState.roster[id]["team"] == Team.RED: red_count += 1
+	return Team.BLUE if blue_count <= red_count else Team.RED
 
 func _my_ready() -> bool:
 	var me := multiplayer.get_unique_id()
@@ -238,8 +279,12 @@ func _rpc_submit_name(name: String) -> void:
 	if !GameState.is_host:
 		return
 	var from := multiplayer.get_remote_sender_id()
-	print("[host] got name from peer ", from, ": ", name)
-	GameState.roster[from] = {"name": name, "ready": false}
+	var team := GameState.pick_balanced_team()   # <-- call here
+	GameState.roster[from] = {
+		"name": name,
+		"ready": false,
+		"team": team
+	}
 	_broadcast_roster()
 
 @rpc("any_peer")
@@ -256,8 +301,12 @@ func _broadcast_roster() -> void:
 	var snapshot: Array = []
 	for id in GameState.roster.keys():
 		var e = GameState.roster[id]
-		snapshot.append({"id": id, "name": e["name"], "ready": e["ready"]})
-	print("[host] broadcasting roster: ", snapshot)
+		snapshot.append({
+			"id": id,
+			"name": e["name"],
+			"ready": e["ready"],
+			"team": e.get("team", Team.BLUE)  # default if missing
+		})
 	rpc("_rpc_set_roster", snapshot)
 	_refresh_ui()
 
@@ -265,9 +314,12 @@ func _broadcast_roster() -> void:
 func _rpc_set_roster(snapshot: Array) -> void:
 	var dict := {}
 	for e in snapshot:
-		dict[int(e["id"])] = {"name": String(e["name"]), "ready": bool(e["ready"])}
+		dict[int(e["id"])] = {
+			"name": String(e["name"]),
+			"ready": bool(e["ready"]),
+			"team":  int(e.get("team", Team.BLUE))
+		}
 	GameState.roster = dict
-	print("[all] applied roster: ", GameState.roster)
 	_refresh_ui()
 
 @rpc("any_peer", "call_local")
