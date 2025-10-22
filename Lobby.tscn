@@ -33,10 +33,6 @@ text = "Connected: 0
 
 "
 
-[node name="PlayerList" type="ItemList" parent="PanelContainer/VBoxContainer"]
-layout_mode = 2
-size_flags_vertical = 3
-
 [node name="HBoxContainer" type="HBoxContainer" parent="PanelContainer/VBoxContainer"]
 layout_mode = 2
 
@@ -54,3 +50,6 @@ text = "Leave
 layout_mode = 2
 text = "Ready
 "
+
+[node name="PlayerList" type="Tree" parent="PanelContainer/VBoxContainer"]
+layout_mode = 2
