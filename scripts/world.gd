@@ -21,7 +21,14 @@ var  jump_edge_latched := false
 var  shoot_edge_latched := false
 
 func _ready() -> void:
-	
+	#var game := Game.new()
+	#add_child(game)
+	# Provide match settings from Lobby
+	#game.match_config = {
+		#"duration_sec": GameState.match_len_sec,
+		#"goal_limit":   GameState.goal_limit,
+		#"roster":       GameState.roster,   # from lobby
+	#}
 	# If you didn't set the spawner in the editor, do it here:
 	var spawner := players_root.get_node_or_null("MultiplayerSpawner")
 	if spawner == null:
@@ -31,7 +38,10 @@ func _ready() -> void:
 		spawner.add_spawnable_scene(player_scene.resource_path)
 		players_root.add_child(spawner)
 	if get_tree().get_multiplayer().is_server():
-		_server_begin_match(GameState.pending_spawn_ids)
+		var ids: Array[int] = []
+		for k in GameState.roster.keys():
+			ids.append(int(k))   # ensure int
+		_server_begin_match(ids)
 	
 	# 1) Connect to the Network autoload signals (do it here so it works even if not wired in editor)
 
@@ -49,6 +59,7 @@ func _ready() -> void:
 		print("Registered preplaced Player as host player; authority=", pre.get_multiplayer_authority())
 
 func _server_begin_match(peer_ids: Array[int]) -> void:
+	print("starting match with the length of the peers: ", peer_ids.size() )
 	for id in peer_ids:
 		_log_pid("the id of the current machine: ")
 		print("the id is: ", id)
