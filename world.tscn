@@ -1,12 +1,12 @@
-[gd_scene load_steps=66 format=4 uid="uid://ex55agd4o2wj"]
+[gd_scene load_steps=60 format=4 uid="uid://ex55agd4o2wj"]
 
 [ext_resource type="Script" uid="uid://nccn213w78dk" path="res://scripts/world.gd" id="1_4h6ng"]
 [ext_resource type="Texture2D" uid="uid://lg2bc8rys6fs" path="res://bg_cliffs.png" id="2_bc84e"]
 [ext_resource type="PackedScene" uid="uid://dv5l1qjf5gwfn" path="res://Player.tscn" id="2_o3ebs"]
 [ext_resource type="Texture2D" uid="uid://bvxkxaod0qfp" path="res://grass.png" id="2_tlwt5"]
+[ext_resource type="PackedScene" uid="uid://ds26o286r5vvn" path="res://ball.tscn" id="3_4h6ng"]
 [ext_resource type="Texture2D" uid="uid://iqnucbl6j3qr" path="res://fence.png" id="4_aqk2v"]
 [ext_resource type="Script" path="res://scripts/GoalTrigger.gd" id="5_2u3nc"]
-[ext_resource type="Script" path="res://scripts/bot.gd" id="6_bo7i5"]
 [ext_resource type="Texture2D" uid="uid://ckyaiflvqt25u" path="res://teleporter.png" id="6_dwbse"]
 [ext_resource type="Script" path="res://scripts/teleporter_pad.gd" id="6_pkg7o"]
 [ext_resource type="Script" path="res://scripts/spring_pad.gd" id="7_pkg7o"]
@@ -63,35 +63,6 @@ alpha_antialiasing_mode = 0
 cull_mode = 2
 albedo_texture = ExtResource("4_aqk2v")
 uv1_scale = Vector3(24, 24, 24)
-
-[sub_resource type="SphereMesh" id="SphereMesh_djrsh"]
-radius = 1.0
-height = 2.0
-
-[sub_resource type="SphereShape3D" id="SphereShape3D_6tagv"]
-radius = 1.0
-
-[sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_4h6ng"]
-properties/0/path = NodePath(".:global_transform")
-properties/0/spawn = true
-properties/0/replication_mode = 1
-properties/1/path = NodePath(".:linear_velocity")
-properties/1/spawn = true
-properties/1/replication_mode = 1
-properties/2/path = NodePath(".:angular_velocity")
-properties/2/spawn = true
-properties/2/replication_mode = 1
-
-[sub_resource type="CapsuleMesh" id="CapsuleMesh_2vmtx"]
-radius = 1.0
-height = 4.0
-
-[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_ld6s0"]
-radius = 1.0
-height = 4.0
-
-[sub_resource type="SphereShape3D" id="SphereShape3D_f3sb7"]
-radius = 19.017
 
 [sub_resource type="BoxMesh" id="BoxMesh_tlwt5"]
 
@@ -199,6 +170,7 @@ uv1_scale = Vector3(8, 8, 8)
 [node name="World" type="Node3D"]
 script = ExtResource("1_4h6ng")
 player_scene = ExtResource("2_o3ebs")
+ball_packed = ExtResource("3_4h6ng")
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
 environment = SubResource("Environment_2tuav")
@@ -208,7 +180,7 @@ environment = SubResource("Environment_2tuav")
 [node name="Floor" type="StaticBody3D" parent="Scene"]
 
 [node name="Mesh" type="MeshInstance3D" parent="Scene/Floor"]
-transform = Transform3D(10, 0, 0, 0, 1, 0, 0, 0, 10, 0, -1, 0)
+transform = Transform3D(10, 0, 0, 0, 1, 0, 0, 0, 10, 0.407478, -1, 0)
 mesh = SubResource("BoxMesh_37uin")
 surface_material_override/0 = SubResource("StandardMaterial3D_aqk2v")
 
@@ -228,59 +200,8 @@ surface_material_override/0 = SubResource("StandardMaterial3D_dwbse")
 transform = Transform3D(10, 0, 0, 0, 1, 0, 0, 0, 10, 0, -1, 0)
 shape = SubResource("ConvexPolygonShape3D_f1i8d")
 
-[node name="Ball" type="RigidBody3D" parent="Scene" groups=["ball"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 5, 0)
-collision_layer = 4
-collision_mask = 3
-mass = 0.1
-can_sleep = false
-
-[node name="Mesh" type="MeshInstance3D" parent="Scene/Ball"]
-mesh = SubResource("SphereMesh_djrsh")
-metadata/_edit_lock_ = true
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Scene/Ball"]
-shape = SubResource("SphereShape3D_6tagv")
-metadata/_edit_lock_ = true
-
-[node name="BallSynchronizer" type="MultiplayerSynchronizer" parent="Scene/Ball"]
-replication_config = SubResource("SceneReplicationConfig_4h6ng")
-
-[node name="Bot" type="CharacterBody3D" parent="Scene" groups=["player"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5, 5, 0)
-collision_layer = 3
-collision_mask = 5
-script = ExtResource("6_bo7i5")
-goal_path = NodePath("../../Teams/TeamRed/Goal_B")
-move_speed = 0.0
-accel = 0.0
-kick_range = 3.0
-kick_power = 3.0
-
-[node name="Mesh" type="MeshInstance3D" parent="Scene/Bot"]
-mesh = SubResource("CapsuleMesh_2vmtx")
-
-[node name="PlayerCollision" type="CollisionShape3D" parent="Scene/Bot"]
-shape = SubResource("CapsuleShape3D_ld6s0")
-
-[node name="KickArea" type="Area3D" parent="Scene/Bot"]
-collision_layer = 8
-collision_mask = 4
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Scene/Bot/KickArea"]
-transform = Transform3D(0.99997, 0.00703362, 0.0031066, -0.00703358, 0.999975, -2.18512e-05, -0.00310668, 0, 0.999995, 0, -0.9, -0.6)
-shape = SubResource("SphereShape3D_f3sb7")
-
-[node name="TackleField" type="Area3D" parent="Scene/Bot"]
-collision_layer = 8
-collision_mask = 4
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Scene/Bot/TackleField"]
-transform = Transform3D(0.99997, 0.00703362, 0.0031066, -0.00703358, 0.999975, -2.18512e-05, -0.00310668, 0, 0.999995, 0, -1.3, 0)
-shape = SubResource("SphereShape3D_f3sb7")
-
 [node name="Camera3D" parent="Scene" groups=["MainCamera"] instance=ExtResource("8_o3ebs")]
-ball_target_path = NodePath("../Ball")
+ball_target_path = NodePath("")
 
 [node name="StaticBody3D" type="StaticBody3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 254.784)
@@ -521,7 +442,7 @@ script = ExtResource("12_70uel")
 camera_path = NodePath("")
 blue_goal_path = NodePath("../../../Teams/TeamBlue/Goal_A")
 green_goal_path = NodePath("../../../Teams/TeamRed/Goal_B")
-ball_path = NodePath("../../../Scene/Ball")
+ball_path = NodePath("")
 blue_offset_below_m = 10.0
 green_offset_below_m = 10.0
 ball_offset_above_m = 0.0
@@ -597,7 +518,6 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.2, -0.1, 0)
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -243)
 script = ExtResource("5_2u3nc")
 scoreboard_path = NodePath("../../../CanvasLayer/UI/Scoreboard")
-ball_path = NodePath("../../../Scene/Ball")
 ball_spawn_path = NodePath("../../../BallSpawn")
 
 [node name="GoalBody" type="StaticBody3D" parent="Teams/TeamBlue/Goal_A"]
@@ -694,7 +614,6 @@ transform = Transform3D(-1, 0, -8.74228e-08, 0, 1, 0, 8.74228e-08, 0, -1, 0, 0, 
 script = ExtResource("5_2u3nc")
 score_for = 0
 scoreboard_path = NodePath("../../../CanvasLayer/UI/Scoreboard")
-ball_path = NodePath("../../../Scene/Ball")
 ball_spawn_path = NodePath("../../../BallSpawn")
 
 [node name="GoalBody" type="StaticBody3D" parent="Teams/TeamRed/Goal_B"]
@@ -770,13 +689,18 @@ shape = SubResource("BoxShape3D_hiqwa")
 [node name="Spawns" type="Node3D" parent="Teams/TeamRed"]
 
 [node name="Spawn1" type="Marker3D" parent="Teams/TeamRed/Spawns"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1992, -33.0287)
 
 [node name="Spawn2" type="Marker3D" parent="Teams/TeamRed/Spawns"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.58292, -76.5879)
 
 [node name="Spawn3" type="Marker3D" parent="Teams/TeamRed/Spawns"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -48.5549, -109.062)
 
 [node name="Spawn4" type="Marker3D" parent="Teams/TeamRed/Spawns"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1992, -33.0287)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 33.6488, -67.7083)
 
 [node name="Spawn5" type="Marker3D" parent="Teams/TeamRed/Spawns"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1992, -33.0287)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.231724, -206.045)
+
+[node name="BallHolder" type="Node3D" parent="."]

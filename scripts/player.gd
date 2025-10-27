@@ -136,8 +136,6 @@ var _net := {
 }
 
 func apply_net_input(d: Dictionary) -> void:
-	if multiplayer.get_unique_id() != 1 and multiplayer.get_unique_id() == owner_peer_id:
-		print("when applying net input, rmb is: ", d["rmb"])
 	# SERVER ONLY: called by world.gd before simulate_server()
 	for k in _net.keys():
 		if d.has(k):
@@ -149,6 +147,7 @@ func apply_net_input(d: Dictionary) -> void:
 			#else:
 				#_net[k] = d[k]
 func attach_camera(c: Camera3D, j : Node) -> void:
+
 	joystick = j
 	cam = c
 	if cam and _is_local_owner():
@@ -161,6 +160,13 @@ func attach_camera(c: Camera3D, j : Node) -> void:
 		cam.cull_mask &= ~SELF_LAYER_MASK
 		cam.current = true
 		cam.near = max(cam.near, 0.12) # small near-plane helps
+
+# Aim the camera at a world position.
+# yaw_only=true keeps the camera level (no pitch); set false to let it tilt up/down.
+@rpc("any_peer", "reliable", "call_local")
+func rpc_aim_camera_at(target_world: Vector3, from : Vector3) -> void:
+	cam.face_towards(target_world, from)
+
 
 #func _debug_list_visible_to_cam():
 	#if cam == null: return
@@ -218,7 +224,6 @@ func _btn_just_released(name: String) -> bool:
 # --- Engine callbacks ---
 
 func _ready() -> void:
-	print("current position is: ", global_transform.origin)
 	if $KickArea:
 		$KickArea.body_entered.connect(_on_kick_area_body_entered)
 		$KickArea.body_exited.connect(_on_kick_area_body_exited)
@@ -256,6 +261,7 @@ func _physics_process(delta: float) -> void:
 
 
 func _process(delta: float) -> void:
+
 	if get_tree().get_multiplayer().get_unique_id() == owner_peer_id: 
 		_local_process(delta)
 
