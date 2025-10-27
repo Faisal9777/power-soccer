@@ -33,10 +33,12 @@ var _min_pitch: float = deg_to_rad(-70.0)
 var _max_pitch: float = deg_to_rad(75.0)
 var _wheel_step: float = 0.7
 var _captured: bool = true
-
+var _pending_face_point: Vector3 = Vector3.ZERO
+var _has_pending_face: bool = false
+@export var front_is_plus_z: bool = true
 func _ready() -> void:
 	_target = get_node_or_null(target_path)
-	_target_ball = get_node_or_null(ball_target_path)
+	_target_ball = get_node_or_null("Ball")
 	# Auto-activate on clients / editor. On dedicated servers, activation will no-op.
 	activate()
 
@@ -73,10 +75,56 @@ func _set_active(on: bool) -> void:
 # Optional helpers (useful for runtime swaps)
 func set_target(player: Node3D) -> void:
 	_target = player
-
-func set_ball(ball: Node3D) -> void:
+	
+func set_ball(ball_path: NodePath) -> void:
+	print("in setting bball of camera, the ball path is: ", ball_path)
+	var ball := get_node(ball_path)
 	_target_ball = ball
 
+# Public: ask the camera to face a world point next physics tick
+func face_towards(target_pos: Vector3, from: Vector3) -> void:
+	#print("face towards is called for unique id of: ", multiplayer.get_unique_id()) 
+	#print("for the player name: ", _target.name) 
+	#print("whoose position is: ", _target.global_position) 
+	#print("target_pos: ", target_pos)
+	#print("camera's position should be: ", from)
+	if _target == null:
+		return
+	if from.distance_squared_to(target_pos) < 1e-8:
+		return
+
+	# Start from the provided world position
+	var desired_pos: Vector3 = from
+
+	# Optional: line-of-sight push (ray: target -> camera) to avoid walls
+	if collision_mask != 0:
+		var space := get_world_3d().direct_space_state
+		var q := PhysicsRayQueryParameters3D.create(target_pos, desired_pos)
+		q.collision_mask = collision_mask
+		q.hit_from_inside = true
+		var hit := space.intersect_ray(q)
+		if hit.size() > 0:
+			var hit_pos: Vector3 = hit.position
+			var dir_tc: Vector3 = (desired_pos - target_pos).normalized() # target→camera
+			desired_pos = hit_pos - dir_tc * collision_padding            # just before the obstacle
+
+	# Build basis so camera forward points to target
+	var dir: Vector3 = (target_pos - desired_pos).normalized()          # world look dir
+	if front_is_plus_z:
+		dir = -dir                                                      # flip for +Z-front rigs
+
+	var look_basis := Basis().looking_at(dir, Vector3.UP)
+	look_basis = look_basis.orthonormalized()
+
+	global_transform = Transform3D(look_basis, desired_pos)
+
+	# Keep yaw/pitch in sync for later frames
+	var e: Vector3 = look_basis.get_euler(EULER_ORDER_YXZ)
+	_yaw = wrapf(e.y, -PI, PI)
+	_pitch = clamp(e.x, -1.55, 1.55)
+
+	if !current:
+		current = true
 # ----------------------------
 # Public toggle for UI/other code
 # ----------------------------
@@ -157,13 +205,21 @@ func _input(event: InputEvent) -> void:
 # ----------------------------
 # Camera follow / collision / FP/TP logic
 # ----------------------------
+func _look() -> void:
+	global_position = Vector3(0.000003, 3.100583, 33.0287)
+	print("looking")
+	print("camera's position: ", global_position)
+	
+	var pos := Vector3.ZERO
+	print("target position: ", pos)
+	look_at(pos)
 func _physics_process(delta: float) -> void:
 	if _target == null:
 		return
-
+	#if Input.is_action_just_pressed("debug"): _look()
 	var focus_player: Vector3 = _target.global_transform.origin + Vector3(0.0, height, 0.0)
-	var R := Basis(Vector3.UP, _yaw) * Basis(Vector3.RIGHT, _pitch)
 
+	var R := Basis(Vector3.UP, _yaw) * Basis(Vector3.RIGHT, _pitch)
 	var ball: Node3D = _target_ball
 	var has_ball: bool = ball != null
 
