@@ -50,14 +50,6 @@ func _ready() -> void:
 	#Network.peer_joined.connect(_on_peer_joined)
 	#Network.peer_left.connect(_on_peer_left)
 	
-	# 2) If a Player is already in the scene (your case), register it for the host
-	var pre := get_node_or_null("Player")
-	if pre != null:
-		# Server must own/simulate every player in server-auth
-		pre.set_multiplayer_authority(1)
-		_players[1] = pre
-		print("Registered preplaced Player as host player; authority=", pre.get_multiplayer_authority())
-
 
 func _server_setup() -> void:
 	if !multiplayer.is_server():
@@ -127,9 +119,7 @@ func _server_begin_match(peer_ids: Array[int]) -> void:
 		_on_peer_joined(id)  # your existing spawn path
 
 func _physics_process(delta: float) -> void:
-	#if  Input.is_action_just_pressed("tackle"): print("tackle input was detected in physics process")
-	#var inputs := _gather_input()
-	#_send_local_input(inputs)
+
 	_update_inputs() 
 	_input_accum += delta
 	var step: float = 1.0 / NET_INPUT_HZ
@@ -341,17 +331,6 @@ func _gather_input() -> Dictionary:
 	else: 
 		mvx = Input.get_action_strength("move_right") - Input.get_action_strength("move_left")
 		mvz = Input.get_action_strength("move_forward") - Input.get_action_strength("move_back")
-	
-	var yaw := 0.0
-	var cam := get_viewport().get_camera_3d()
-	if cam:
-		yaw = cam.global_transform.basis.get_euler().y
-	else:
-		# Fallback to local player rotation if camera not ready
-		var me: CharacterBody3D = _players.get(multiplayer.get_unique_id(), null) as CharacterBody3D
-		if me:
-			yaw = me.rotation.y
-	
 	return {
 		"mvx": mvx,
 		"mvz": mvz,
@@ -363,10 +342,12 @@ func _gather_input() -> Dictionary:
 		"shoot_down": Input.is_action_pressed(_shoot_action()),
 		"shoot_up": shoot_edge_latched,
 		"rmb": Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT),
-		"cam_yaw": yaw,
-		"aim_position": _my_player.get_aim_arrow_position() if shoot_edge_latched else null
+		"facing": _my_player.get_yaw() if _my_player else {},
+		"aim_position":_my_player.get_aim_arrow_position() if _my_player and shoot_edge_latched else null
 	}
-#
+
+
+
 func _send_local_input() -> void:
 	# 0) If there is no network peer yet (single-player / not joined / not hosting), do nothing
 	if multiplayer.multiplayer_peer == null:
@@ -406,10 +387,12 @@ func _notify_client_to_attach_camera(p: Node, peer_id: int) -> void:
 	if multiplayer.get_unique_id() == peer_id:
 		_rpc_attach_cam(p.get_path(), joystick_path, ball_scene.get_path())
 	else:
+
 		rpc_id(peer_id, "_rpc_attach_cam", p.get_path(), joystick_path, ball_scene.get_path())
 
 @rpc("any_peer", "reliable", "call_local")
 func _rpc_attach_cam(player_path: NodePath, joystick_path: NodePath, ball_path: NodePath) -> void:
+	print("_rpc_attach_cam")
 	var joystick := get_node_or_null(joystick_path)
 	_my_player = get_node_or_null(player_path)
 	var p := get_node_or_null(player_path)
