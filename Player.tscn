@@ -1,4 +1,4 @@
-[gd_scene load_steps=7 format=3 uid="uid://dv5l1qjf5gwfn"]
+[gd_scene load_steps=8 format=3 uid="uid://dv5l1qjf5gwfn"]
 
 [ext_resource type="Script" uid="uid://ba1oat4ex8suj" path="res://scripts/Player.gd" id="1_xhfnw"]
 
@@ -36,6 +36,11 @@ properties/5/path = NodePath(".:current_ball_path")
 properties/5/spawn = true
 properties/5/replication_mode = 1
 
+[sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_xhfnw"]
+properties/0/path = NodePath(".:rotation")
+properties/0/spawn = true
+properties/0/replication_mode = 1
+
 [node name="Player" type="CharacterBody3D"]
 collision_layer = 2
 collision_mask = 5
@@ -66,3 +71,9 @@ shape = SubResource("SphereShape3D_fj7yv")
 
 [node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="."]
 replication_config = SubResource("SceneReplicationConfig_kpjcp")
+
+[node name="AimPivot" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.19209e-07, 1.18405, 0.071167)
+
+[node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="AimPivot"]
+replication_config = SubResource("SceneReplicationConfig_xhfnw")

@@ -77,7 +77,6 @@ func set_target(player: Node3D) -> void:
 	_target = player
 	
 func set_ball(ball_path: NodePath) -> void:
-	print("in setting bball of camera, the ball path is: ", ball_path)
 	var ball := get_node(ball_path)
 	_target_ball = ball
 
@@ -216,58 +215,36 @@ func _look() -> void:
 func _physics_process(delta: float) -> void:
 	if _target == null:
 		return
-	#if Input.is_action_just_pressed("debug"): _look()
-	var focus_player: Vector3 = _target.global_transform.origin + Vector3(0.0, height, 0.0)
 
-	var R := Basis(Vector3.UP, _yaw) * Basis(Vector3.RIGHT, _pitch)
-	var ball: Node3D = _target_ball
-	var has_ball: bool = ball != null
+	var t_player := _target.global_transform
+	var focus     := t_player.origin + Vector3(0.0, height, 0.0)
 
-	# ===== FIRST-PERSON (distance ~ 0) =====
+	# Use AimPivot if present, else fall back to the player body
+	var pivot := _target.get_node_or_null("AimPivot") as Node3D
+	var t_piv: Transform3D = pivot.global_transform if is_instance_valid(pivot) else t_player
+	var forward := (-t_piv.basis.z).normalized()  # includes vertical pitch
+
+	# ===== First-person =====
 	if distance <= 0.05:
-		# Stick camera to head; apply rotation from yaw/pitch
-		global_transform = Transform3D(R, focus_player)
-
-		# If aiming and we have a ball, only twist to face the ball (no position change)
-		if _aim_mode and has_ball:
-			look_at(ball.global_transform.origin, Vector3.UP)
+		global_transform.origin = focus
+		look_at(focus + forward, Vector3.UP)
 		return
 
-	# ===== THIRD-PERSON (boom) =====
-	var desired_pos: Vector3
-	if _aim_mode:
-		# Stay behind player in aim (ignore mouse yaw/pitch for position)
-		var player_forward: Vector3 = (-_target.global_transform.basis.z).normalized()
-		desired_pos = focus_player - player_forward * distance
-	else:
-		# Normal mouse-orbit
-		desired_pos = focus_player + R * Vector3(0, 0, -distance)
+	# ===== Third-person =====
+	var desired_pos := focus - forward * distance
 
-	# Wall avoidance from head to desired camera position
+	# Wall avoidance: from head to desired camera position
 	var space := get_world_3d().direct_space_state
-	var q := PhysicsRayQueryParameters3D.create(focus_player, desired_pos)
+	var q := PhysicsRayQueryParameters3D.create(focus, desired_pos)
 	q.collision_mask = collision_mask
 	q.hit_from_inside = true
 	var hit := space.intersect_ray(q)
 	if hit.size() > 0:
 		var hit_pos: Vector3 = hit.position
-		var back_dir: Vector3 = (focus_player - hit_pos).normalized()
+		var back_dir: Vector3 = (focus - hit_pos).normalized()
 		desired_pos = hit_pos + back_dir * collision_padding
 
-	# Smooth follow and apply rotation
-	var t: float = 1.0 - exp(-follow_speed * delta)
-	var new_pos := global_transform.origin.lerp(desired_pos, t)
-
-	if _aim_mode:
-		# In aim, position behind player and rotate to ball/player forward
-		global_transform.origin = new_pos
-		if has_ball:
-			# Optional leading (if you wire ball velocity into a variable)
-			# var lead := ball.get("linear_velocity") * lead_factor if available
-			# look_at(ball.global_transform.origin + lead, Vector3.UP)  # when you have 'lead'
-			look_at(ball.global_transform.origin, Vector3.UP)
-
-		else:
-			look_at(focus_player + (-_target.global_transform.basis.z), Vector3.UP)
-	else:
-		global_transform = Transform3D(R, new_pos)
+	# Smooth follow and face the same direction as the character
+	var t := 1.0 - exp(-follow_speed * delta)
+	global_transform.origin = global_transform.origin.lerp(desired_pos, t)
+	look_at(focus + forward, Vector3.UP)

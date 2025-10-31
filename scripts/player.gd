@@ -67,6 +67,21 @@ extends CharacterBody3D
 @export var stamina_min_to_jump: float = 15
 @export var stamina_min_to_dribble: float = 10
 @export var stamina_min_to_stop_ball: float = 10    
+@export var mouse_sens: float = 0.008
+@onready var aim_pivot: Node3D = $AimPivot
+@export var min_pitch := deg_to_rad(-60)
+@export var max_pitch := deg_to_rad( 60)
+# --- Aiming/orbit state (client-local) ---
+@export var aim_sens_x := 0.010   # radians per pixel (tune)
+@export var aim_sens_y := 0.010
+@export var aim_pitch_min := deg_to_rad(-80)
+@export var aim_pitch_max := deg_to_rad( 80)
+
+var _aim_az := 0.0      # yaw around the ball (left/right)
+var _aim_el := 0.0      # pitch around the ball (up/down)
+var _captured := true
+var _yaw_delta_accum: float = 0.0  # collected since last send
+var _pitch_delta_accum := 0.0
 const SELF_LAYER_UI := 19                     # the checkbox number in the inspector
 const SELF_LAYER_MASK := 1 << (SELF_LAYER_UI - 1)  # convert 1..20 -> bit 0..19
 const WORLD_LAYER_MASK := 1 << 0   # Layer 1 (default / visible to camera)
@@ -131,7 +146,7 @@ var _net := {
 	"shoot_up": false,     # edge
 	# optional (if you later send mouse aim):
 	"rmb": false,    # Vector3 or null
-	"cam_yaw": 0.0,
+	"facing": {"yaw_delta" : _yaw_delta_accum, "pitch_delta" : _pitch_delta_accum},
 	"aim_position": null
 }
 
@@ -167,7 +182,13 @@ func attach_camera(c: Camera3D, j : Node) -> void:
 func rpc_aim_camera_at(target_world: Vector3, from : Vector3) -> void:
 	cam.face_towards(target_world, from)
 
-
+func get_yaw() -> Dictionary:
+	# Consume yaw delta accumulated since the last send (desktop)
+	var yaw_delta := _yaw_delta_accum
+	var pitch_delta := _pitch_delta_accum
+	_yaw_delta_accum = 0.0
+	_pitch_delta_accum = 0.0
+	return {"yaw_delta" : yaw_delta, "pitch_delta" : pitch_delta}
 #func _debug_list_visible_to_cam():
 	#if cam == null: return
 	#for ch in get_tree().get_nodes_in_group("**unused**"): pass # no group? do recursive walk
@@ -224,6 +245,7 @@ func _btn_just_released(name: String) -> bool:
 # --- Engine callbacks ---
 
 func _ready() -> void:
+	
 	if $KickArea:
 		$KickArea.body_entered.connect(_on_kick_area_body_entered)
 		$KickArea.body_exited.connect(_on_kick_area_body_exited)
@@ -236,6 +258,8 @@ func _ready() -> void:
 	
 	_ensure_aim_arrow()
 	if is_local:
+		Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+		_captured = true
 		_client_side_setup()
 	# ⬇️ prevent taps-anywhere from triggering 'shoot'
 	if is_mobile:
@@ -270,150 +294,47 @@ func _local_physics_process(delta: float) -> void:
 		#request_arrow_calculation()
 		_update_arrow_position(delta)
 
-#func request_arrow_calculation() -> void:
-	#var mp: Vector2 = get_viewport().get_mouse_position()
-	#var ro: Vector3 = cam.project_ray_origin(mp)
-	#var rd: Vector3 = cam.project_ray_normal(mp).normalized()
-	#if multiplayer.get_unique_id() == 1:
-		#_calculate_arrow_position(ro, rd)
-	#else:
-		#rpc_id(1, "_calculate_arrow_position", ro, rd)
-#
-#@rpc("any_peer", "unreliable")
-#func _calculate_arrow_position(ro:Vector3, rd:Vector3) -> void:
-	#if !multiplayer.is_server():
-		#return
-	#
-	#rd = _sanitize_ray(ro, rd)
-	#if rd == Vector3.ZERO:
-		#return  
-	#var ball: RigidBody3D = _resolve_ball() as RigidBody3D
-	#if aim_arrow == null or ball == null or !is_instance_valid(ball) or !aim_active:
-		#_show_arrow(false)
-		#return
-	#
-	## Interpolated poses for smooth visuals
-	#var pxf: Transform3D = get_global_transform_interpolated()
-	#var bxf: Transform3D = ball.get_global_transform_interpolated()
-	#var P: Vector3 = pxf.origin
-	#var C: Vector3 = bxf.origin
-	#var R: float = _get_ball_radius(ball)
-#
-	#var contact: Vector3 = Vector3.ZERO
-#
-	#if _is_aiming():
-		## Mouse-driven contact (ray → sphere)
-		#var oc: Vector3 = ro - C
-		#var bq: float = 2.0 * rd.dot(oc)
-		#var cq: float = oc.dot(oc) - R * R
-		#var disc: float = bq * bq - 4.0 * cq
-#
-		#var hit: Vector3 = Vector3.ZERO
-		#if disc >= 0.0:
-			#var sd: float = sqrt(disc)
-			#var t1: float = (-bq - sd) * 0.5
-			#var t2: float = (-bq + sd) * 0.5
-			#var t: float = -1.0
-			#if t1 > 0.0:
-				#t = t1
-			#elif t2 > 0.0:
-				#t = t2
-			#if t > 0.0:
-				#hit = ro + rd * t
-#
-		#if hit != Vector3.ZERO:
-			#contact = hit
-		#else:
-			## Fallback: closest point on ray, projected to sphere surface
-			#var t_closest: float = maxf(-rd.dot(oc), 0.0)
-			#var closest: Vector3 = ro + rd * t_closest
-			#var dir_to: Vector3 = closest - C
-			#if dir_to == Vector3.ZERO:
-				#dir_to = P - C
-			#contact = C + dir_to.normalized() * R
-	#else:
-		## Front-facing surface toward the player (no mouse aim)
-		#var dir: Vector3 = (C - P).normalized()
-		#contact = C - dir * R
-#
-	## Server-side smoothing per physics step (match ~0.14 at 60 FPS)
-	#var physics_hz := float(Engine.get_physics_ticks_per_second()) # typically 60
-	#var k := 0.14
-	#var smooth: float = 1.0 - pow(1.0 - k, 60.0 / physics_hz)
-	#aim_contact = aim_contact.lerp(contact, clamp(smooth, 0.0, 1.0))
-	#arrow_position = P
-#
-#func _sanitize_ray(ro: Vector3, rd: Vector3) -> Vector3:
-	## reject NaNs / infinities
-	#if !ro.is_finite() or !rd.is_finite():
-		#return Vector3.ZERO
-#
-	## ensure non-zero direction
-	#var len := rd.length()
-	#if len < 1e-6:
-		#return Vector3.ZERO
-#
-	#return rd / len
 
 func _update_arrow_position(delta: float) -> void:
-	var ball: RigidBody3D = _resolve_ball() as RigidBody3D
+	var ball := _resolve_ball() as RigidBody3D
 	if aim_arrow == null or ball == null or !is_instance_valid(ball) or !aim_active:
 		_show_arrow(false)
 		return
 
-	# Interpolated poses for smooth visuals
-	var pxf: Transform3D = get_global_transform_interpolated()
+	# Live for owner, interpolated for others
+	var is_owner := (multiplayer.get_unique_id() == owner_peer_id)
+	var pxf: Transform3D = (global_transform if is_owner else get_global_transform_interpolated())
 	var bxf: Transform3D = ball.get_global_transform_interpolated()
+
 	var P: Vector3 = pxf.origin
 	var C: Vector3 = bxf.origin
-	var R: float = _get_ball_radius(ball)
+	var R: float   = _get_ball_radius(ball)
 
-	var contact: Vector3 = Vector3.ZERO
-	var cam: Camera3D = get_viewport().get_camera_3d()
-	if owner_peer_id != 1 and _net["rmb"]:
-		print("is aim active: ", aim_active)
-		print("is rmb: ", _net["rmb"])
-		print("cam exists: ", cam != null)
-	if _is_aiming() and cam != null:
-		# Mouse-driven contact (ray → sphere)
-		var mp: Vector2 = get_viewport().get_mouse_position()
-		var ro: Vector3 = cam.project_ray_origin(mp)
-		var rd: Vector3 = cam.project_ray_normal(mp).normalized()
+	var contact: Vector3 = C  # RMB not held => center of ball
 
-		var oc: Vector3 = ro - C
-		var bq: float = 2.0 * rd.dot(oc)
-		var cq: float = oc.dot(oc) - R * R
-		var disc: float = bq * bq - 4.0 * cq
+	if _is_aiming():
+		# RMB held: orbit on sphere via local azimuth/elevation (no camera rays)
+		var pivot := get_node_or_null("AimPivot") as Node3D
+		var pivot_pos: Vector3 = pxf.origin
+		if is_instance_valid(pivot):
+			pivot_pos = (pivot.global_transform.origin if is_owner else pivot.get_global_transform_interpolated().origin)
 
-		var hit: Vector3 = Vector3.ZERO
-		if disc >= 0.0:
-			var sd: float = sqrt(disc)
-			var t1: float = (-bq - sd) * 0.5
-			var t2: float = (-bq + sd) * 0.5
-			var t: float = -1.0
-			if t1 > 0.0:
-				t = t1
-			elif t2 > 0.0:
-				t = t2
-			if t > 0.0:
-				hit = ro + rd * t
+		# Orthonormal frame at ball, pointing toward player
+		var front: Vector3 = (pivot_pos - C).normalized()   # from ball → player
+		var up_ref: Vector3 = Vector3.UP
+		if abs(front.dot(up_ref)) > 0.98:
+			up_ref = Vector3(0, 0, 1)                       # fallback if almost parallel
+		var right: Vector3 = up_ref.cross(front).normalized()
+		var up_s: Vector3 = front.cross(right).normalized()
 
-		if hit != Vector3.ZERO:
-			contact = hit
-		else:
-			# Fallback: closest point on ray, projected to sphere surface
-			var t_closest: float = maxf(-rd.dot(oc), 0.0)
-			var closest: Vector3 = ro + rd * t_closest
-			var dir_to: Vector3 = closest - C
-			if dir_to == Vector3.ZERO:
-				dir_to = P - C
-			contact = C + dir_to.normalized() * R
-	else:
-		# Front-facing surface toward the player (no mouse aim)
-		var dir: Vector3 = (C - P).normalized()
-		contact = C - dir * R
+		# Rotate 'front' by azimuth around up_s, then elevation around right
+		var basis_az: Basis = Basis(up_s, _aim_az)
+		var basis_el: Basis = Basis(right, _aim_el)
+		var dir: Vector3 = ((basis_el * basis_az) * front).normalized()
 
-	# Exponential-style smoothing (frame-rate friendly)
+		contact = C + dir * R
+
+	# Smooth & draw
 	var smooth: float = 1.0 - pow(1.0 - 0.14, maxf(delta * 60.0, 0.0))
 	aim_contact = aim_contact.lerp(contact, clamp(smooth, 0.0, 1.0))
 
@@ -422,86 +343,10 @@ func _update_arrow_position(delta: float) -> void:
 		_show_arrow(false)
 		return
 
-	_show_arrow(multiplayer.get_unique_id() == owner_peer_id)
-
-	# Prefer world-space arrow to avoid parent-induced jitter
+	_show_arrow(is_owner)
 	aim_arrow.global_position = P
 	aim_arrow.look_at(P + vec.normalized(), Vector3.UP)
 	aim_arrow.scale = Vector3(1.0, 1.0, maxf(vec.length(), aim_min_len))
-
-
-#func _calculate_arrow_position(delta: float) -> void:
-	#var ball: RigidBody3D = _resolve_ball() as RigidBody3D
-	#if aim_arrow == null or ball == null or !is_instance_valid(ball) or !aim_active:
-		#_show_arrow(false)
-		#return
-	#
-	## Interpolated poses for smooth visuals
-	#var pxf: Transform3D = get_global_transform_interpolated()
-	#var bxf: Transform3D = ball.get_global_transform_interpolated()
-	#var P: Vector3 = pxf.origin
-	#var C: Vector3 = bxf.origin
-	#var R: float = _get_ball_radius(ball)
-#
-	#var contact: Vector3 = Vector3.ZERO
-	#var cam: Camera3D = get_viewport().get_camera_3d()
-#
-	#if _is_aiming() and cam != null:
-		## Mouse-driven contact (ray → sphere)
-		#var mp: Vector2 = get_viewport().get_mouse_position()
-		#var ro: Vector3 = cam.project_ray_origin(mp)
-		#var rd: Vector3 = cam.project_ray_normal(mp).normalized()
-#
-		#var oc: Vector3 = ro - C
-		#var bq: float = 2.0 * rd.dot(oc)
-		#var cq: float = oc.dot(oc) - R * R
-		#var disc: float = bq * bq - 4.0 * cq
-#
-		#var hit: Vector3 = Vector3.ZERO
-		#if disc >= 0.0:
-			#var sd: float = sqrt(disc)
-			#var t1: float = (-bq - sd) * 0.5
-			#var t2: float = (-bq + sd) * 0.5
-			#var t: float = -1.0
-			#if t1 > 0.0:
-				#t = t1
-			#elif t2 > 0.0:
-				#t = t2
-			#if t > 0.0:
-				#hit = ro + rd * t
-#
-		#if hit != Vector3.ZERO:
-			#contact = hit
-		#else:
-			## Fallback: closest point on ray, projected to sphere surface
-			#var t_closest: float = maxf(-rd.dot(oc), 0.0)
-			#var closest: Vector3 = ro + rd * t_closest
-			#var dir_to: Vector3 = closest - C
-			#if dir_to == Vector3.ZERO:
-				#dir_to = P - C
-			#contact = C + dir_to.normalized() * R
-	#else:
-		## Front-facing surface toward the player (no mouse aim)
-		#var dir: Vector3 = (C - P).normalized()
-		#contact = C - dir * R
-#
-	## Exponential-style smoothing (frame-rate friendly)
-	#var smooth: float = 1.0 - pow(1.0 - 0.14, maxf(delta * 60.0, 0.0))
-	#aim_contact = aim_contact.lerp(contact, clamp(smooth, 0.0, 1.0))
-	#arrow_position = P
-	
-#func _update_arrow_position() -> void:
-	#var vec: Vector3 = aim_contact - arrow_position
-	#if vec == Vector3.ZERO:
-		#_show_arrow(false)
-		#return
-#
-	##_show_arrow(multiplayer.get_unique_id() == owner_peer_id)
-	#_show_arrow(true)
-	## Prefer world-space arrow to avoid parent-induced jitter
-	#aim_arrow.global_position = arrow_position
-	#aim_arrow.look_at(arrow_position + vec.normalized(), Vector3.UP)
-	#aim_arrow.scale = Vector3(1.0, 1.0, maxf(vec.length(), aim_min_len))
 
 func _resolve_ball() -> RigidBody3D:
 	if String(current_ball_path) == "":
@@ -537,13 +382,13 @@ func simulate_server(delta: float) -> void:
 	_update_cooldowns(delta)
 	_update_charge_server(delta)
 	apply_gravity(delta)
-	_face_camera_yaw(delta)
+	#_face_camera_yaw(delta)
+	_update_player_facing_server(delta)
 	#_calculate_arrow_position(delta)
 	var input_dir := _get_input_dir_server()
 	_pre_move_vel = velocity
 	_handle_tackle_input_server(delta)
 	_handle_action_server(input_dir, delta)
-	#_update_aim_server(delta)
 	_update_stamina_server(delta)
 
 func _can_perform(action: String, stamina_required : float) -> bool:
@@ -559,6 +404,47 @@ func _can_perform(action: String, stamina_required : float) -> bool:
 func _is_valid_action(action: String) -> bool:
 	return ["sprint", "tackle", "shoot", "dribble", "jump", "stop"].has(action)
 
+
+func _unhandled_input(event: InputEvent) -> void:
+	if !_is_local_owner():
+		return
+	# Optional aim toggle you already had...
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT:
+		if event.pressed:
+			_captured = false
+			Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+			# initialize arrow orbit from current facing: point to frontmost spot
+			if not current_ball:
+				_resolve_ball()
+			if current_ball and is_instance_valid(current_ball):
+				var C := current_ball.global_transform.origin
+				var pivot := get_node_or_null("AimPivot") as Node3D
+				var P := (pivot.global_transform.origin if is_instance_valid(pivot) else global_transform.origin)
+				# front = from center toward player; start az=0, el=0 -> frontmost point
+				_aim_az = 0.0
+				_aim_el = 0.0
+		else:
+			_captured = true
+			Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+
+		return
+
+	# Mouse move → just accumulate yaw delta; no local rotation
+	if event is InputEventMouseMotion:
+		var mm := event as InputEventMouseMotion
+		
+		if _is_aiming():
+			# Arrow-only orbit control (do NOT rotate character)
+			_aim_az +=  mm.relative.x * aim_sens_x
+			_aim_el += mm.relative.y * aim_sens_y   # invert for typical feel
+			# keep angles reasonable
+			_aim_az = wrapf(_aim_az, -PI, PI)
+			_aim_el = clamp(_aim_el, aim_pitch_min, aim_pitch_max)
+		else:
+			# Normal mode: accumulate facing deltas (character will rotate on server)
+			_yaw_delta_accum   += -mm.relative.x * mouse_sens
+			_pitch_delta_accum += -mm.relative.y * mouse_sens
+		# (If you track local camera pitch, you can still update that here; it’s local-only)
 func _update_stamina_ui_from_replication() -> void:
 	# _stamina is replicated from server → owner via MultiplayerSynchronizer
 	var pct := 100.0 * (_stamina / maxf(1e-6, stamina_max))
@@ -772,56 +658,6 @@ func _kick_at_contact_server() -> void:
 func get_aim_arrow_position() -> Transform3D:
 	return aim_arrow.global_transform
 
-#func _kick_at_contact_server() -> void:
-	## --- Preconditions ---
-	#var ball: RigidBody3D = current_ball
-	#if ball == null or !is_instance_valid(ball):
-		#return
-	#if _charge <= 0.0:
-		#return
-	#if aim_contact == Vector3.ZERO:
-		#return
-#
-	## --- Ball geometry ---
-	#var C: Vector3 = ball.global_transform.origin
-	#var R: float = _get_ball_radius(ball)
-#
-	## Validate that aim_contact is on (or very close to) the ball surface
-	#var dist: float = aim_contact.distance_to(C)
-	#if absf(dist - R) > 0.08:
-		#return  # reject bogus/desynced contact
-#
-	## --- Build impulse from charge and surface normal ---
-	#var q: float = clampf(_charge, 0.0, 1.0)
-	#var strength: float = kick_force * pow(q, 2.0)
-	#var dir: Vector3 = (C - aim_contact).normalized()
-	#var J: Vector3 = dir * strength
-#
-	## --- Ground-taming: project away bad normal components when grounded ---
-	#if ball.get_contact_count() > 0:
-		#var n: Vector3 = ball.get_contact_normal(0)
-		#if n == Vector3.ZERO:
-			#n = Vector3.UP
-#
-		#var normal_mag: float = J.dot(n)
-		#var normal_imp: Vector3 = n * normal_mag
-		#var tangent: Vector3 = J - normal_imp
-		## keep only upward normal (scaled), drop downward normal entirely
-		#var kept_normal: Vector3 = n * maxf(normal_mag, 0.0) * 0.25
-		#J = tangent + kept_normal
-#
-	## --- Apply impulse (offset = contact - center, NOT world point) ---
-	#ball.sleeping = false
-	#ball.apply_impulse(J, aim_contact - C)
-#
-	## Optional: visualize the contact for debugging
-	##_debug_red_dot(ball, aim_contact, 500)
-#
-	## --- Housekeeping ---
-	#_cooldowns["shoot"] = shoot_cooldown
-	#_charge = 0.0
-	#if is_instance_valid(_charge_bar):
-		#_charge_bar.value = 0.0
 func _debug_red_dot(ball: Node3D,p: Vector3, seconds: float = 1.5, size: float = 0.06) -> void:
 	var mi := MeshInstance3D.new()
 	var sphere := SphereMesh.new()
@@ -983,6 +819,62 @@ func _face_camera_yaw(delta: float) -> void:
 	cur.y = lerp_angle(cur.y, target_yaw, clamp(turn_speed * delta, 0.0, 1.0))
 	rotation = cur
 
+# Helper: face ball (body yaw + pivot pitch)
+func _face_ball_server() -> void:
+	_resolve_ball()
+	if current_ball == null or !is_instance_valid(current_ball):
+		return
+	focus_at(current_ball)
+	
+func focus_at(current_ball : Node3D) -> void:
+	var ball_pos: Vector3 = current_ball.global_transform.origin
+	var body_pos: Vector3 = global_transform.origin
+	var pivot_pos: Vector3 = (aim_pivot.global_transform.origin if is_instance_valid(aim_pivot) else body_pos)
+
+	# --- Yaw on the upright body (ignore vertical) ---
+	var v_h := ball_pos - body_pos
+	v_h.y = 0.0
+	if v_h.length_squared() > 1e-8:
+		var r := rotation
+		# Because -Z is forward, use (-x, -z) in atan2:
+		r.y = atan2(-v_h.x, -v_h.z)
+		# (equivalently: r.y = atan2(v_h.x, v_h.z) + PI)
+		rotation = r
+
+	# --- Pitch on the aim pivot (up/down toward ball) ---
+	if is_instance_valid(aim_pivot):
+		var v := ball_pos - pivot_pos
+		var horiz := sqrt(v.x * v.x + v.z * v.z)
+		var pitch := atan2(v.y, max(horiz, 1e-5))  # +up
+		var pr := aim_pivot.rotation
+		pr.x = clamp(pitch, min_pitch, max_pitch)
+		aim_pivot.rotation = pr
+func _update_player_facing_server(delta: float) -> void:
+	if !multiplayer.is_server():
+		return
+
+	# Read flags/deltas the way you already store them
+	var aiming := bool(_net.get("rmb", false))
+
+	if aiming:
+		# Ignore client deltas; force facing to ball
+		_face_ball_server()
+		return
+
+	# Not aiming: apply client deltas as usual
+	var f: Dictionary = _net.get("facing", {})
+	var dy := float(f.get("yaw_delta", 0.0))
+	var dp := float(f.get("pitch_delta", 0.0))
+
+	if absf(dy) > 1e-6:
+		var r := rotation
+		r.y = wrapf(r.y + clamp(dy, -0.35, 0.35), -PI, PI)
+		rotation = r
+
+	if is_instance_valid(aim_pivot) and absf(dp) > 1e-6:
+		var pr := aim_pivot.rotation
+		pr.x = clamp(pr.x + clamp(dp, -0.35, 0.35), min_pitch, max_pitch)
+		aim_pivot.rotation = pr
 func _ensure_aim_arrow() -> void:
 	if !show_aim_arrow: return
 	aim_arrow = Node3D.new()
@@ -1092,66 +984,7 @@ func _get_ball_radius(ball: RigidBody3D) -> float:
 	return r
 
 # Server uses a simple, camera-forward contact if no aim sent.
-func _update_aim_server(delta: float) -> void:
-	# Arrow only exists while a ball is in the KickArea
-	if not aim_active or current_ball == null:
-		_show_arrow(false)
-		return
 
-	var C: Vector3 = current_ball.global_transform.origin
-	var R: float = _get_ball_radius(current_ball)
-
-	if _is_aiming():
-		# --- Mouse-driven contact (ray -> sphere)
-		var cam := get_viewport().get_camera_3d()
-		if cam == null:
-			_show_arrow(false)
-			return
-		var mp: Vector2 = get_viewport().get_mouse_position()
-		var ro: Vector3 = cam.project_ray_origin(mp)
-		var rd: Vector3 = cam.project_ray_normal(mp).normalized()
-
-		var oc: Vector3 = ro - C
-		var b: float = 2.0 * rd.dot(oc)
-		var c: float = oc.dot(oc) - R * R
-		var disc: float = b * b - 4.0 * c
-		var contact: Vector3 = Vector3.ZERO
-		if disc >= 0.0:
-			var sd: float = sqrt(disc)
-			var t1: float = (-b - sd) * 0.5
-			var t2: float = (-b + sd) * 0.5
-			var t: float = -1.0
-			if t1 > 0.0:
-				t = t1
-			elif t2 > 0.0:
-				t = t2
-			if t > 0.0:
-				contact = ro + rd * t
-		if contact == Vector3.ZERO:
-			var t_closest: float = -rd.dot(oc)
-			var closest: Vector3 = ro + rd * maxf(t_closest, 0.0)
-			var dir_to: Vector3 = closest - C
-			if dir_to == Vector3.ZERO:
-				dir_to = global_transform.origin - C
-			contact = C + dir_to.normalized() * R
-		aim_contact = contact
-	#else:
-		## --- Fixed contact: front-facing surface toward the player (no mouse)
-		#var dir := (C - global_transform.origin).normalized()
-		#aim_contact = C - dir * R
-#
-	## Common: drive the arrow from player -> contact
-	#var vec: Vector3 = aim_contact - global_transform.origin
-	#if vec == Vector3.ZERO:
-		#_show_arrow(false)
-		#return
-	#var dist: float = maxf(vec.length(), aim_min_len)  # no upper clamp
-	#aim_dir = vec.normalized()
-#
-	#if get_tree().get_multiplayer().get_unique_id() == owner_peer_id: _show_arrow(true)
-	#aim_arrow.global_transform.origin = global_transform.origin
-	#aim_arrow.look_at(aim_arrow.global_transform.origin + aim_dir, Vector3.UP)
-	#aim_arrow.scale = Vector3(1.0, 1.0, dist)
 func _is_aiming() -> bool:
 	return aim_active and Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)
 # KickArea hooks

@@ -102,7 +102,6 @@ func _spawn_players_from_roster() -> void:
 @rpc("any_peer", "reliable", "call_local")
 func _rpc_aim_camera(target_pos: Vector3, path: NodePath) -> void:
 	# On the owning client, call on its local player
-	print("_rpc_aim_camera: " , multiplayer.get_unique_id())
 	var p = get_node(path)
 	if p:
 		p.aim_camera_at(target_pos, 0.0, true)
@@ -135,9 +134,7 @@ func _position_players() -> void:
 				p.global_transform = sp.global_transform
 				red_placed += 1
 		# tell that specific client to aim their camera
-		var from := p.global_position
-		p.rpc_id(pid, "rpc_aim_camera_at", target_pos, from)
-
+		p.focus_at(ball)
 
 
 func _face_towards_xz(n: Node3D, target: Vector3) -> void:
