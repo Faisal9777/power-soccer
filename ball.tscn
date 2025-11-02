@@ -1,4 +1,6 @@
-[gd_scene load_steps=4 format=3 uid="uid://ds26o286r5vvn"]
+[gd_scene load_steps=5 format=3 uid="uid://ds26o286r5vvn"]
+
+[ext_resource type="Script" uid="uid://dqski1v7ddsi4" path="res://ball.gd" id="1_x8fbi"]
 
 [sub_resource type="SphereMesh" id="SphereMesh_djrsh"]
 radius = 1.0
@@ -23,6 +25,7 @@ collision_layer = 4
 collision_mask = 3
 mass = 0.1
 can_sleep = false
+script = ExtResource("1_x8fbi")
 
 [node name="Mesh" type="MeshInstance3D" parent="."]
 mesh = SubResource("SphereMesh_djrsh")
