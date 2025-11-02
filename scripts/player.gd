@@ -647,7 +647,10 @@ func _kick_at_contact_server() -> void:
 	var J: Vector3 = dir * strength
 
 	current_ball.sleeping = false
-	current_ball.apply_impulse(J,  hit_point - C)
+	#current_ball.apply_impulse(J,  hit_point - C)
+	var ball := current_ball as Ball
+	if not ball : print("ball bcame null when casted")
+	ball.apply_hit(J,  hit_point - C, owner_peer_id)
 	#_debug_red_dot(current_ball, hit_point, 500)
 	# housekeeping
 	_cooldowns["shoot"] = shoot_cooldown

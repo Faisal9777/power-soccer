@@ -23,6 +23,11 @@ func is_blue(peer_id: int) -> bool:
 
 func is_red(peer_id: int) -> bool:
 	return get_team(peer_id) == Team.RED
+	
+func is_in_the_same_team(peer_id: int, team : String) -> bool:
+	if team == "blue":
+		return is_team(peer_id, 0)
+	return is_team(peer_id, 1)
 func reset_lobby() -> void:
 	is_host = false
 	roster.clear()

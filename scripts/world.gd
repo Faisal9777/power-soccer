@@ -43,6 +43,7 @@ func _ready() -> void:
 		players_root.add_child(spawner)
 	_create_ball_spawner()
 	_server_setup()
+	_initialize_game()
 	# 1) Connect to the Network autoload signals (do it here so it works even if not wired in editor)
 
 	#Network.server_started.connect(_on_server_started)
@@ -59,9 +60,11 @@ func _server_setup() -> void:
 	for k in GameState.roster.keys():
 		ids.append(int(k))   # ensure int
 		_server_begin_match(ids)
-	var game := Game.new()
 
-	# Resolve to actual nodes in World context
+func _initialize_game() -> void:
+	var game := Game.new()
+	game.name = "Game"
+		# Resolve to actual nodes in World context
 	var blue_spawns := get_node(TEAM_BLUE_PATH)  as Node3D
 	var red_spawns  := get_node(TEAM_RED_PATH)   as Node3D
 	var ball_spawn  := get_node(BALL_SPAWN_PATH) as Node3D
@@ -69,13 +72,13 @@ func _server_setup() -> void:
 
 	# Give Game everything it needs *before* it's added (so _ready can safely use them)
 	game.setup({
-		"duration_sec": GameState.match_len_sec,
-		"goal_limit":   GameState.goal_limit,
-		"roster":       GameState.roster,
-	}, blue_spawns, red_spawns, ball_spawn, ball_scene)
+			"duration_sec": GameState.match_len_sec,
+			"goal_limit":   GameState.goal_limit,
+			"roster":       GameState.roster,
+		}, blue_spawns, red_spawns, ball_spawn, ball_scene)
 
-	add_child(game)
 	
+	add_child(game)
 
 func _create_ball_server() -> void:
 	# Instance a **fresh** rigid body
@@ -269,6 +272,7 @@ func _spawn_player_for2(id: int) -> void:
 	_players[id] = p
 	players_root.add_child(p, true)
 	GameState.roster[id]["player_path"] = p.get_path()
+	GameState.roster[id]["name"] = p.name
 	print("Spawned/registered player for peer ", id, " authority=", p.get_multiplayer_authority())
 		# Tell only that client to attach their camera to this player
 	_notify_client_to_attach_camera(p, id)
