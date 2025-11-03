@@ -1,0 +1,69 @@
+[gd_scene load_steps=7 format=3 uid="uid://dv5l1qjf5gwfn"]
+
+[ext_resource type="Script" uid="uid://ba1oat4ex8suj" path="res://scripts/player.gd" id="1_xhfnw"]
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_2vmtx"]
+radius = 1.0
+height = 4.0
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_ld6s0"]
+radius = 1.0
+height = 4.0
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_f3sb7"]
+radius = 19.017
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_fj7yv"]
+radius = 1.467
+
+[sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_kpjcp"]
+properties/0/path = NodePath(".:owner_peer_id")
+properties/0/spawn = true
+properties/0/replication_mode = 1
+properties/1/path = NodePath(".:transform")
+properties/1/spawn = true
+properties/1/replication_mode = 1
+properties/2/path = NodePath(".:aim_active")
+properties/2/spawn = true
+properties/2/replication_mode = 1
+properties/3/path = NodePath(".:_charge")
+properties/3/spawn = true
+properties/3/replication_mode = 1
+properties/4/path = NodePath(".:_stamina")
+properties/4/spawn = true
+properties/4/replication_mode = 1
+properties/5/path = NodePath(".:current_ball_path")
+properties/5/spawn = true
+properties/5/replication_mode = 1
+
+[node name="Player" type="CharacterBody3D"]
+collision_layer = 2
+collision_mask = 5
+script = ExtResource("1_xhfnw")
+sprint_speed = 12.0
+
+[node name="Mesh" type="MeshInstance3D" parent="."]
+mesh = SubResource("CapsuleMesh_2vmtx")
+
+[node name="PlayerCollision" type="CollisionShape3D" parent="."]
+shape = SubResource("CapsuleShape3D_ld6s0")
+
+[node name="KickArea" type="Area3D" parent="."]
+transform = Transform3D(0.125, 0, 0, 0, 0.125, 0, 0, 0, 0.125, 0, 0, 0)
+collision_layer = 8
+collision_mask = 4
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="KickArea"]
+transform = Transform3D(0.99997, 0.007033615, 0.0031066039, -0.00703358, 0.999975, -2.1851216e-05, -0.0031066798, 1.4551912e-11, 0.999995, 0, -0.9, -0.6)
+shape = SubResource("SphereShape3D_f3sb7")
+
+[node name="TackleField" type="Area3D" parent="."]
+collision_layer = 16
+collision_mask = 4
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="TackleField"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.0160648, -1.35571, 4.76837e-07)
+shape = SubResource("SphereShape3D_fj7yv")
+
+[node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="."]
+replication_config = SubResource("SceneReplicationConfig_kpjcp")

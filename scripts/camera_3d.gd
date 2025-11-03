@@ -1,0 +1,273 @@
+extends Camera3D
+
+@export var target_path: NodePath
+@export var ball_target_path: NodePath
+
+# First-person head height
+@export var height: float = 1.6
+
+# Distance: FP if ~0, TP if > 0
+@export var distance: float = 0.0
+@export var min_distance: float = 0.0
+@export var max_distance: float = 0.0
+
+@export var mouse_sens: float = 0.008
+@export var invert_y: bool = false
+@export var follow_speed: float = 12.0
+
+@export var collision_mask: int = 1
+@export var collision_padding: float = 0.2
+
+@onready var _is_mobile: bool = OS.has_feature("mobile")
+var _look_touch_id: int = -1
+
+@export var lead_factor: float = 0.0   # (not used yet) try 0.1..0.25 to lead targets slightly
+
+var _aim_mode: bool = false
+var _target: Node3D
+var _target_ball: Node3D
+
+var _yaw: float = 0.0
+var _pitch: float = -0.25
+var _min_pitch: float = deg_to_rad(-70.0)
+var _max_pitch: float = deg_to_rad(75.0)
+var _wheel_step: float = 0.7
+var _captured: bool = true
+var _pending_face_point: Vector3 = Vector3.ZERO
+var _has_pending_face: bool = false
+@export var front_is_plus_z: bool = true
+func _ready() -> void:
+	_target = get_node_or_null(target_path)
+	_target_ball = get_node_or_null("Ball")
+	# Auto-activate on clients / editor. On dedicated servers, activation will no-op.
+	activate()
+
+# ----------------------------
+# Activation / Deactivation API
+# ----------------------------
+func activate() -> void:
+	# If this is a dedicated headless server, don't run a camera.
+	if OS.has_feature("server"):
+		_set_active(false)
+		return
+	_set_active(true)
+	# Mouse capture/visibility based on platform and aim state
+	if _is_mobile:
+		_captured = false
+		Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+	else:
+		_captured = true
+		Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+
+func deactivate() -> void:
+	_set_active(false)
+	# Release mouse if we had captured it
+	if Input.get_mouse_mode() == Input.MOUSE_MODE_CAPTURED:
+		Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+
+func _set_active(on: bool) -> void:
+	current = on
+	set_process(on)
+	set_physics_process(on)
+	set_process_input(on)
+	set_process_unhandled_input(on)
+
+# Optional helpers (useful for runtime swaps)
+func set_target(player: Node3D) -> void:
+	_target = player
+	
+func set_ball(ball_path: NodePath) -> void:
+	print("in setting bball of camera, the ball path is: ", ball_path)
+	var ball := get_node(ball_path)
+	_target_ball = ball
+
+# Public: ask the camera to face a world point next physics tick
+func face_towards(target_pos: Vector3, from: Vector3) -> void:
+	#print("face towards is called for unique id of: ", multiplayer.get_unique_id()) 
+	#print("for the player name: ", _target.name) 
+	#print("whoose position is: ", _target.global_position) 
+	#print("target_pos: ", target_pos)
+	#print("camera's position should be: ", from)
+	if _target == null:
+		return
+	if from.distance_squared_to(target_pos) < 1e-8:
+		return
+
+	# Start from the provided world position
+	var desired_pos: Vector3 = from
+
+	# Optional: line-of-sight push (ray: target -> camera) to avoid walls
+	if collision_mask != 0:
+		var space := get_world_3d().direct_space_state
+		var q := PhysicsRayQueryParameters3D.create(target_pos, desired_pos)
+		q.collision_mask = collision_mask
+		q.hit_from_inside = true
+		var hit := space.intersect_ray(q)
+		if hit.size() > 0:
+			var hit_pos: Vector3 = hit.position
+			var dir_tc: Vector3 = (desired_pos - target_pos).normalized() # target→camera
+			desired_pos = hit_pos - dir_tc * collision_padding            # just before the obstacle
+
+	# Build basis so camera forward points to target
+	var dir: Vector3 = (target_pos - desired_pos).normalized()          # world look dir
+	if front_is_plus_z:
+		dir = -dir                                                      # flip for +Z-front rigs
+
+	var look_basis := Basis().looking_at(dir, Vector3.UP)
+	look_basis = look_basis.orthonormalized()
+
+	global_transform = Transform3D(look_basis, desired_pos)
+
+	# Keep yaw/pitch in sync for later frames
+	var e: Vector3 = look_basis.get_euler(EULER_ORDER_YXZ)
+	_yaw = wrapf(e.y, -PI, PI)
+	_pitch = clamp(e.x, -1.55, 1.55)
+
+	if !current:
+		current = true
+# ----------------------------
+# Public toggle for UI/other code
+# ----------------------------
+func set_aim_mode(on: bool) -> void:
+	_aim_mode = on
+	if _is_mobile:
+		return
+	_captured = not on
+	if _captured:
+		Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+	else:
+		Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+
+# ----------------------------
+# Desktop input (mouse)
+# ----------------------------
+func _unhandled_input(event: InputEvent) -> void:
+	if _is_mobile:
+		return
+
+	# RMB toggles aim mode (release mouse for on-screen cursor while aiming)
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT:
+		if event.pressed:
+			_aim_mode = true
+			_captured = false
+			Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+		else:
+			# sync yaw/pitch to current view before returning to mouse orbit
+			var e := global_transform.basis.get_euler()
+			_yaw = e.y
+			_pitch = clamp(e.x, _min_pitch, _max_pitch)
+			_aim_mode = false
+			_captured = true
+			Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+		return
+
+	# Rotate camera from mouse when captured (not aiming)
+	elif event is InputEventMouseMotion and _captured:
+		var mm := event as InputEventMouseMotion
+		var sy: float = (1.0 if invert_y else -1.0)
+		_yaw -= mm.relative.x * mouse_sens
+		_pitch += mm.relative.y * mouse_sens * sy
+		_pitch = clamp(_pitch, _min_pitch, _max_pitch)
+
+	# Wheel zoom (no-op for FP unless you expose min/max > 0)
+	elif event is InputEventMouseButton and event.pressed:
+		var mb := event as InputEventMouseButton
+		if mb.button_index == MOUSE_BUTTON_WHEEL_UP:
+			distance = max(min_distance, distance - _wheel_step)
+		elif mb.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+			distance = min(max_distance, distance + _wheel_step)
+
+# ----------------------------
+# Mobile input (touch look)
+# ----------------------------
+func _input(event: InputEvent) -> void:
+	if not _is_mobile:
+		return  # Desktop uses mouse code in _unhandled_input
+
+	var vp_size := get_viewport().get_visible_rect().size
+
+	# Start/stop a "look finger" on the RIGHT half of the screen
+	if event is InputEventScreenTouch:
+		if event.pressed:
+			if _look_touch_id == -1 and event.position.x >= vp_size.x * 0.5:
+				_look_touch_id = event.index
+		else:
+			if event.index == _look_touch_id:
+				_look_touch_id = -1
+
+	# While that finger moves, rotate camera by its delta
+	if event is InputEventScreenDrag and event.index == _look_touch_id:
+		var sy: float = (1.0 if invert_y else -1.0)
+		_yaw -= event.relative.x * mouse_sens
+		_pitch += event.relative.y * mouse_sens * sy
+		_pitch = clamp(_pitch, _min_pitch, _max_pitch)
+
+# ----------------------------
+# Camera follow / collision / FP/TP logic
+# ----------------------------
+func _look() -> void:
+	global_position = Vector3(0.000003, 3.100583, 33.0287)
+	print("looking")
+	print("camera's position: ", global_position)
+	
+	var pos := Vector3.ZERO
+	print("target position: ", pos)
+	look_at(pos)
+func _physics_process(delta: float) -> void:
+	if _target == null:
+		return
+	#if Input.is_action_just_pressed("debug"): _look()
+	var focus_player: Vector3 = _target.global_transform.origin + Vector3(0.0, height, 0.0)
+
+	var R := Basis(Vector3.UP, _yaw) * Basis(Vector3.RIGHT, _pitch)
+	var ball: Node3D = _target_ball
+	var has_ball: bool = ball != null
+
+	# ===== FIRST-PERSON (distance ~ 0) =====
+	if distance <= 0.05:
+		# Stick camera to head; apply rotation from yaw/pitch
+		global_transform = Transform3D(R, focus_player)
+
+		# If aiming and we have a ball, only twist to face the ball (no position change)
+		if _aim_mode and has_ball:
+			look_at(ball.global_transform.origin, Vector3.UP)
+		return
+
+	# ===== THIRD-PERSON (boom) =====
+	var desired_pos: Vector3
+	if _aim_mode:
+		# Stay behind player in aim (ignore mouse yaw/pitch for position)
+		var player_forward: Vector3 = (-_target.global_transform.basis.z).normalized()
+		desired_pos = focus_player - player_forward * distance
+	else:
+		# Normal mouse-orbit
+		desired_pos = focus_player + R * Vector3(0, 0, -distance)
+
+	# Wall avoidance from head to desired camera position
+	var space := get_world_3d().direct_space_state
+	var q := PhysicsRayQueryParameters3D.create(focus_player, desired_pos)
+	q.collision_mask = collision_mask
+	q.hit_from_inside = true
+	var hit := space.intersect_ray(q)
+	if hit.size() > 0:
+		var hit_pos: Vector3 = hit.position
+		var back_dir: Vector3 = (focus_player - hit_pos).normalized()
+		desired_pos = hit_pos + back_dir * collision_padding
+
+	# Smooth follow and apply rotation
+	var t: float = 1.0 - exp(-follow_speed * delta)
+	var new_pos := global_transform.origin.lerp(desired_pos, t)
+
+	if _aim_mode:
+		# In aim, position behind player and rotate to ball/player forward
+		global_transform.origin = new_pos
+		if has_ball:
+			# Optional leading (if you wire ball velocity into a variable)
+			# var lead := ball.get("linear_velocity") * lead_factor if available
+			# look_at(ball.global_transform.origin + lead, Vector3.UP)  # when you have 'lead'
+			look_at(ball.global_transform.origin, Vector3.UP)
+
+		else:
+			look_at(focus_player + (-_target.global_transform.basis.z), Vector3.UP)
+	else:
+		global_transform = Transform3D(R, new_pos)

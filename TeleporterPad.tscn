@@ -1,0 +1,22 @@
+[gd_scene load_steps=4 format=3 uid="uid://chl6gnurtocpi"]
+
+[ext_resource type="Texture2D" uid="uid://ckyaiflvqt25u" path="res://teleporter.png" id="5_nrv3q"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_al8n4"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_qx8rq"]
+
+[node name="TeleporterPad" type="Area3D"]
+
+[node name="TeleporterPad" type="Area3D" parent="."]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="TeleporterPad"]
+transform = Transform3D(2, 0, 0, 0, 0.3, 0, 0, 0, 2, 0, 0, 0)
+shape = SubResource("BoxShape3D_al8n4")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="TeleporterPad"]
+transform = Transform3D(2, 0, 0, 0, 0.3, 0, 0, 0, 2, 0, 0, 0)
+mesh = SubResource("BoxMesh_qx8rq")
+
+[node name="Decal" type="Decal" parent="TeleporterPad"]
+texture_albedo = ExtResource("5_nrv3q")
