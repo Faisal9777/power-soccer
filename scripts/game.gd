@@ -412,21 +412,26 @@ func _position_players() -> void:
             if sp:
                 p.global_transform = sp.global_transform
                 blue_placed += 1
-                if not _all_team_assinged_color: _set_player_team_color(p, true)
+                if not _all_team_assinged_color: rpc("_cl_set_team_id", p.get_path(), true)
         else:
             var sp := spawns_red.get_node_or_null("Spawn%d" % red_placed) as Node3D
             if sp:
                 p.global_transform = sp.global_transform
                 red_placed += 1
-                if not _all_team_assinged_color: _set_player_team_color(p, false)
+                if not _all_team_assinged_color:  rpc("_cl_set_team_id", p.get_path(), false)
         # tell that specific client to aim their camera
         p.focus_at(ball)
         p.freeze(true)
     _all_team_assinged_color = true
 
+@rpc("authority", "reliable", "call_local")
+func _cl_set_team_id(p_path: NodePath, is_blue : bool) -> void:
+    print("_cl_set_team_id, player path: ", p_path)
+    var p := get_node(p_path)
+    _set_player_team_color(p, is_blue)
+
 
 func _set_player_team_color(p: Node3D, is_blue: bool) -> void:
-    print("assigningg color to; ", p.name)
     var col := BLUE
     if not is_blue: col = RED
     _tint_recursive(p, col)
