@@ -82,6 +82,7 @@ var _aim_el := 0.0      # pitch around the ball (up/down)
 var _captured := true
 var _yaw_delta_accum: float = 0.0  # collected since last send
 var _pitch_delta_accum := 0.0
+var _is_frozen := true
 const SELF_LAYER_UI := 19                     # the checkbox number in the inspector
 const SELF_LAYER_MASK := 1 << (SELF_LAYER_UI - 1)  # convert 1..20 -> bit 0..19
 const WORLD_LAYER_MASK := 1 << 0   # Layer 1 (default / visible to camera)
@@ -377,19 +378,20 @@ func _update_charge_ui_from_replication() -> void:
 func simulate_server(delta: float) -> void:
 	#if is_instance_valid(current_ball) and current_ball.linear_velocity.length() > 0.1:
 		#log_ball_velocity()
-	if current_ball_path:
-		_resolve_ball() 
-	_update_cooldowns(delta)
-	_update_charge_server(delta)
-	apply_gravity(delta)
-	#_face_camera_yaw(delta)
-	_update_player_facing_server(delta)
-	#_calculate_arrow_position(delta)
-	var input_dir := _get_input_dir_server()
-	_pre_move_vel = velocity
-	_handle_tackle_input_server(delta)
-	_handle_action_server(input_dir, delta)
-	_update_stamina_server(delta)
+	if not _is_frozen:
+		if current_ball_path:
+			_resolve_ball() 
+		_update_cooldowns(delta)
+		_update_charge_server(delta)
+		apply_gravity(delta)
+		#_face_camera_yaw(delta)
+		_update_player_facing_server(delta)
+		#_calculate_arrow_position(delta)
+		var input_dir := _get_input_dir_server()
+		_pre_move_vel = velocity
+		_handle_tackle_input_server(delta)
+		_handle_action_server(input_dir, delta)
+		_update_stamina_server(delta)
 
 func _can_perform(action: String, stamina_required : float) -> bool:
 	
@@ -660,6 +662,10 @@ func _kick_at_contact_server() -> void:
 
 func get_aim_arrow_position() -> Transform3D:
 	return aim_arrow.global_transform
+
+func freeze(toggle : bool) -> void:
+	_is_frozen = toggle
+
 
 func _debug_red_dot(ball: Node3D,p: Vector3, seconds: float = 1.5, size: float = 0.06) -> void:
 	var mi := MeshInstance3D.new()

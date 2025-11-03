@@ -21,8 +21,9 @@ var _roster := {}
 var _end_ms: int = -1
 var _game : Dictionary = {}
 var countdown_ms: int = 0                 # replicated ALWAYS during prestart
-var _cd_ms: int = -1
-var is_paused := true     
+var _cd_ms: int = -2
+var is_paused := true 
+var _all_team_assinged_color := false    
 # ---------- replicated property ----------
 var time_left_ms: int = 0    # <— this is the ONLY thing we sync
 var blue_score: int = 0           # NEW: server writes, clients read
@@ -45,7 +46,6 @@ var ball_scene: Node3D
 # Scene references (set on _ready by grabbing from World)
 #var spawns_blue: Array[Node3D] = []
 #var spawns_red:  Array[Node3D] = []
-
 var players_root: Node
 var ball_holder: Node
 
@@ -57,7 +57,8 @@ var phase      := "waiting"   # waiting|kickoff|playing|goal_freeze|ended
 
 # Networking
 var IS_HOST := GameState.is_host
-
+const BLUE := Color(0.20, 0.60, 1.00)
+const RED  := Color(1.00, 0.30, 0.30)
 
 func setup(s_cfg: Dictionary, blue: Node3D, red: Node3D, ball_sp: Node3D, scene: Node3D) -> void:
     _duration_sec = s_cfg.get("duration_sec")
@@ -82,8 +83,12 @@ func _start_countdown_server() -> void:
 
 func _start_game() -> void:
     is_paused = false
-    _cd_ms = -1
-    _countdown_label.hide()
+    for k in GameState.roster.keys():
+        var p := get_node(GameState.roster[k]["player_path"]) as Node3D
+        #print("the player's id is: ", pid)
+        if p == null:
+            continue
+        p.freeze(false)
 
 func _set_game() -> void:
     _spawn_ball_at(ball_spawn.global_transform.origin)
@@ -201,11 +206,13 @@ func _install_synchronizer() -> void:
     var p_blue := NodePath(".:blue_score")
     var p_red  := NodePath(".:red_score")
     var p_cd := NodePath(".:countdown_ms")
+    var p_ps := NodePath(".:is_paused")
 
     cfg.add_property(p_time)
     cfg.add_property(p_blue)
     cfg.add_property(p_red)
     cfg.add_property(p_cd)
+    cfg.add_property(p_ps)
 
     # Time updates every frame -> ALWAYS (unreliable, frequent)
     cfg.property_set_replication_mode(p_time, SceneReplicationConfig.REPLICATION_MODE_ALWAYS)
@@ -213,6 +220,7 @@ func _install_synchronizer() -> void:
     cfg.property_set_replication_mode(p_blue, SceneReplicationConfig.REPLICATION_MODE_ON_CHANGE)
     cfg.property_set_replication_mode(p_red,  SceneReplicationConfig.REPLICATION_MODE_ON_CHANGE)
     cfg.property_set_replication_mode(p_cd,    SceneReplicationConfig.REPLICATION_MODE_ALWAYS)     # 3s, smooth
+    cfg.property_set_replication_mode(p_ps,    SceneReplicationConfig.REPLICATION_MODE_ALWAYS)     # 3s, smooth
     sync.replication_config = cfg
     sync.replication_interval = 0.0   # send time every multiplayer tick
 
@@ -238,9 +246,13 @@ func _update_countdown_ui(ms:int) -> void:
         var s := int(ceil(ms / 1000.0))
         _countdown_label.text = str(s)     # "3", "2", "1"
         _countdown_label.show()
+    
     elif ms == 0:
         _countdown_label.text = "GO!"
         _countdown_label.show()
+
+    elif ms == -1:
+        _countdown_label.hide()
 
         
 
@@ -305,23 +317,31 @@ func _physics_process(delta: float) -> void:
     if not is_paused:
         # Everyone (server + clients) renders from replicated time_left_ms
         _update_label(time_left_ms)
-    else:
-        _update_countdown_ui(countdown_ms)
-    if countdown_ms == 0:
-        _start_game()
+    
+    _update_countdown_ui(countdown_ms)
     _update_score_label(blue_score, red_score)
 
+
 func _physics_process_server(delta: float) -> void:
+    if is_paused and countdown_ms == 0:
+        _start_game()
     if not is_paused: 
         if _end_ms > 0:
             var now := Time.get_ticks_msec()
             time_left_ms = max(0, _end_ms - now)  # this write replicates automatically
             if time_left_ms == 0:
                 _on_time_up_server()
-    else:
-        if _cd_ms > 0:
-            var now := Time.get_ticks_msec()
-            countdown_ms = max(0, _cd_ms - now)  # this write replicates automatically
+    if countdown_ms != -1:
+        #var now := Time.get_ticks_msec()
+        #countdown_ms = max(0, _cd_ms - now)  # this write replicates automatically
+        var now := Time.get_ticks_msec()
+        var remaining := _cd_ms - now   # ms until countdown end
+        if remaining > 0:
+            countdown_ms = remaining
+        elif remaining > -1000:
+            countdown_ms = 0           # just hit 0: show GO! for up to 1s
+        else:
+            countdown_ms = -1          # after 1 more second: hide
         
 
 
@@ -378,11 +398,10 @@ func _position_players() -> void:
     var target_pos := ball_spawn.global_position
     for k in GameState.roster.keys():
         var pid := int(k)
-        if _game.is_empty():
-            var entry: Dictionary = _game.get_or_add(k, {}) as Dictionary        # create {} at key k if missing
-            entry["name"] = GameState.roster.get(k, {}).get("name", "")
-            entry["goals"] = 0
-            entry["assists"] = 0
+        var entry: Dictionary = _game.get_or_add(k, {}) as Dictionary        # create {} at key k if missing
+        entry["name"] = GameState.roster.get(k, {}).get("name", "")
+        entry["goals"] = 0
+        entry["assists"] = 0
         var p := get_node(GameState.roster[k]["player_path"]) as Node3D
         #print("the player's id is: ", pid)
         if p == null:
@@ -393,14 +412,59 @@ func _position_players() -> void:
             if sp:
                 p.global_transform = sp.global_transform
                 blue_placed += 1
+                if not _all_team_assinged_color: _set_player_team_color(p, true)
         else:
             var sp := spawns_red.get_node_or_null("Spawn%d" % red_placed) as Node3D
             if sp:
                 p.global_transform = sp.global_transform
                 red_placed += 1
+                if not _all_team_assinged_color: _set_player_team_color(p, false)
         # tell that specific client to aim their camera
         p.focus_at(ball)
+        p.freeze(true)
+    _all_team_assinged_color = true
 
+
+func _set_player_team_color(p: Node3D, is_blue: bool) -> void:
+    print("assigningg color to; ", p.name)
+    var col := BLUE
+    if not is_blue: col = RED
+    _tint_recursive(p, col)
+
+func _tint_recursive(n: Node, col: Color) -> void:
+    if n is MeshInstance3D:
+        var mi: MeshInstance3D = n as MeshInstance3D
+        var mesh: Mesh = mi.mesh
+        if mesh != null:
+            var sc: int = mesh.get_surface_count()
+            var s: int = 0
+            while s < sc:
+                var base_mat: Material = mi.get_surface_override_material(s)
+                if base_mat == null:
+                    base_mat = mesh.surface_get_material(s)
+
+                var new_mat: Material
+                if base_mat != null:
+                    new_mat = base_mat.duplicate(true)
+                else:
+                    new_mat = StandardMaterial3D.new()
+
+                if new_mat is StandardMaterial3D:
+                    var sm: StandardMaterial3D = new_mat as StandardMaterial3D
+                    sm.albedo_color = col
+                elif new_mat is ShaderMaterial:
+                    var sh: ShaderMaterial = new_mat as ShaderMaterial
+                    # your shader must have a 'tint_color' uniform (change name if different)
+                    sh.set_shader_parameter("tint_color", col)
+
+                mi.set_surface_override_material(s, new_mat)
+                s += 1
+
+    # recurse children
+    var children: Array = n.get_children()
+    for i in children.size():
+        var child: Node = children[i] as Node
+        _tint_recursive(child, col)
 
 func _pick_spawn(team:int, blue_i:int, red_i:int) -> Node3D:
     return spawns_blue[min(blue_i, spawns_blue.size()-1)] if team == GameState.Team.BLUE \
