@@ -21,3 +21,9 @@ export_credentials.cfg
 .mono/
 data_*/
 mono_crash.*.json
+*.orig
+*_BACKUP_*
+*_BASE_*
+*_LOCAL_*
+*_REMOTE_*
+*.gd.uid
