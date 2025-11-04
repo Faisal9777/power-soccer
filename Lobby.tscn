@@ -34,7 +34,9 @@ text = "Connected: 0
 "
 
 [node name="HBoxContainer" type="HBoxContainer" parent="PanelContainer/VBoxContainer"]
+custom_minimum_size = Vector2(0, 50)
 layout_mode = 2
+alignment = 1
 
 [node name="StartButton" type="Button" parent="PanelContainer/VBoxContainer/HBoxContainer"]
 layout_mode = 2
@@ -52,4 +54,5 @@ text = "Ready
 "
 
 [node name="PlayerList" type="Tree" parent="PanelContainer/VBoxContainer"]
+custom_minimum_size = Vector2(0, 50)
 layout_mode = 2

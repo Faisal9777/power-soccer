@@ -2,6 +2,9 @@ extends Node
 
 
 # --- Assign in the inspector or hardcode a PackedScene for clients that join ---
+@export var win_scene_path: String = "res://WinScene.tscn"
+@export var defeat_scene_path: String = "res://DefeatScene.tscn"
+@export var scoreboard_scene_path: String = "res://ScoreboardScene.tscn"
 @export var player_scene: PackedScene
 @export var ball_packed: PackedScene
 @onready var spawn_points := $SpawnPoints   # optional, if you have markers named SpawnPoint0/1/2...
@@ -12,6 +15,16 @@ extends Node
 @onready var joystick: Node = get_node(joystick_path) 
 # Keep a typed map of peer-id -> Player node
 var _players: Dictionary[int, CharacterBody3D] = {}    # { int: Node }
+ 
+# --- Pause dialog (created at runtime) ---
+var _pause_ui: Control
+var _gfx_ui: Control
+var _btn_resume: Button
+# --- Scoreboard popup (shown while holding the "scoreboard" action) ---
+var _scoreboard_popup: Control
+var _scoreboard_instance: Control
+const SCOREBOARD_PAUSES := false  # set true if you want gameplay paused while holding
+
 
 # Input pump
 const NET_INPUT_HZ: float = 30.0
@@ -43,7 +56,7 @@ func _ready() -> void:
 		players_root.add_child(spawner)
 	_create_ball_spawner()
 	_server_setup()
-	_initialize_game()
+    _initialize_game()
 	# 1) Connect to the Network autoload signals (do it here so it works even if not wired in editor)
 
 	#Network.server_started.connect(_on_server_started)
@@ -51,6 +64,349 @@ func _ready() -> void:
 	#Network.peer_joined.connect(_on_peer_joined)
 	#Network.peer_left.connect(_on_peer_left)
 	
+	# 2) If a Player is already in the scene (your case), register it for the host
+	var pre := get_node_or_null("Player")
+	if pre != null:
+		# Server must own/simulate every player in server-auth
+		pre.set_multiplayer_authority(1)
+		_players[1] = pre
+		print("Registered preplaced Player as host player; authority=", pre.get_multiplayer_authority())
+	_setup_pause_dialog()
+	_setup_scoreboard_popup()
+
+# Returns [overlay: Control, panel: Panel]
+# Returns [overlay: Control, panel: Panel]
+# Returns [overlay: Control, panel: Panel]
+func _make_centered_overlay(name: String, panel_min_size: Vector2i) -> Array:
+	var overlay := Control.new()
+	overlay.name = name
+	overlay.visible = false
+	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	overlay.process_mode = Node.PROCESS_MODE_WHEN_PAUSED
+	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	# ensure no stale offsets
+	overlay.offset_left = 0
+	overlay.offset_top = 0
+	overlay.offset_right = 0
+	overlay.offset_bottom = 0
+
+	var dim := ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.5)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.offset_left = 0
+	dim.offset_top = 0
+	dim.offset_right = 0
+	dim.offset_bottom = 0
+	overlay.add_child(dim)
+
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	# make sure it truly fills the viewport
+	center.offset_left = 0
+	center.offset_top = 0
+	center.offset_right = 0
+	center.offset_bottom = 0
+	center.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	center.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	overlay.add_child(center)
+
+	var panel := Panel.new()
+	panel.custom_minimum_size = panel_min_size
+	# **key:** don’t let children force it to expand; keep it centered
+	panel.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	panel.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	center.add_child(panel)
+
+	return [overlay, panel]
+
+func _setup_scoreboard_popup() -> void:
+	var parts := _make_centered_overlay("ScoreboardOverlay", Vector2i(560, 360))
+	_scoreboard_popup = parts[0]
+	var panel: Panel = parts[1]
+	add_child(_scoreboard_popup)
+
+	var pad := MarginContainer.new()
+	pad.add_theme_constant_override("margin_left", 12)
+	pad.add_theme_constant_override("margin_right", 12)
+	pad.add_theme_constant_override("margin_top", 12)
+	pad.add_theme_constant_override("margin_bottom", 12)
+	panel.add_child(pad)
+
+# Load the scoreboard scene
+	var ps := load(scoreboard_scene_path)
+	if ps is PackedScene:
+		var inst: Node = ps.instantiate()
+
+		# If root is CanvasLayer, unwrap the first Control child
+		var root_ctrl: Control = null
+		if inst is CanvasLayer:
+			var layer := inst as CanvasLayer
+			if layer.get_child_count() > 0 and layer.get_child(0) is Control:
+				root_ctrl = layer.get_child(0) as Control
+				layer.remove_child(root_ctrl)
+				layer.queue_free()
+			else:
+				push_error("ScoreboardScene CanvasLayer must contain a Control as first child"); return
+		elif inst is Control:
+			root_ctrl = inst as Control
+		else:
+			push_error("ScoreboardScene root must be Control or CanvasLayer"); return
+
+		# Normalize
+		root_ctrl.top_level = false
+		# IMPORTANT: do NOT full-rect this; let CenterContainer center it
+		root_ctrl.set_anchors_preset(Control.PRESET_TOP_LEFT)
+		root_ctrl.offset_left = 0
+		root_ctrl.offset_top = 0
+		root_ctrl.offset_right = 0
+		root_ctrl.offset_bottom = 0
+		root_ctrl.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		root_ctrl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+
+		# Wrap in a CenterContainer so it's truly centered in the panel
+		var inner_center := CenterContainer.new()
+		inner_center.set_anchors_preset(Control.PRESET_FULL_RECT)
+		inner_center.offset_left = 0
+		inner_center.offset_top = 0
+		inner_center.offset_right = 0
+		inner_center.offset_bottom = 0
+		inner_center.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		inner_center.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		pad.add_child(inner_center)
+
+		# If the scoreboard has no inherent min size, give one so it has something to center
+		if root_ctrl.get_minimum_size() == Vector2.ZERO:
+			root_ctrl.custom_minimum_size = Vector2i(560, 360)  # tweak as you like
+
+		inner_center.add_child(root_ctrl)
+		_scoreboard_instance = root_ctrl
+	else:
+		push_error("Could not load scoreboard scene at: %s" % scoreboard_scene_path)
+
+
+func _open_scoreboard() -> void:
+	if SCOREBOARD_PAUSES:
+		get_tree().paused = true
+		# keep mouse as-is (you’re only holding a key)
+	_scoreboard_popup.visible = true
+
+func _close_scoreboard() -> void:
+	_scoreboard_popup.visible = false
+	if SCOREBOARD_PAUSES and get_tree().paused:
+		get_tree().paused = false
+
+func _setup_pause_dialog() -> void:
+	# Root overlay that still works while paused
+	_pause_ui = Control.new()
+	_pause_ui.name = "PauseOverlay"
+	_pause_ui.mouse_filter = Control.MOUSE_FILTER_STOP
+	_pause_ui.process_mode = Node.PROCESS_MODE_WHEN_PAUSED
+	_pause_ui.visible = false
+	_pause_ui.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(_pause_ui)  # or add to your CanvasLayer
+
+	# Dim background
+	var dim := ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.5)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_pause_ui.add_child(dim)
+
+	# Center the panel
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	center.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	center.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_pause_ui.add_child(center)
+
+	var panel := Panel.new()
+	panel.custom_minimum_size = Vector2i(420, 260)
+	center.add_child(panel)
+
+	# Vertical stack
+	var v := VBoxContainer.new()
+	v.alignment = BoxContainer.ALIGNMENT_CENTER
+	v.add_theme_constant_override("separation", 14)
+	v.set_anchors_preset(Control.PRESET_FULL_RECT)
+	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	v.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	panel.add_child(v)
+
+	# Title
+	var title := Label.new()
+	title.text = "Paused"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 24)
+	v.add_child(title)
+
+	# --- Buttons (centered, comfy touch sizes) ---
+	_btn_resume = Button.new()
+	_btn_resume.text = "Resume"
+	_btn_resume.custom_minimum_size = Vector2i(260, 56)
+	_btn_resume.pressed.connect(_on_pause_resume)
+	v.add_child(_btn_resume)
+
+	var btn_gfx := Button.new()
+	btn_gfx.text = "Graphics Settings"
+	btn_gfx.custom_minimum_size = Vector2i(260, 56)
+	btn_gfx.pressed.connect(_open_graphics_settings)
+	v.add_child(btn_gfx)
+
+	var btn_exit := Button.new()
+	btn_exit.text = "Exit Game"
+	btn_exit.custom_minimum_size = Vector2i(260, 56)
+	btn_exit.pressed.connect(_on_pause_exit)
+	v.add_child(btn_exit)
+func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("ui_cancel"):
+		_toggle_pause_menu()
+
+	# SHOW while holding
+	if event.is_action_pressed("scoreboard"):
+		_open_scoreboard()
+
+	# HIDE on release
+	if event.is_action_released("scoreboard"):
+		_close_scoreboard()
+
+func _toggle_pause_menu() -> void:
+	if _pause_ui and _pause_ui.visible:
+		_on_pause_resume()
+		return
+	get_tree().paused = true
+	if !OS.has_feature("mobile"):
+		Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+	_pause_ui.visible = true
+	if _btn_resume:
+		_btn_resume.grab_focus()  # keyboard/controller friendly
+
+func _on_pause_resume() -> void:
+	if _pause_ui:
+		_pause_ui.visible = false
+	get_tree().paused = false
+	if !OS.has_feature("mobile"):  # don’t hide mouse on touch devices
+		Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+func _on_pause_exit() -> void:
+	if get_tree().paused:
+		get_tree().paused = false
+	if !OS.has_feature("mobile"):
+		Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+	# Quit or go to title:
+	# get_tree().quit()
+	get_tree().change_scene_to_file("res://title_screen.tscn")
+
+func _open_graphics_settings() -> void:
+	if _gfx_ui and _gfx_ui.visible:
+		_gfx_ui.hide()
+		return
+
+	if _gfx_ui == null:
+		_gfx_ui = _create_graphics_settings_ui()
+		add_child(_gfx_ui)
+
+	_gfx_ui.visible = true
+
+
+func _create_graphics_settings_ui() -> Control:
+	var root := Control.new()
+	root.name = "GraphicsSettings"
+	root.visible = false
+	root.mouse_filter = Control.MOUSE_FILTER_STOP
+	root.process_mode = Node.PROCESS_MODE_WHEN_PAUSED
+	root.set_anchors_preset(Control.PRESET_FULL_RECT)
+
+	# background dim
+	var dim := ColorRect.new()
+	dim.color = Color(0,0,0,0.5)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	root.add_child(dim)
+
+	# centered panel
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	root.add_child(center)
+
+	var panel := Panel.new()
+	panel.custom_minimum_size = Vector2i(480, 340)
+	center.add_child(panel)
+
+	var v := VBoxContainer.new()
+	v.alignment = BoxContainer.ALIGNMENT_CENTER
+	v.add_theme_constant_override("separation", 14)
+	panel.add_child(v)
+
+	# Title
+	var title := Label.new()
+	title.text = "Graphics Settings"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 24)
+	v.add_child(title)
+
+	# --- Fullscreen toggle ---
+	var fullscreen := CheckBox.new()
+	fullscreen.text = "Fullscreen"
+	fullscreen.button_pressed = DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN
+	v.add_child(fullscreen)
+
+	# --- VSync toggle ---
+	var vsync := CheckBox.new()
+	vsync.text = "VSync"
+	vsync.button_pressed = ProjectSettings.get_setting("display/window/vsync/vsync_mode") != 0
+	v.add_child(vsync)
+
+	# --- Quality dropdown ---
+	var quality_label := Label.new()
+	quality_label.text = "Quality (MSAA)"
+	v.add_child(quality_label)
+
+	var quality := OptionButton.new()
+	quality.add_item("Low (No AA)", 0)
+	quality.add_item("Medium (2x AA)", 1)
+	quality.add_item("High (4x AA)", 2)
+	# pick based on current MSAA
+	match get_viewport().msaa_3d:
+		Viewport.MSAA_DISABLED: quality.select(0)
+		Viewport.MSAA_2X:       quality.select(1)
+		Viewport.MSAA_4X:       quality.select(2)
+	v.add_child(quality)
+
+	# --- Texture quality dropdown ---
+	var tex_label := Label.new()
+	tex_label.text = "Texture Quality"
+	v.add_child(tex_label)
+
+	var tex_quality := OptionButton.new()
+	tex_quality.add_item("Low", 0)
+	tex_quality.add_item("Medium", 1)
+	tex_quality.add_item("High", 2)
+	tex_quality.select(clamp(Settings.tex_quality, 0, 2))
+	v.add_child(tex_quality)
+
+	# --- Apply and Back buttons ---
+	var h := HBoxContainer.new()
+	h.alignment = BoxContainer.ALIGNMENT_CENTER
+	h.add_theme_constant_override("separation", 16)
+	v.add_child(h)
+
+	var apply := Button.new()
+	apply.text = "Apply"
+	h.add_child(apply)
+
+	var back := Button.new()
+	back.text = "Back"
+	h.add_child(back)
+
+	# --- Signal handlers ---
+	apply.pressed.connect(func ():
+		_apply_graphics_settings(fullscreen.button_pressed, vsync.button_pressed, quality.selected,tex_quality.selected)
+	)
+
+	back.pressed.connect(func ():
+		root.hide()
+	)
+
+	return root
+func _apply_graphics_settings(fullscreen: bool, vsync: bool, quality: int, tex_quality: int) -> void:
+	Settings.set_and_save(fullscreen, vsync, quality, tex_quality)
 
 func _server_setup() -> void:
 	if !multiplayer.is_server():
@@ -60,7 +416,6 @@ func _server_setup() -> void:
 	for k in GameState.roster.keys():
 		ids.append(int(k))   # ensure int
 		_server_begin_match(ids)
-
 func _initialize_game() -> void:
 	var game := Game.new()
 	game.name = "Game"
@@ -122,7 +477,9 @@ func _server_begin_match(peer_ids: Array[int]) -> void:
 		_on_peer_joined(id)  # your existing spawn path
 
 func _physics_process(delta: float) -> void:
-
+	#if  Input.is_action_just_pressed("tackle"): print("tackle input was detected in physics process")
+	#var inputs := _gather_input()
+	#_send_local_input(inputs)
 	_update_inputs() 
 	_input_accum += delta
 	var step: float = 1.0 / NET_INPUT_HZ
@@ -155,12 +512,26 @@ func _process(delta: float) -> void:
 			print("Already hosting (ENet)")
 		else:
 			Network.host()              # start hosting
+	#var fps := Engine.get_frames_per_second()
+	##if fmod(fps, 10.0) < 0.001:
+		##print(int(round(fps)))
+	#print("MSAA Level:", get_viewport().msaa_3d)
 
 	if Input.is_action_just_pressed("join_key"):
 		if multiplayer.multiplayer_peer is ENetMultiplayerPeer:
 			print("Already connected (ENet)")
 		else:
 			Network.join("127.0.0.1")
+	if Input.is_action_just_pressed("debug_win"):
+		Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+		get_tree().paused = false
+		get_tree().change_scene_to_file(win_scene_path)
+	#if Input.is_action_just_pressed("scoreboard"):
+		#get_tree().change_scene_to_file(scoreboard_scene_path)
+	elif Input.is_action_just_pressed("debug_lose"):
+		Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+		get_tree().paused = false
+		get_tree().change_scene_to_file(defeat_scene_path)
 	#print("am i connected? ", multiplayer.multiplayer_peer != null and multiplayer.is_server())
 	#print("total numbers of players joined: ", multiplayer.get_peers())
 	# Input pump
@@ -272,7 +643,7 @@ func _spawn_player_for2(id: int) -> void:
 	_players[id] = p
 	players_root.add_child(p, true)
 	GameState.roster[id]["player_path"] = p.get_path()
-	GameState.roster[id]["name"] = p.name
+    GameState.roster[id]["name"] = p.name
 	print("Spawned/registered player for peer ", id, " authority=", p.get_multiplayer_authority())
 		# Tell only that client to attach their camera to this player
 	_notify_client_to_attach_camera(p, id)
@@ -335,6 +706,17 @@ func _gather_input() -> Dictionary:
 	else: 
 		mvx = Input.get_action_strength("move_right") - Input.get_action_strength("move_left")
 		mvz = Input.get_action_strength("move_forward") - Input.get_action_strength("move_back")
+	
+	var yaw := 0.0
+	var cam := get_viewport().get_camera_3d()
+	if cam:
+		yaw = cam.global_transform.basis.get_euler().y
+	else:
+		# Fallback to local player rotation if camera not ready
+		var me: CharacterBody3D = _players.get(multiplayer.get_unique_id(), null) as CharacterBody3D
+		if me:
+			yaw = me.rotation.y
+	
 	return {
 		"mvx": mvx,
 		"mvz": mvz,
@@ -349,9 +731,7 @@ func _gather_input() -> Dictionary:
 		"facing": _my_player.get_yaw() if _my_player else {},
 		"aim_position":_my_player.get_aim_arrow_position() if _my_player and shoot_edge_latched else null
 	}
-
-
-
+#
 func _send_local_input() -> void:
 	# 0) If there is no network peer yet (single-player / not joined / not hosting), do nothing
 	if multiplayer.multiplayer_peer == null:
@@ -391,44 +771,52 @@ func _notify_client_to_attach_camera(p: Node, peer_id: int) -> void:
 	if multiplayer.get_unique_id() == peer_id:
 		_rpc_attach_cam(p.get_path(), joystick_path, ball_scene.get_path())
 	else:
-
 		rpc_id(peer_id, "_rpc_attach_cam", p.get_path(), joystick_path, ball_scene.get_path())
 
 @rpc("any_peer", "reliable", "call_local")
-func _rpc_attach_cam(player_path: NodePath, joystick_path: NodePath, ball_path: NodePath) -> void:
-	print("_rpc_attach_cam")
-	var joystick := get_node_or_null(joystick_path)
+func _rpc_attach_cam(player_path: NodePath, _unused_joystick_path: NodePath, ball_path: NodePath) -> void:
+	# Resolve player locally
 	_my_player = get_node_or_null(player_path)
-	var p := get_node_or_null(player_path)
+	var p := _my_player
 	if p == null:
-		# Player may not be ready yet on this client; try a frame later.
 		await get_tree().process_frame
 		p = get_node_or_null(player_path)
 	if p == null:
 		print("Camera attach: player not found on client")
 		return
-	# Find your camera (pick whichever suits your project)
-	# Option 1: a global camera in the scene tagged by group
-	#var cam := get_tree().get_first_node_in_group("Camera3D")
-	var cam := get_node_or_null("/root/World/Scene/Camera3D")
-	# Option 2: a camera under the player
+
+	# --- Resolve joystick on THIS client ---
+	var joystick: Node = null
+	if OS.has_feature("mobile"):
+		# Your tree: World/CanvasLayer/UI/JoyStick  (capital S)
+		joystick = get_node_or_null("/root/World/CanvasLayer/UI/JoyStick")
+		if joystick == null:
+			# Fallback: search by name anywhere under World
+			var world := get_node_or_null("/root/World")
+			if world:
+				joystick = world.find_child("JoyStick", true, false)
+	# (Desktop clients won’t have/need it; joystick stays null)
+
+	# --- Resolve camera ---
+	var cam: Camera3D = get_node_or_null("/root/World/Scene/Camera3D") as Camera3D
 	if cam == null:
-		cam = p.get_node_or_null("Camera3D")
-	if cam:
-		cam.set_target(p)
-		cam.activate()
-	cam.set_ball(ball_path)
-	# Assign camera variable on the Player and hook it up
+		cam = p.get_node_or_null("Camera3D") as Camera3D
+	if cam == null:
+		print("No camera found to attach on client.")
+		return
+
+	# Wire camera
+	cam.current = true
+	if cam.has_method("set_target"):
+		cam.call_deferred("set_target", p)
+	if cam.has_method("activate"):
+		cam.call_deferred("activate")
+	if cam.has_method("set_ball"):
+		cam.call_deferred("set_ball", ball_path)
+
+	# Hand joystick to player (your Player.attach_camera(cam, joystick) handles null fine)
 	if p.has_method("attach_camera"):
-		p.attach_camera(cam, joystick)
-	#if cam and cam.has_method("set_target"):
-		#cam.call_deferred("set_target", p)  # use deferred in case camera script isn’t ready yet
-	#elif cam:
-		## Fallback: just make it current
-		#if "current" in cam:
-			#cam.current = true
-	else:
-		print("No camera found to attach on client")
+		p.call_deferred("attach_camera", cam, joystick)
 
 func _focus_camera_on_player(p: Node, peer_id: int) -> void:
 	# Find your camera (adjust the path/group/name to your project)
