@@ -426,7 +426,6 @@ func _position_players() -> void:
 
 @rpc("authority", "reliable", "call_local")
 func _cl_set_team_id(p_path: NodePath, is_blue : bool) -> void:
-    print("_cl_set_team_id, player path: ", p_path)
     var p := get_node(p_path)
     _set_player_team_color(p, is_blue)
 
