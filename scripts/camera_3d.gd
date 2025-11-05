@@ -26,7 +26,8 @@ var _look_touch_id: int = -1
 var _aim_mode: bool = false
 var _target: Node3D
 var _target_ball: Node3D
-
+@export var joystick_path :NodePath
+@onready var joystick := get_node_or_null(joystick_path)
 var _yaw: float = 0.0
 var _pitch: float = -0.25
 var _min_pitch: float = deg_to_rad(-70.0)
@@ -58,7 +59,11 @@ func activate() -> void:
 	else:
 		_captured = true
 		Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
-
+func _touch_on_joystick(pos: Vector2) -> bool:
+	if joystick:
+		return joystick.get_global_rect().has_point(pos)
+	return false
+	
 func deactivate() -> void:
 	_set_active(false)
 	# Release mouse if we had captured it
@@ -142,7 +147,7 @@ func set_aim_mode(on: bool) -> void:
 # ----------------------------
 func _unhandled_input(event: InputEvent) -> void:
 	if _is_mobile:
-		return
+		return  # mobile path handled in _input()
 
 	# RMB toggles aim mode (release mouse for on-screen cursor while aiming)
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT:
@@ -151,7 +156,6 @@ func _unhandled_input(event: InputEvent) -> void:
 			_captured = false
 			Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 		else:
-			# sync yaw/pitch to current view before returning to mouse orbit
 			var e := global_transform.basis.get_euler()
 			_yaw = e.y
 			_pitch = clamp(e.x, _min_pitch, _max_pitch)
@@ -168,7 +172,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		_pitch += mm.relative.y * mouse_sens * sy
 		_pitch = clamp(_pitch, _min_pitch, _max_pitch)
 
-	# Wheel zoom (no-op for FP unless you expose min/max > 0)
+	# Wheel zoom
 	elif event is InputEventMouseButton and event.pressed:
 		var mb := event as InputEventMouseButton
 		if mb.button_index == MOUSE_BUTTON_WHEEL_UP:
@@ -181,25 +185,32 @@ func _unhandled_input(event: InputEvent) -> void:
 # ----------------------------
 func _input(event: InputEvent) -> void:
 	if not _is_mobile:
-		return  # Desktop uses mouse code in _unhandled_input
+		return
 
 	var vp_size := get_viewport().get_visible_rect().size
 
-	# Start/stop a "look finger" on the RIGHT half of the screen
 	if event is InputEventScreenTouch:
-		if event.pressed:
-			if _look_touch_id == -1 and event.position.x >= vp_size.x * 0.5:
-				_look_touch_id = event.index
+		var st := event as InputEventScreenTouch
+		if st.pressed:
+			# ignore touches on joystick UI
+			if _touch_on_joystick(st.position):
+				return
+			if _look_touch_id == -1 and st.position.x >= vp_size.x * 0.5:
+				_look_touch_id = st.index
 		else:
-			if event.index == _look_touch_id:
+			if st.index == _look_touch_id:
 				_look_touch_id = -1
 
-	# While that finger moves, rotate camera by its delta
-	if event is InputEventScreenDrag and event.index == _look_touch_id:
-		var sy: float = (1.0 if invert_y else -1.0)
-		_yaw -= event.relative.x * mouse_sens
-		_pitch += event.relative.y * mouse_sens * sy
-		_pitch = clamp(_pitch, _min_pitch, _max_pitch)
+	elif event is InputEventScreenDrag:
+		var sd := event as InputEventScreenDrag
+		# ignore joystick area drags
+		if _touch_on_joystick(sd.position):
+			return
+		if sd.index == _look_touch_id:
+			var sy: float = (1.0 if invert_y else -1.0)
+			_yaw   -= sd.relative.x * mouse_sens
+			_pitch += sd.relative.y * mouse_sens * sy
+			_pitch  = clamp(_pitch, _min_pitch, _max_pitch)
 
 # ----------------------------
 # Camera follow / collision / FP/TP logic

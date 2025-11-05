@@ -149,7 +149,7 @@ extends Control
 # (Optional: if you kept a bottom TeamButton, you can remove it or ignore it.)
 
 var _ui_ids: Array[int] = []  # peer_id order as shown (not needed for Tree, kept for reference)
-const WORLD_SCENE := "res://World.tscn"
+const WORLD_SCENE := "res://world.tscn"
 const Team = GameState.Team
 const TEAM_COLOR := {
 	GameState.Team.BLUE: Color(0.2, 0.6, 1.0),

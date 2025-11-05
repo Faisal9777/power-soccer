@@ -113,4 +113,4 @@ func _update_vector(local_pos: Vector2) -> void:
 func _move_knob(v_game_up: Vector2) -> void:
 	if _knob:
 		# v_game_up uses +Y = up; UI uses +Y = down → flip Y to place
-		_knob.position = (size * 0.5) + Vector2(v_game_up.x, -v_game_up.y)
+		_knob.position = (size * 0.5) + Vector2(v_game_up.x, -v_game_up.y)  

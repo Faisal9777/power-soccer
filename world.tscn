@@ -1,21 +1,21 @@
 [gd_scene load_steps=60 format=4 uid="uid://ex55agd4o2wj"]
 
-[ext_resource type="Script" uid="uid://nccn213w78dk" path="res://scripts/world.gd" id="1_4h6ng"]
+[ext_resource type="Script" uid="uid://be81hdo6fj4x2" path="res://scripts/world.gd" id="1_4h6ng"]
 [ext_resource type="Texture2D" uid="uid://lg2bc8rys6fs" path="res://bg_cliffs.png" id="2_bc84e"]
 [ext_resource type="PackedScene" uid="uid://dv5l1qjf5gwfn" path="res://Player.tscn" id="2_o3ebs"]
 [ext_resource type="Texture2D" uid="uid://bvxkxaod0qfp" path="res://grass.png" id="2_tlwt5"]
 [ext_resource type="PackedScene" uid="uid://ds26o286r5vvn" path="res://ball.tscn" id="3_4h6ng"]
 [ext_resource type="Texture2D" uid="uid://iqnucbl6j3qr" path="res://fence.png" id="4_aqk2v"]
-[ext_resource type="Script" path="res://scripts/GoalTrigger.gd" id="5_2u3nc"]
+[ext_resource type="Script" uid="uid://c67n8kl2wr5bb" path="res://scripts/GoalTrigger.gd" id="5_2u3nc"]
 [ext_resource type="Texture2D" uid="uid://ckyaiflvqt25u" path="res://teleporter.png" id="6_dwbse"]
-[ext_resource type="Script" path="res://scripts/teleporter_pad.gd" id="6_pkg7o"]
-[ext_resource type="Script" path="res://scripts/spring_pad.gd" id="7_pkg7o"]
-[ext_resource type="Script" path="res://scripts/spring_mesh.gd" id="8_gbfbk"]
+[ext_resource type="Script" uid="uid://c16lvcs2s31j7" path="res://scripts/teleporter_pad.gd" id="6_pkg7o"]
+[ext_resource type="Script" uid="uid://uobuw5ls8m2w" path="res://scripts/spring_pad.gd" id="7_pkg7o"]
+[ext_resource type="Script" uid="uid://cw1hucpin5hpc" path="res://scripts/spring_mesh.gd" id="8_gbfbk"]
 [ext_resource type="PackedScene" uid="uid://dpicujbq5yvvi" path="res://PlayerCamera.tscn" id="8_o3ebs"]
-[ext_resource type="Script" path="res://scripts/joy_stick.gd" id="9_k3n1d"]
+[ext_resource type="Script" uid="uid://c2yj0eaqbu3ma" path="res://scripts/joy_stick.gd" id="9_k3n1d"]
 [ext_resource type="Texture2D" uid="uid://cl47ta5h6ne1t" path="res://JumpButtonTexture.png" id="10_ic0uy"]
-[ext_resource type="Script" path="res://scripts/ui.gd" id="11_wukud"]
-[ext_resource type="Script" path="res://scripts/goal_markers.gd" id="12_70uel"]
+[ext_resource type="Script" uid="uid://qy2wikuman02" path="res://scripts/ui.gd" id="11_wukud"]
+[ext_resource type="Script" uid="uid://biii28s4muarm" path="res://scripts/goal_markers.gd" id="12_70uel"]
 [ext_resource type="Texture2D" uid="uid://q6muixq3msuu" path="res://ShootButtonTexture.png" id="12_k3n1d"]
 [ext_resource type="Texture2D" uid="uid://cj3trlht0ycuh" path="res://BlueMarker.png" id="13_70uel"]
 [ext_resource type="Texture2D" uid="uid://dlck27v585nd0" path="res://StopButtonTexture.png" id="13_cbp6q"]
@@ -23,10 +23,10 @@
 [ext_resource type="Texture2D" uid="uid://sa84j336yugo" path="res://KnobTexture.png" id="13_il2jm"]
 [ext_resource type="Texture2D" uid="uid://cs11ipm60d843" path="res://TackleButtonTexture.png" id="14_26xuy"]
 [ext_resource type="Texture2D" uid="uid://bxp55xgu8bvdm" path="res://DribbleButtonTexture.png" id="15_bc84e"]
-[ext_resource type="Script" path="res://scripts/scoreboard.gd" id="15_hiqwa"]
+[ext_resource type="Script" uid="uid://dwm8dbimip1ap" path="res://scripts/scoreboard.gd" id="15_hiqwa"]
 [ext_resource type="Texture2D" uid="uid://b8dabvdjlh5yx" path="res://BallMarker.png" id="19_26xuy"]
 [ext_resource type="Texture2D" uid="uid://b7gmnh5r1vvi1" path="res://FocusTexture.png" id="19_wjb0r"]
-[ext_resource type="Script" path="res://scripts/focus.gd" id="20_mc2jv"]
+[ext_resource type="Script" uid="uid://bp6dvtew8jxpw" path="res://scripts/focus.gd" id="20_mc2jv"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_ayaqe"]
 sky_top_color = Color(0.403922, 0.72549, 0.776471, 1)
@@ -115,7 +115,7 @@ roughness = 0.2
 
 [sub_resource type="ArrayMesh" id="ArrayMesh_o3ebs"]
 _surfaces = [{
-"aabb": AABB(-0.559671, -0.0598102, -0.557261, 1.11934, 1.61962, 1.11452),
+"aabb": AABB(-0.5596713, -0.059810232, -0.55726093, 1.1193426, 1.6196206, 1.1145219),
 "format": 34359738375,
 "material": SubResource("StandardMaterial3D_4h6ng"),
 "primitive": 3,
@@ -167,10 +167,13 @@ uv1_scale = Vector3(8, 8, 8)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_hiqwa"]
 
-[node name="World" type="Node3D"]
+[node name="World" type="Node3D" node_paths=PackedStringArray("pause_btn", "score_btn")]
 script = ExtResource("1_4h6ng")
+pause_btn = NodePath("CanvasLayer/UI/PauseButton")
+score_btn = NodePath("CanvasLayer/UI/ScoreButton")
 player_scene = ExtResource("2_o3ebs")
 ball_packed = ExtResource("3_4h6ng")
+joystick_path = NodePath("CanvasLayer/UI/JoyStick")
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
 environment = SubResource("Environment_2tuav")
@@ -180,28 +183,29 @@ environment = SubResource("Environment_2tuav")
 [node name="Floor" type="StaticBody3D" parent="Scene"]
 
 [node name="Mesh" type="MeshInstance3D" parent="Scene/Floor"]
-transform = Transform3D(10, 0, 0, 0, 1, 0, 0, 0, 10, 0.407478, -1, 0)
+transform = Transform3D(5, 0, 0, 0, 0.5, 0, 0, 0, 5, 0.407478, -1, 0)
 mesh = SubResource("BoxMesh_37uin")
 surface_material_override/0 = SubResource("StandardMaterial3D_aqk2v")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Scene/Floor"]
-transform = Transform3D(10, 0, 0, 0, 1, 0, 0, 0, 10, 0, -1, 0)
+transform = Transform3D(5, 0, 0, 0, 0.5, 0, 0, 0, 5, 0, -1, 0)
 shape = SubResource("ConvexPolygonShape3D_f1i8d")
 
 [node name="Ceiling" type="StaticBody3D" parent="Scene"]
-transform = Transform3D(1, 0, 0, 0, 0.2, 0, 0, 0, 1, 0, 151.25, 0)
+transform = Transform3D(1, 0, 0, 0, 0.2, 0, 0, 0, 1, 0, 75, 0)
 
 [node name="Mesh" type="MeshInstance3D" parent="Scene/Ceiling"]
-transform = Transform3D(10, 0, 0, 0, 1, 0, 0, 0, 10, -0.654282, -1, 0.276337)
+transform = Transform3D(5, 0, 0, 0, 0.5, 0, 0, 0, 5, -0.654282, -1, 0.276337)
 mesh = SubResource("BoxMesh_37uin")
 surface_material_override/0 = SubResource("StandardMaterial3D_dwbse")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Scene/Ceiling"]
-transform = Transform3D(10, 0, 0, 0, 1, 0, 0, 0, 10, 0, -1, 0)
+transform = Transform3D(5, 0, 0, 0, 0.5, 0, 0, 0, 5, -0.654, -1, 0.276)
 shape = SubResource("ConvexPolygonShape3D_f1i8d")
 
 [node name="Camera3D" parent="Scene" groups=["MainCamera"] instance=ExtResource("8_o3ebs")]
 ball_target_path = NodePath("")
+joystick_path = NodePath("../../CanvasLayer/UI/JoyStick")
 
 [node name="StaticBody3D" type="StaticBody3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 254.784)
@@ -220,46 +224,45 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.860714, -0.665835, -2.33582
 [node name="Wall_North" type="StaticBody3D" parent="Walls"]
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="Walls/Wall_North"]
-transform = Transform3D(500, 0, 0, 0, 300, 0, 0, 0, 0.25, 0, 1, -247.5)
+transform = Transform3D(250, 0, 0, 0, 150, 0, 0, 0, 0.125, 0, 1, -122.5)
 mesh = SubResource("BoxMesh_aqk2v")
 surface_material_override/0 = SubResource("StandardMaterial3D_036b0")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Walls/Wall_North"]
-transform = Transform3D(500, 0, 0, 0, 300, 0, 0, 0, 0.25, 0, 1, -247.5)
+transform = Transform3D(250, 0, 0, 0, 150, 0, 0, 0, 0.125, 0, 1, -122.5)
 shape = SubResource("BoxShape3D_036b0")
 
 [node name="Wall_West" type="StaticBody3D" parent="Walls"]
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="Walls/Wall_West"]
-transform = Transform3D(0.25, 0, 0, 0, 300, 0, 0, 0, 500, -250, 1, 0)
+transform = Transform3D(0.125, 0, 0, 0, 150, 0, 0, 0, 250, -124, 1, 0)
 mesh = SubResource("BoxMesh_aqk2v")
 surface_material_override/0 = SubResource("StandardMaterial3D_pkg7o")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Walls/Wall_West"]
-transform = Transform3D(0.25, 0, 0, 0, 300, 0, 0, 0, 500, -250, 1, 0)
+transform = Transform3D(0.125, 0, 0, 0, 150, 0, 0, 0, 250, -124, 1, 0)
 shape = SubResource("BoxShape3D_036b0")
 
 [node name="Wall_East" type="StaticBody3D" parent="Walls"]
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="Walls/Wall_East"]
-transform = Transform3D(0.25, 0, 0, 0, 300, 0, 0, 0, 500, 249, 1, 0)
+transform = Transform3D(0.125, 0, 0, 0, 150, 0, 0, 0, 250, 124, 1, 0)
 mesh = SubResource("BoxMesh_aqk2v")
 surface_material_override/0 = SubResource("StandardMaterial3D_gbfbk")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Walls/Wall_East"]
-transform = Transform3D(0.25, 0, 0, 0, 300, 0, 0, 0, 500, 249, 1, 0)
+transform = Transform3D(0.125, 0, 0, 0, 150, 0, 0, 0, 250, 124, 1, 0)
 shape = SubResource("BoxShape3D_036b0")
 
 [node name="Wall_South" type="StaticBody3D" parent="Walls"]
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="Walls/Wall_South"]
-transform = Transform3D(500, 0, 0, 0, 300, 0, 0, 0, 0.25, 0, 1, 250)
+transform = Transform3D(250, 0, 0, 0, 150, 0, 0, 0, 0.125, 0, 1, 126.5)
 mesh = SubResource("BoxMesh_aqk2v")
 surface_material_override/0 = SubResource("StandardMaterial3D_ioo17")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Walls/Wall_South"]
-transform = Transform3D(500, 0, 0, 0, 300, 0, 0, 0, 0.25, 0, 1, 250)
-visible = false
+transform = Transform3D(250, 0, 0, 0, 150, 0, 0, 0, 0.125, 0, 1, 126.5)
 shape = SubResource("BoxShape3D_036b0")
 
 [node name="TelePad_A1" type="Area3D" parent="."]
@@ -343,32 +346,33 @@ layout_mode = 1
 anchors_preset = 2
 anchor_top = 1.0
 anchor_bottom = 1.0
-offset_left = 32.0
-offset_top = -498.0
-offset_right = 432.0
-offset_bottom = -98.0
+offset_left = 50.0
+offset_top = -300.0
+offset_right = 300.0
+offset_bottom = -100.0
 grow_vertical = 0
+scale = Vector2(0.5, 0.5)
 mouse_filter = 1
 script = ExtResource("9_k3n1d")
 
 [node name="Base" type="TextureRect" parent="CanvasLayer/UI/JoyStick"]
-layout_mode = 0
-offset_right = 400.0
-offset_bottom = 400.0
+layout_mode = 1
+anchors_preset = -1
+offset_left = -50.0
+offset_top = -50.0
+offset_right = 250.0
+offset_bottom = 200.0
+scale = Vector2(1.2, 1.2)
 stretch_mode = 6
 
 [node name="Knob" type="TextureRect" parent="CanvasLayer/UI/JoyStick"]
 layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
+anchors_preset = 4
 anchor_top = 0.5
-anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -125.0
-offset_top = -125.0
-offset_right = 125.0
-offset_bottom = 125.0
-grow_horizontal = 2
+offset_top = -100.0
+offset_right = 250.0
+offset_bottom = 100.0
 grow_vertical = 2
 texture = ExtResource("13_il2jm")
 stretch_mode = 6
@@ -380,18 +384,19 @@ anchor_left = 1.0
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = -40.0
 offset_top = -40.0
-offset_right = 230.0
+offset_right = 270.0
 offset_bottom = 350.0
 grow_horizontal = 0
 grow_vertical = 0
 rotation = 3.14159
+scale = Vector2(0.7, 0.7)
 mouse_filter = 1
 
 [node name="Jump" type="TouchScreenButton" parent="CanvasLayer/UI/ActionPad"]
 position = Vector2(250, 100)
 rotation = 3.14159
+scale = Vector2(0.7, 0.7)
 texture_normal = ExtResource("10_ic0uy")
 shape = SubResource("RectangleShape2D_ioo17")
 action = "jump"
@@ -399,6 +404,7 @@ action = "jump"
 [node name="Shoot" type="TouchScreenButton" parent="CanvasLayer/UI/ActionPad"]
 position = Vector2(100, 100)
 rotation = 3.14159
+scale = Vector2(0.7, 0.7)
 texture_normal = ExtResource("12_k3n1d")
 shape = SubResource("RectangleShape2D_ioo17")
 action = "shoot_touch"
@@ -406,6 +412,7 @@ action = "shoot_touch"
 [node name="Stop" type="TouchScreenButton" parent="CanvasLayer/UI/ActionPad"]
 position = Vector2(100, 250)
 rotation = 3.14159
+scale = Vector2(0.7, 0.7)
 texture_normal = ExtResource("13_cbp6q")
 shape = SubResource("RectangleShape2D_ioo17")
 action = "stop_ball"
@@ -413,6 +420,7 @@ action = "stop_ball"
 [node name="Tackle" type="TouchScreenButton" parent="CanvasLayer/UI/ActionPad"]
 position = Vector2(250, 250)
 rotation = 3.14159
+scale = Vector2(0.7, 0.7)
 texture_normal = ExtResource("14_26xuy")
 shape = SubResource("RectangleShape2D_ioo17")
 action = "tackle"
@@ -420,6 +428,7 @@ action = "tackle"
 [node name="Dribble" type="TouchScreenButton" parent="CanvasLayer/UI/ActionPad"]
 position = Vector2(100, 380)
 rotation = 3.14159
+scale = Vector2(0.7, 0.7)
 texture_normal = ExtResource("15_bc84e")
 shape = SubResource("RectangleShape2D_ioo17")
 passby_press = true
@@ -428,21 +437,22 @@ action = "dribble"
 [node name="Focus" type="TouchScreenButton" parent="CanvasLayer/UI/ActionPad"]
 position = Vector2(250, 380)
 rotation = 3.14159
+scale = Vector2(0.7, 0.7)
 texture_normal = ExtResource("19_wjb0r")
 shape = SubResource("RectangleShape2D_ioo17")
 passby_press = true
 action = "dribble"
 script = ExtResource("20_mc2jv")
+camera_path = NodePath("../../../../Scene/Camera3D")
 
 [node name="GoalMarkers" type="Control" parent="CanvasLayer/UI"]
 anchors_preset = 0
 offset_right = 40.0
 offset_bottom = 40.0
 script = ExtResource("12_70uel")
-camera_path = NodePath("")
+camera_path = NodePath("../../../Scene/Camera3D")
 blue_goal_path = NodePath("../../../Teams/TeamBlue/Goal_A")
 green_goal_path = NodePath("../../../Teams/TeamRed/Goal_B")
-ball_path = NodePath("")
 blue_offset_below_m = 10.0
 green_offset_below_m = 10.0
 ball_offset_above_m = 0.0
@@ -495,6 +505,33 @@ theme_override_font_sizes/font_size = 32
 horizontal_alignment = 1
 vertical_alignment = 1
 
+[node name="PauseButton" type="Button" parent="CanvasLayer/UI"]
+custom_minimum_size = Vector2(120, 48)
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -8.0
+offset_top = 12.0
+offset_right = -12.0
+offset_bottom = 8.0
+grow_horizontal = 0
+text = "Pause"
+
+[node name="ScoreButton" type="Button" parent="CanvasLayer/UI"]
+custom_minimum_size = Vector2(120, 48)
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -8.0
+offset_top = 12.0
+offset_right = -156.0
+offset_bottom = 8.0
+grow_horizontal = 0
+text = "Score
+"
+
 [node name="BallSpawn" type="Marker3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.153519)
 
@@ -516,7 +553,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.2, -0.1, 0)
 [node name="TeamBlue" type="Node3D" parent="Teams"]
 
 [node name="Goal_A" type="Node3D" parent="Teams/TeamBlue"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -243)
+transform = Transform3D(2.5, 0, 0, 0, 2, 0, 0, 0, 2, 0, -0.5, -117)
 script = ExtResource("5_2u3nc")
 scoreboard_path = NodePath("../../../CanvasLayer/UI/Scoreboard")
 ball_spawn_path = NodePath("../../../BallSpawn")
@@ -611,7 +648,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.231724, -206.045)
 [node name="TeamRed" type="Node3D" parent="Teams"]
 
 [node name="Goal_B" type="Node3D" parent="Teams/TeamRed"]
-transform = Transform3D(-1, 0, -8.74228e-08, 0, 1, 0, 8.74228e-08, 0, -1, 0, 0, 243)
+transform = Transform3D(-2.5, 0, -3.019916e-07, 0, 2, 0, 3.774895e-07, 0, -2, 0, -0.5, 116)
 script = ExtResource("5_2u3nc")
 score_for = 0
 scoreboard_path = NodePath("../../../CanvasLayer/UI/Scoreboard")

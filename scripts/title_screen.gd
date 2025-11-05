@@ -193,7 +193,7 @@ func _on_connect_to_ip() -> void:
 	_set_connect_ui_enabled(false)
 
 	# Join server; on success we'll get _on_joined_server()
-	Network.join(ip)
+	Network.join("192.168.0.107")
 func get_lan_ip() -> String:
 	for addr in IP.get_local_addresses():  # PackedStringArray of addresses
 		var is_ipv6 := String(addr).find(":") != -1
