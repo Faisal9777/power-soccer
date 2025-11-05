@@ -2,6 +2,8 @@ extends Node
 
 
 # --- Assign in the inspector or hardcode a PackedScene for clients that join ---
+@export var pause_btn: Button
+@export var score_btn: Button
 @export var win_scene_path: String = "res://WinScene.tscn"
 @export var defeat_scene_path: String = "res://DefeatScene.tscn"
 @export var scoreboard_scene_path: String = "res://ScoreboardScene.tscn"
@@ -44,7 +46,20 @@ var  jump_edge_latched := false
 var  shoot_edge_latched := false
 
 func _ready() -> void:
-	
+	if OS.has_feature("mobile"):
+		pause_btn.show()
+		score_btn.show()
+	else:
+		pause_btn.hide()
+		score_btn.hide()
+	if not pause_btn.pressed.is_connected(_on_mobile_pause_pressed):
+		print("I RAN")
+		pause_btn.pressed.connect(_on_mobile_pause_pressed)
+
+	if not score_btn.button_down.is_connected(_on_mobile_score_down):
+		score_btn.button_down.connect(_on_mobile_score_down)
+	if not score_btn.button_up.is_connected(_on_mobile_score_up):
+		score_btn.button_up.connect(_on_mobile_score_up)
 	_setup_team_position()
 	# If you didn't set the spawner in the editor, do it here:
 	var spawner := players_root.get_node_or_null("MultiplayerSpawner")
@@ -56,7 +71,7 @@ func _ready() -> void:
 		players_root.add_child(spawner)
 	_create_ball_spawner()
 	_server_setup()
-    _initialize_game()
+	_initialize_game()
 	# 1) Connect to the Network autoload signals (do it here so it works even if not wired in editor)
 
 	#Network.server_started.connect(_on_server_started)
@@ -77,6 +92,13 @@ func _ready() -> void:
 # Returns [overlay: Control, panel: Panel]
 # Returns [overlay: Control, panel: Panel]
 # Returns [overlay: Control, panel: Panel]
+func _on_mobile_pause_pressed() -> void:
+	if _pause_ui and _pause_ui.visible: _on_pause_resume()
+	else: _toggle_pause_menu()
+
+func _on_mobile_score_down() -> void: _open_scoreboard()
+func _on_mobile_score_up()   -> void: _close_scoreboard()
+
 func _make_centered_overlay(name: String, panel_min_size: Vector2i) -> Array:
 	var overlay := Control.new()
 	overlay.name = name
@@ -522,24 +544,24 @@ func _process(delta: float) -> void:
 			print("Already connected (ENet)")
 		else:
 			Network.join("127.0.0.1")
-	if Input.is_action_just_pressed("debug_win"):
-		Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
-		get_tree().paused = false
-		get_tree().change_scene_to_file(win_scene_path)
-	#if Input.is_action_just_pressed("scoreboard"):
-		#get_tree().change_scene_to_file(scoreboard_scene_path)
-	elif Input.is_action_just_pressed("debug_lose"):
-		Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
-		get_tree().paused = false
-		get_tree().change_scene_to_file(defeat_scene_path)
-	#print("am i connected? ", multiplayer.multiplayer_peer != null and multiplayer.is_server())
-	#print("total numbers of players joined: ", multiplayer.get_peers())
-	# Input pump
-	#_input_accum += delta
-	#var step: float = 1.0 / NET_INPUT_HZ
-	#while _input_accum >= step:
-		#_input_accum -= step
-		#_send_local_input()
+	#if Input.is_action_just_pressed("debug_win"):
+		#Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+		#get_tree().paused = false
+		#get_tree().change_scene_to_file(win_scene_path)
+	##if Input.is_action_just_pressed("scoreboard"):
+		##get_tree().change_scene_to_file(scoreboard_scene_path)
+	#elif Input.is_action_just_pressed("debug_lose"):
+		#Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+		#get_tree().paused = false
+		#get_tree().change_scene_to_file(defeat_scene_path)
+	##print("am i connected? ", multiplayer.multiplayer_peer != null and multiplayer.is_server())
+	##print("total numbers of players joined: ", multiplayer.get_peers())
+	## Input pump
+	##_input_accum += delta
+	##var step: float = 1.0 / NET_INPUT_HZ
+	##while _input_accum >= step:
+		##_input_accum -= step
+		##_send_local_input()
 
 func _is_really_hosting() -> bool:
 	return multiplayer.multiplayer_peer is ENetMultiplayerPeer and multiplayer.is_server()
@@ -643,7 +665,7 @@ func _spawn_player_for2(id: int) -> void:
 	_players[id] = p
 	players_root.add_child(p, true)
 	GameState.roster[id]["player_path"] = p.get_path()
-    GameState.roster[id]["name"] = p.name
+	GameState.roster[id]["name"] = p.name
 	print("Spawned/registered player for peer ", id, " authority=", p.get_multiplayer_authority())
 		# Tell only that client to attach their camera to this player
 	_notify_client_to_attach_camera(p, id)
