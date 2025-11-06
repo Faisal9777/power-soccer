@@ -113,6 +113,7 @@ var _charge_layer: CanvasLayer
 var _charge_root: Control
 var _charge_bar: ProgressBar
 var _ball_prev_parent: Node = null
+var _ball_offset: Transform3D = Transform3D.IDENTITY  # ball in anchor space
 var _pre_move_vel: Vector3
 var tackle_active: bool = false
 var tackle_time_left: float = 0.0
@@ -246,7 +247,8 @@ func _btn_just_released(name: String) -> bool:
 # --- Engine callbacks ---
 
 func _ready() -> void:
-	
+	if tackle_field:
+		tackle_field.body_entered.connect(_on_tackle_field_body_entered)
 	if $KickArea:
 		$KickArea.body_entered.connect(_on_kick_area_body_entered)
 		$KickArea.body_exited.connect(_on_kick_area_body_exited)
@@ -711,7 +713,6 @@ func _handle_tackle_input_server(delta: float) -> void:
 	if can_perform : _start_tackle_server()
 	#_net["tackle_pressed"] = false
 
-
 func _start_tackle_server() -> void:
 
 	var fwd := -global_transform.basis.z; fwd.y = 0.0
@@ -732,23 +733,12 @@ func _start_tackle_server() -> void:
 	tackle_time_left = lerpf(tackle_dur_min, tackle_dur_max, w_dur)
 	tackle_active = true
 
-	# Begin latch attempt; no reparent—server will tick-snap ball (see _tick_latch_ball_server)
-	if current_ball and tackle_field and tackle_field.overlaps_body(current_ball) and current_ball.is_in_group("ball"):
-		var C := current_ball.global_transform.origin
-		var F := tackle_field.global_transform.origin
-		var dir := (C - F).normalized()
-		var r := _get_ball_radius(current_ball)
-		var contact_world := C - dir * r
-		_latched_offset_local = to_local(contact_world)
-		ball_latched = true
-		current_ball.freeze = true
-		current_ball.linear_velocity = Vector3.ZERO
-		current_ball.angular_velocity = Vector3.ZERO
-	
+	#_latch_ball_server2(current_ball)
+
 func _update_tackle_server(delta: float) -> void:
 	# keep the ball glued while latched (server-side tick snap)
-	_tick_latch_ball_server()
-
+	
+	_update_latched_ball_server(delta)
 	# slide & gravity
 	var v_xz := Vector3(tackle_velocity.x, 0.0, tackle_velocity.z)
 	var dec := tackle_decel * delta
@@ -768,34 +758,55 @@ func _update_tackle_server(delta: float) -> void:
 	if tackle_time_left <= 0.0 or Vector3(velocity.x,0.0,velocity.z).length() < 0.1:
 		_end_tackle_server()
 
-func _tick_latch_ball_server() -> void:
-	if current_ball and tackle_field.overlaps_body(current_ball) and current_ball is RigidBody3D and current_ball.is_in_group("ball"):
-		print("latching the ball")
-		var ball := current_ball
-		var C: Vector3 = ball.global_transform.origin
-		var F: Vector3 = tackle_field.global_transform.origin
-		var dir: Vector3 = (C - F).normalized()
-		var r: float = _get_ball_radius(ball)
-		var contact_world: Vector3 = C - dir * r
+# Call when tackle begins and you decide to latch
+func _latch_ball_server(ball: RigidBody3D) -> void:
+	if ball == null:
+		return
 
-		# Position the anchor at the contact point in world space
-		ball_latch_anchor.global_transform.origin = contact_world
+	_latched_ball = ball
 
-		# Save parent & collisions
-		_ball_prev_parent = current_ball.get_parent()
-		_saved_ball_layer = current_ball.collision_layer
-		_saved_ball_mask  = current_ball.collision_mask
+	# Save collisions to restore later
+	_saved_ball_layer = ball.collision_layer
+	_saved_ball_mask  = ball.collision_mask
 
-		# Freeze so physics won’t fight the parenting, and avoid blocking
-		current_ball.freeze = true
-		current_ball.linear_velocity  = Vector3.ZERO
-		current_ball.angular_velocity = Vector3.ZERO
-		current_ball.collision_layer = 0
-		current_ball.collision_mask  = 0
-		_latched_ball = current_ball
-		# Reparent under the anchor, keeping world transform
-		current_ball.reparent(ball_latch_anchor, true)  # keep_global = true
-		ball_latched = true
+	# Compute offset: anchor^-1 * ball (so ball = anchor * offset each frame)
+	_ball_offset = ball_latch_anchor.global_transform.affine_inverse() * ball.global_transform
+
+	# Make physics tame while carried (no reparent)
+	ball.freeze = true
+	ball.linear_velocity  = Vector3.ZERO
+	ball.angular_velocity = Vector3.ZERO
+	# Optional: avoid blocking while carried (do replicate these to clients via tiny RPC if you need)
+	ball.collision_layer = 0
+	ball.collision_mask  = 0
+
+	ball_latched = true
+
+# Call when tackle ends
+func _unlatch_ball_server() -> void:
+	if _latched_ball == null:
+		return
+
+	var ball := _latched_ball
+	_latched_ball = null
+	#ball_latch_anchor = null
+	ball_latched = false
+
+	# Restore physics/collisions
+	ball.freeze = false
+	ball.collision_layer = _saved_ball_layer
+	ball.collision_mask  = _saved_ball_mask
+
+	# Optional: give it a finishing shove
+	# ball.apply_impulse(impulse_vector, Vector3.ZERO)
+
+func _update_latched_ball_server(delta: float) -> void:
+	if ball_latched and _latched_ball != null and ball_latch_anchor != null:
+		var target_xf: Transform3D = ball_latch_anchor.global_transform * _ball_offset
+		_latched_ball.global_transform = target_xf
+		# keep velocities calm while carried
+		_latched_ball.linear_velocity  = Vector3.ZERO
+		_latched_ball.angular_velocity = Vector3.ZERO
 
 func _end_tackle_server() -> void:
 	tackle_active = false
@@ -805,20 +816,6 @@ func _end_tackle_server() -> void:
 		_unlatch_ball_server()
 	
 
-func _unlatch_ball_server() -> void:
-	if _latched_ball:
-		print("unlatching the ball")
-	current_ball = _latched_ball
-	_latched_ball = null
-	if _ball_prev_parent != null and is_instance_valid(_ball_prev_parent):
-		# Keep world transform when restoring parent
-		current_ball.reparent(_ball_prev_parent, true)
-	current_ball.freeze = false
-	current_ball.sleeping = false
-	current_ball.collision_layer = _saved_ball_layer
-	current_ball.collision_mask  = _saved_ball_mask
-	_ball_prev_parent = null
-	ball_latched = false
 
 # --- Misc / UI / aim ---
 
@@ -1019,3 +1016,16 @@ func _on_kick_area_body_exited(body: Node) -> void:
 		current_ball_path = NodePath("")
 		aim_active = false
 		_show_arrow(false)
+
+func _on_tackle_field_body_entered(body: Node) -> void:
+	if !multiplayer.is_server():
+		return
+	var rb := body as RigidBody3D
+	if rb == null:
+		return
+	if !rb.is_in_group("ball"):
+		return
+
+	# start follow-with-offset latch (no reparent)
+	if tackle_active:
+		_latch_ball_server(rb)
