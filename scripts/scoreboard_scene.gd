@@ -40,6 +40,7 @@ func _ready() -> void:
 # -------- Public API: call later with real data --------
 # snapshot = [{id, name, team (0/1), goals, assists, saves}, ...]
 func set_stats(snapshot: Array) -> void:
+
 	_tree.clear()
 	var root := _tree.create_item()
 

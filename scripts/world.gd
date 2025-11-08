@@ -17,7 +17,7 @@ extends Node
 @onready var joystick: Node = get_node(joystick_path) 
 # Keep a typed map of peer-id -> Player node
 var _players: Dictionary[int, CharacterBody3D] = {}    # { int: Node }
- 
+var _game : Game
 # --- Pause dialog (created at runtime) ---
 var _pause_ui: Control
 var _gfx_ui: Control
@@ -207,6 +207,8 @@ func _setup_scoreboard_popup() -> void:
 
 
 func _open_scoreboard() -> void:
+	var game_stats : Array[Dictionary] = _game.get_stats_in_array()
+	_scoreboard_instance.set_stats(game_stats)
 	if SCOREBOARD_PAUSES:
 		get_tree().paused = true
 		# keep mouse as-is (you’re only holding a key)
@@ -454,7 +456,7 @@ func _initialize_game() -> void:
 			"roster":       GameState.roster,
 		}, blue_spawns, red_spawns, ball_spawn, ball_scene)
 
-	
+	_game = game
 	add_child(game)
 
 func _create_ball_server() -> void:

@@ -37,7 +37,7 @@ func _on_body_entered(body: Node) -> void:
 		if goal_forward.dot(vel) <= 0.0:
 			return  # ball is moving out of the goal; ignore
 
-	_score()
+	#_score()
 
 func _score() -> void:
 	_locked = true
