@@ -8,7 +8,7 @@ var is_host: bool = false
 # { peer_id: { "name": String, "ready": bool, "team": int(Team) } }
 var roster: Dictionary = {}
 var pending_spawn_ids: Array[int] = []
-var match_len_sec = 600
+var match_len_sec = 180
 var goal_limit = 50
 # --- tie-alternation state ---
 var _next_on_tie: int = Team.BLUE
