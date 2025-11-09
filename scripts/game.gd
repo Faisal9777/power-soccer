@@ -21,17 +21,18 @@ var _duration_sec := 180
 var _goal_limit := 0
 var _roster := {}
 var _end_ms: int = -1
-var _game : Dictionary = {}
 var countdown_ms: int = 0                 # replicated ALWAYS during prestart
 var _cd_ms: int = -2
 var is_paused := true 
 var _all_team_assinged_color := false   
+var _scoreboard_instance: Control
 # ---------- replicated property ----------
 var time_left_ms: int = 0    # <— this is the ONLY thing we sync
 var blue_score: int = 0           # NEW: server writes, clients read
 var red_score: int = 0  
 var can_process := true;
 var scene_path_to_load := ""
+var game : Dictionary = {}
 # ---------- UI ----------
 var _ui_layer: CanvasLayer
 var _hud_layer: CanvasLayer
@@ -72,25 +73,26 @@ func setup(s_cfg: Dictionary, blue: Node3D, red: Node3D, ball_sp: Node3D, scene:
 	ball_spawn   = ball_sp
 	ball_scene  = scene
 
+func set_scoreboard(scoreboard : Control) -> void:
+	_scoreboard_instance = scoreboard
+	#var stats_array = get_stats_in_array()
+	#_scoreboard_instance.set_stats(stats_array)
+
 func get_stats_in_array() -> Array[Dictionary]:
-	print("_game: ", _game)
 	var stats: Array[Dictionary] = []
 
-	for k in GameState.roster.keys():
+	for k in game.keys():
 		var pid: int = int(k)
-		var e := _game[k] as Dictionary
+		var e := game[k] as Dictionary
 
 		# name: prefer _game entry; fall back to GameState.roster
 		var name_val: String = ""
 		if e.has("name"):
 			name_val = String(e["name"])
-		else:
-			name_val = String(GameState.roster.get(pid, {}).get("name", ""))
 
 		# team: derive from your helper
-		var team_val := GameState.Team.BLUE
-		if not GameState.is_blue(pid):
-			team_val = GameState.Team.RED
+		var team_val := e["team"] as int
+
 
 		# build one row
 		var row: Dictionary = {
@@ -105,7 +107,6 @@ func get_stats_in_array() -> Array[Dictionary]:
 
 	# (Optional) stable ordering by id
 	stats.sort_custom(func(a, b): return int(a["id"]) < int(b["id"]))
-	print("stats: ", stats)
 	return stats
 
 func _start_clock_server() -> void:
@@ -132,8 +133,12 @@ func _start_game() -> void:
 func _set_game() -> void:
 	_spawn_ball_at(ball_spawn.global_transform.origin)
 	#_spawn_players_from_roster()
-	_position_players()
-	_start_countdown_server() 
+	
+	_position_players2()
+	_start_countdown_server()
+
+func set_game() -> void:
+	_set_game()
 
 # ---------- UI helpers ----------
 func _create_timer_ui() -> void:
@@ -248,6 +253,7 @@ func _install_synchronizer() -> void:
 	var p_ps := NodePath(".:is_paused")
 	var p_process := NodePath(".:can_process")
 	var p_end_scene := NodePath(".:scene_path_to_load")
+	#var p_game := NodePath(".:game")
 
 	cfg.add_property(p_time)
 	cfg.add_property(p_blue)
@@ -256,6 +262,7 @@ func _install_synchronizer() -> void:
 	cfg.add_property(p_ps)
 	cfg.add_property(p_process)
 	cfg.add_property(p_end_scene)
+	#cfg.add_property(p_game)
 
 	# Time updates every frame -> ALWAYS (unreliable, frequent)
 	cfg.property_set_replication_mode(p_time, SceneReplicationConfig.REPLICATION_MODE_ALWAYS)
@@ -266,6 +273,7 @@ func _install_synchronizer() -> void:
 	cfg.property_set_replication_mode(p_ps,    SceneReplicationConfig.REPLICATION_MODE_ALWAYS)     # 3s, smooth
 	cfg.property_set_replication_mode(p_process,    SceneReplicationConfig.REPLICATION_MODE_ALWAYS)
 	cfg.property_set_replication_mode(p_end_scene,    SceneReplicationConfig.REPLICATION_MODE_ALWAYS)
+	#cfg.property_set_replication_mode(p_game,    SceneReplicationConfig.REPLICATION_MODE_ALWAYS)
 	sync.replication_config = cfg
 	sync.replication_interval = 0.0   # send time every multiplayer tick
 
@@ -313,8 +321,8 @@ func _ready() -> void:
 		 # server owns it (peer 1)
 		_start_clock_server()
 		_start_match_authoritative()
-		
-	# clients just wait for RPC updates
+	print("game.gd is ready: ", multiplayer.get_unique_id())
+
 
 func _start_match_authoritative() -> void:
 	var world := get_parent()
@@ -324,7 +332,7 @@ func _start_match_authoritative() -> void:
 		_blue_zone.body_entered.connect(_on_score_zone_body_entered.bind("blue_goal"))
 	if is_instance_valid(_red_zone):
 		_red_zone.body_entered.connect(_on_score_zone_body_entered.bind("red_goal"))
-	_set_game()
+	#_set_game()
 	
 
 func _physics_process(delta: float) -> void:
@@ -411,9 +419,10 @@ func _position_players() -> void:
 	for k in GameState.roster.keys():
 		var pid := int(k)
 		# initialize only if missing
-		var entry := _game.get_or_add(pid, {
+		var entry := game.get_or_add(pid, {
 			"name": String(GameState.roster.get(pid, {}).get("name","")),
 			"goals": 0,
+			"team": GameState.roster.get(pid, {}).get("team",0),
 			"assists": 0,
 			"saves": 0,
 		}) as Dictionary
@@ -438,6 +447,58 @@ func _position_players() -> void:
 		p.focus_at(ball)
 		p.freeze(true)
 	_all_team_assinged_color = true
+
+func _position_players2() -> void:
+	var blue_placed := 1
+	var red_placed  := 1
+
+	# Find a target to face: live Ball if it exists, else the BallSpawn
+	var ball := ball_scene
+	#var target_pos := ball.global_transform.origin if ball != null else ball_spawn.global_transform.origin
+	var target_pos := ball_spawn.global_position
+	for k in GameState.roster.keys():
+		var pid := int(k)
+		var name := String(GameState.roster.get(pid, {}).get("name", ""))
+		var team := int(GameState.roster.get(pid, {}).get("team", 0))
+		#print("about to calll _cl_init_entry: ", multiplayer.get_unique_id())
+		# initialize only if missing
+		rpc("_cl_init_entry", pid, name, team)
+		var p := get_node(GameState.roster[k]["player_path"]) as Node3D
+		#print("the player's id is: ", pid)
+		if p == null:
+			continue
+
+		if GameState.is_blue(pid):
+			var sp := spawns_blue.get_node_or_null("Spawn%d" % blue_placed) as Node3D
+			if sp:
+				p.global_transform = sp.global_transform
+				blue_placed += 1
+				if not _all_team_assinged_color: rpc("_cl_set_team_id", p.get_path(), true)
+		else:
+			var sp := spawns_red.get_node_or_null("Spawn%d" % red_placed) as Node3D
+			if sp:
+				p.global_transform = sp.global_transform
+				red_placed += 1
+				if not _all_team_assinged_color:  rpc("_cl_set_team_id", p.get_path(), false)
+		# tell that specific client to aim their camera
+		p.focus_at(ball)
+		p.freeze(true)
+	_all_team_assinged_color = true
+
+# Put this anywhere in the same script (or a synced autoload) -----------------
+@rpc("any_peer", "reliable", "call_local")
+func _cl_init_entry(pid: int, name: String, team: int) -> void:
+	# Each peer (and the caller) runs this locally
+	var entry := game.get_or_add(pid, {
+		"name": name,
+		"goals": 0,
+		"team": team,
+		"assists": 0,
+		"saves": 0,
+	}) as Dictionary
+	if _scoreboard_instance:
+		var stats_array = get_stats_in_array()
+		_scoreboard_instance.set_stats(stats_array)
 
 func _process_game_end() -> void:
 	can_process = false
@@ -564,17 +625,34 @@ func _handle_goal(which_goal: String, ball : Node3D) -> void:
 func _add_point(scoring_team: String, ball : Node3D) -> void:
 	var goal_player = ball.get_player(0)
 	var assist_player = ball.get_player(1)
-	if goal_player != -1 and not GameState.is_in_the_same_team(goal_player, scoring_team):
-		_game[goal_player]["goals"] += 1
+	#if goal_player != -1 and not GameState.is_in_the_same_team(goal_player, scoring_team):
+		#game[goal_player]["goals"] += 1
+	#else:
+		#game[goal_player]["goals"] -= 1
+	#if assist_player != -1 and not GameState.is_in_the_same_team(goal_player, scoring_team):
+		#game[goal_player]["assists"] += 1
+	#if scoring_team == "red":
+		#blue_score += 1
+	#else:
+		#red_score += 1
+	#var stats_array = get_stats_in_array()
+	#_scoreboard_instance.set_stats(stats_array)
+	rpc("_cl_apply_goal_update", scoring_team, goal_player, assist_player, GameState.is_in_the_same_team(goal_player, scoring_team))
+
+@rpc("authority", "reliable", "call_local")
+func _cl_apply_goal_update(scoring_team : String, goal_player : int, assist_player : int, is_in_the_same_team : bool) -> void:
+	if goal_player != -1 and not is_in_the_same_team:
+		game[goal_player]["goals"] += 1
 	else:
-		_game[goal_player]["goals"] -= 1
-	if assist_player != -1 and not GameState.is_in_the_same_team(goal_player, scoring_team):
-		_game[goal_player]["assists"] += 1
+		game[goal_player]["goals"] -= 1
+	if assist_player != -1 and not is_in_the_same_team:
+		game[goal_player]["assists"] += 1
 	if scoring_team == "red":
 		blue_score += 1
 	else:
 		red_score += 1
-	print("_game after goal is scored: ", _game)
+	var stats_array = get_stats_in_array()
+	_scoreboard_instance.set_stats(stats_array)
 
 @rpc("authority", "reliable", "call_local") 
 func _cl_handle_goal_outcome(text: String, seconds: float) -> void:
@@ -597,6 +675,12 @@ func _cl_end_match(text: String, seconds: float, scene_path_to_load: String) -> 
 	await _show_banner_for(text, seconds)
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 	get_tree().change_scene_to_file(scene_path_to_load)
+# On the same node (path) on all peers:
+@rpc("any_peer", "reliable")  # server calls; clients execute
+func _cl_set_game(game : String) -> void:
+	print("_cl_set_game: ", game)
+	print("multiplayer.get_unique_id(): ", multiplayer.get_unique_id())
+	#_game = game
 
 
 

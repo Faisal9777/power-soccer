@@ -8,7 +8,7 @@ class_name Ball
 #
 var _last_player_hits: Array[int] = [-1, -1]
 func apply_hit(J : Vector3, position : Vector3, player_id : int) -> void:
-	if _last_player_hits.size() > 1:
+	if _last_player_hits.size() > 1 and _last_player_hits[0] != player_id :
 		var last_player_id = _last_player_hits[0]
 		_last_player_hits[1] = last_player_id
 
