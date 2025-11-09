@@ -70,8 +70,12 @@ func _ready() -> void:
 		spawner.add_spawnable_scene(player_scene.resource_path)
 		players_root.add_child(spawner)
 	_create_ball_spawner()
-	_server_setup()
 	_initialize_game()
+	_setup_pause_dialog()
+	_setup_scoreboard_popup()
+	_game.set_scoreboard(_scoreboard_instance)
+	_server_setup()
+
 	# 1) Connect to the Network autoload signals (do it here so it works even if not wired in editor)
 
 	#Network.server_started.connect(_on_server_started)
@@ -86,8 +90,7 @@ func _ready() -> void:
 		pre.set_multiplayer_authority(1)
 		_players[1] = pre
 		print("Registered preplaced Player as host player; authority=", pre.get_multiplayer_authority())
-	_setup_pause_dialog()
-	_setup_scoreboard_popup()
+
 
 # Returns [overlay: Control, panel: Panel]
 # Returns [overlay: Control, panel: Panel]
@@ -207,8 +210,6 @@ func _setup_scoreboard_popup() -> void:
 
 
 func _open_scoreboard() -> void:
-	var game_stats : Array[Dictionary] = _game.get_stats_in_array()
-	_scoreboard_instance.set_stats(game_stats)
 	if SCOREBOARD_PAUSES:
 		get_tree().paused = true
 		# keep mouse as-is (you’re only holding a key)
@@ -435,14 +436,12 @@ func _apply_graphics_settings(fullscreen: bool, vsync: bool, quality: int, tex_q
 func _server_setup() -> void:
 	if !multiplayer.is_server():
 		return
+	
 	_create_ball_server()
 	var ids: Array[int] = []
 	for k in GameState.roster.keys():
 		ids.append(int(k))   # ensure int
 		_server_begin_match(ids)
-func _initialize_game() -> void:
-	var game := Game.new()
-	game.name = "Game"
 		# Resolve to actual nodes in World context
 	var blue_spawns := get_node(TEAM_BLUE_PATH)  as Node3D
 	var red_spawns  := get_node(TEAM_RED_PATH)   as Node3D
@@ -450,11 +449,27 @@ func _initialize_game() -> void:
 	#var ball_scene := get_node(BALL_PATH) as Node3D
 
 	# Give Game everything it needs *before* it's added (so _ready can safely use them)
-	game.setup({
+	_game.setup({
 			"duration_sec": GameState.match_len_sec,
 			"goal_limit":   GameState.goal_limit,
 			"roster":       GameState.roster,
 		}, blue_spawns, red_spawns, ball_spawn, ball_scene)
+	_game.set_game()
+func _initialize_game() -> void:
+	var game := Game.new()
+	game.name = "Game"
+		## Resolve to actual nodes in World context
+	#var blue_spawns := get_node(TEAM_BLUE_PATH)  as Node3D
+	#var red_spawns  := get_node(TEAM_RED_PATH)   as Node3D
+	#var ball_spawn  := get_node(BALL_SPAWN_PATH) as Node3D
+	##var ball_scene := get_node(BALL_PATH) as Node3D
+#
+	## Give Game everything it needs *before* it's added (so _ready can safely use them)
+	#game.setup({
+			#"duration_sec": GameState.match_len_sec,
+			#"goal_limit":   GameState.goal_limit,
+			#"roster":       GameState.roster,
+		#}, blue_spawns, red_spawns, ball_spawn, ball_scene)
 
 	_game = game
 	add_child(game)
