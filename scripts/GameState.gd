@@ -3,8 +3,10 @@ extends Node
 
 enum Team { BLUE = 0, RED = 1 }
 const TEAM_NONE := -1
-var player_name: String = "Fardin Eajdani"
+var player_name: String = ""
 var is_host: bool = false
+signal player_name_changed(id: int, name: String)
+var id:int
 # { peer_id: { "name": String, "ready": bool, "team": int(Team) } }
 var roster: Dictionary = {}
 var pending_spawn_ids: Array[int] = []
@@ -51,3 +53,18 @@ func pick_balanced_team() -> int:
 	var t := _next_on_tie
 	_next_on_tie = Team.RED if _next_on_tie == Team.BLUE else Team.BLUE
 	return t
+
+func get_player_name(id: int) -> String:
+	# Prefer roster[id]["name"], fall back to the single player_name, else a default.
+	var rec: Dictionary = roster.get(id, {})
+	if rec != null and rec.has("name") and String(rec["name"]) != "":
+		return String(rec["name"])
+	if player_name != "":
+		return player_name
+	return "Player %d" % id
+
+func set_player_name_for(id: int, name: String) -> void:
+	var rec: Dictionary = roster.get(id, {})
+	rec["name"] = name
+	roster[id] = rec
+	player_name_changed.emit(id, name)

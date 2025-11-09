@@ -643,7 +643,7 @@ func _spawn_player_for(id: int) -> void:
 	if player_scene == null:
 		push_error("player_scene not assigned"); return
 	p = player_scene.instantiate()
-	p.name = "Player_%d" % id
+	p.name = GameState.player_name
 	# Put at a spawn point if you have one
 	#var sp := spawn_points.get_node_or_null("Marker3D%d" % ((id - 1) % max(1, spawn_points.get_child_count())))
 	var sp := spawn_points.get_node_or_null("Marker3D")
@@ -674,7 +674,7 @@ func _spawn_player_for2(id: int) -> void:
 	if player_scene == null:
 		push_error("player_scene not assigned"); return
 	p = player_scene.instantiate()
-	p.name = "Player_%d" % id
+	p.name = GameState.player_name
 
 	p.set_multiplayer_authority(1)  # SERVER owns/simulates in server-auth
 	#print("the id bbeofre setting owner peer id: ", id)
@@ -682,7 +682,7 @@ func _spawn_player_for2(id: int) -> void:
 	_players[id] = p
 	players_root.add_child(p, true)
 	GameState.roster[id]["player_path"] = p.get_path()
-	GameState.roster[id]["name"] = p.name
+	
 	print("Spawned/registered player for peer ", id, " authority=", p.get_multiplayer_authority())
 		# Tell only that client to attach their camera to this player
 	_notify_client_to_attach_camera(p, id)

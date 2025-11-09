@@ -107,6 +107,7 @@ func get_stats_in_array() -> Array[Dictionary]:
 
 	# (Optional) stable ordering by id
 	stats.sort_custom(func(a, b): return int(a["id"]) < int(b["id"]))
+	print(stats)
 	return stats
 
 func _start_clock_server() -> void:
@@ -426,6 +427,7 @@ func _position_players() -> void:
 			"assists": 0,
 			"saves": 0,
 		}) as Dictionary
+		
 		var p := get_node(GameState.roster[k]["player_path"]) as Node3D
 		#print("the player's id is: ", pid)
 		if p == null:
