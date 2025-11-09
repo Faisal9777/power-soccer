@@ -127,6 +127,7 @@ var _saved_ball_mask: int = 0
 var _latched_ball: RigidBody3D = null
 var cam: Camera3D = null  # local-only reference
 var _ui_charge := 0.0  # client-only visual charge
+@onready var name_tag: Label3D = $NameTag if has_node("NameTag") else null
 @onready var ground_ray: RayCast3D = $GroundRay
 @onready var kick_area: Area3D = $KickArea
 @onready var tackle_field: Area3D = $TackleField
@@ -206,13 +207,14 @@ func get_yaw() -> Dictionary:
 
 func _mark_self_layer_recursive(n: Node) -> void:
 	for ch in n.get_children():
-		# Skip the whole arrow subtree
-		if aim_arrow and (ch == aim_arrow or aim_arrow.is_ancestor_of(ch)):
+		# Skip the aim arrow and the name tag (and its subtree)
+		if (aim_arrow and (ch == aim_arrow or aim_arrow.is_ancestor_of(ch))) \
+		or (name_tag and (ch == name_tag or name_tag.is_ancestor_of(ch))) \
+		or (ch is Label3D):   # extra safeguard
 			continue
 
 		if ch is VisualInstance3D:
 			var v := ch as VisualInstance3D
-			# add self bit, drop world bit (local-only)
 			v.layers = (v.layers | SELF_LAYER_MASK) & ~WORLD_LAYER_MASK
 			v.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
@@ -269,8 +271,34 @@ func _ready() -> void:
 		var ev := InputEventMouseButton.new()
 		ev.button_index = MOUSE_BUTTON_LEFT
 		InputMap.action_erase_event("shoot", ev)   # remove mouse-left binding at runtime
+	_ensure_name_tag()
 
-	
+func _ensure_name_tag() -> void:
+	if name_tag == null:
+		name_tag = Label3D.new()
+		name_tag.name = "NameTag"
+		name_tag.position = Vector3(0, 1.9, 0)   # hover above head
+		add_child(name_tag)
+
+	# Visual tuning
+	name_tag.fixed_size = true
+	name_tag.pixel_size = 0.002          # 0.004..0.010; tweak to taste
+	name_tag.outline_size = 12           # optional readability
+	name_tag.no_depth_test = false       # set true to draw through walls
+	name_tag.visible = true
+
+	# IMPORTANT: keep it on a camera-visible layer (default layer 1 is fine)
+	name_tag.layers = 1
+
+	# Text from your GameState (adapt if you use a different getter)
+	if "get_player_name" in GameState:
+		name_tag.text = GameState.get_player_name(owner_peer_id)
+	elif GameState.player_name != "":
+		name_tag.text = GameState.player_name
+	else:
+		name_tag.text = "Player %d" % owner_peer_id
+
+
 func _log_pid(msg : String) -> void:
 	print(msg, OS.get_process_id())
 
@@ -291,7 +319,15 @@ func _process(delta: float) -> void:
 
 	if get_tree().get_multiplayer().get_unique_id() == owner_peer_id: 
 		_local_process(delta)
-
+	if name_tag:
+		var cam := get_viewport().get_camera_3d()
+		if cam:
+			var to_cam := cam.global_transform.origin - name_tag.global_transform.origin
+			to_cam.y = 0.0
+			if to_cam.length() > 0.001:
+				name_tag.look_at(name_tag.global_transform.origin + to_cam, Vector3.UP)
+				name_tag.rotate_y(PI)  # Label3D front faces -Z; flip it
+				
 func _local_physics_process(delta: float) -> void:
 	if get_tree().get_multiplayer().get_unique_id() == owner_peer_id: 
 		#request_arrow_calculation()

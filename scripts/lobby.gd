@@ -215,6 +215,11 @@ func _ready() -> void:
 		_refresh_ui()
 		_update_start_enabled()
 	)
+	
+	multiplayer.connected_to_server.connect(_on_connected_to_server)
+	multiplayer.peer_connected.connect(_on_peer_connected)
+	
+	
 	# If the server (host) goes away, clients should bounce to title
 	multiplayer.server_disconnected.connect(_on_host_gone)
 	multiplayer.connection_failed.connect(_on_host_gone)
@@ -235,6 +240,23 @@ func _ready() -> void:
 	_refresh_ui()
 	_update_start_enabled()
 
+func _on_connected_to_server() -> void:
+	# Client: tell server our name right after connect
+	#print("CLIENT ID %d" % GameState.)
+	rpc_id(GameState.id, "_rpc_submit_name", GameState.player_name)
+
+func _peer_name(pid: int) -> String:
+	return GameState.roster.get(pid, {}).get("name", "Player %d" % pid)
+
+
+
+# When any peer connects (server side), you can request their name if you prefer pull:
+func _on_peer_connected(pid: int) -> void:
+	if multiplayer.is_server():
+		# Optionally pre-create an entry to avoid has() failure later
+		if !GameState.roster.has(pid):
+			GameState.roster[pid] = {"name": "Player %d" % pid, "ready": false}
+		# (Then either wait for their _rpc_submit_name, or actively request it)
 
 # -------------------- Tree setup / UI --------------------
 
@@ -458,10 +480,19 @@ func _rpc_set_roster(snapshot: Array) -> void:
 			"ready": bool(e["ready"]),
 			"team":  int(e.get("team", Team.BLUE))
 		}
+	print("ROSTERRRRRR")
 	GameState.roster = dict
+	print(GameState.roster)
 	_refresh_ui()
 	_update_start_enabled()
 
 @rpc("any_peer", "call_local")
 func _rpc_start_match(scene_path: String) -> void:
 	get_tree().change_scene_to_file(scene_path)
+@rpc("any_peer", "reliable")
+func _rpc_set_my_name(name: String) -> void:
+	if multiplayer.is_server():
+		var pid := multiplayer.get_remote_sender_id()
+		if GameState.roster.has(pid):
+			GameState.roster[pid]["name"] = name
+		# optionally broadcast a lobby refresh to everyone here

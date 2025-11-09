@@ -3,6 +3,8 @@ extends Node
 
 const CFG_PATH := "user://settings.cfg"
 
+var player_name := ""   # shown in lobbies
+
 var fullscreen := false
 var vsync := true
 var quality := 1          # 0=Low, 1=Med, 2=High (MSAA)
@@ -56,10 +58,30 @@ func _load() -> void:
 		quality     = cfg.get_value("video", "quality", quality)
 		tex_quality = cfg.get_value("video", "texture_quality", tex_quality)
 
+		# NEW: profile
+		player_name = cfg.get_value("profile", "name", player_name)
+
 func _save() -> void:
 	var cfg := ConfigFile.new()
+	# write BOTH sections so we don’t lose one when saving the other
 	cfg.set_value("video", "fullscreen", fullscreen)
 	cfg.set_value("video", "vsync", vsync)
 	cfg.set_value("video", "quality", quality)
 	cfg.set_value("video", "texture_quality", tex_quality)
+
+	# NEW: profile
+	cfg.set_value("profile", "name", player_name)
+
 	cfg.save(CFG_PATH)
+func ensure_player_name() -> void:
+	# called on startup (e.g., TitleScreen._ready())
+	if player_name.strip_edges() == "":
+		player_name = "Player_%d" % randi()
+		_save()
+
+func set_player_name_and_save(name: String) -> void:
+	player_name = name.strip_edges()
+	print(player_name)
+	if player_name == "":
+		player_name = "Player_%d" % randi()
+	_save()

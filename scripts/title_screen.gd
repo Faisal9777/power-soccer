@@ -109,6 +109,9 @@ extends Control
 const LOBBY_SCENE := "res://Lobby.tscn"
 
 func _ready() -> void:
+	Settings.ensure_player_name()
+	if Settings.player_name == "" or Settings.player_name.begins_with("Player_"):
+		await _prompt_for_player_name()
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 	if OS.has_feature("mobile") and quit_btn:
 		quit_btn.visible = false
@@ -130,6 +133,51 @@ func _ready() -> void:
 	# Convenience default for local tests
 	if ip_line.text.strip_edges() == "":
 		ip_line.text = "127.0.0.1"
+
+func _prompt_for_player_name() -> void:
+	var win := Window.new()
+	win.title = "Set Your Player Name"
+	win.initial_position = Window.WINDOW_INITIAL_POSITION_CENTER_MAIN_WINDOW_SCREEN
+	win.size = Vector2i(800, 400)
+	win.unresizable = true
+	add_child(win)
+
+	var vb := VBoxContainer.new()
+	vb.set_anchors_preset(Control.PRESET_FULL_RECT)
+	vb.offset_left = 16; vb.offset_right = -16
+	vb.offset_top  = 16; vb.offset_bottom = -16
+	win.add_child(vb)
+
+	var label := Label.new()
+	label.text = "Enter the name to show in lobbies:"
+	vb.add_child(label)
+
+	var name_edit := LineEdit.new()
+	name_edit.placeholder_text = "e.g., Ayaan"
+	name_edit.text = Settings.player_name
+	vb.add_child(name_edit)
+
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_END
+	vb.add_child(row)
+
+	var cancel := Button.new(); cancel.text = "Cancel"
+	var ok := Button.new();     ok.text = "Save"
+	row.add_child(cancel); row.add_child(ok)
+
+	ok.pressed.connect(func():
+		Settings.set_player_name_and_save(name_edit.text)
+		win.queue_free()
+	)
+	cancel.pressed.connect(func():
+		if Settings.player_name == "" or Settings.player_name.begins_with("Player_"):
+			Settings.ensure_player_name()
+		win.queue_free()
+	)
+
+	win.popup_centered()
+	await win.tree_exited
+
 
 func _unhandled_input(event: InputEvent) -> void:
 	# Enter starts game only when popup is closed
@@ -169,6 +217,9 @@ func _on_create_server() -> void:
 
 	# Start ENet server and go to lobby
 	Network.host()
+	GameState.player_name = Settings.player_name
+	GameState.id = 1
+	GameState.roster[1] = {"name": GameState.player_name, "ready": false, "team": GameState.Team.BLUE} # team optional
 	var lan := get_lan_ip()
 	print("Hosting on UDP 24565, LAN IP =", lan)
 	# Register host in roster (peer 1) with ready=false
@@ -182,12 +233,13 @@ func _on_connect_to_ip() -> void:
 		ip = "127.0.0.1"
 
 	# Set a client name if you don't already have one
-	if GameState.player_name == "" or GameState.player_name == "Fardin Eajdani":
-		GameState.player_name = "Guest_%d" % randi()
+	
 
 	GameState.is_host = false
 	GameState.reset_lobby()
-
+	GameState.player_name = Settings.player_name
+	GameState.id = randi()
+	GameState.roster[GameState.id ] = {"name": GameState.player_name, "ready": false}
 	# UI feedback
 	_set_status("Connecting to %s…" % ip)
 	_set_connect_ui_enabled(false)

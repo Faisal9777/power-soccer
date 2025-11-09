@@ -1,21 +1,21 @@
-[gd_scene load_steps=60 format=4 uid="uid://ex55agd4o2wj"]
+[gd_scene load_steps=59 format=4 uid="uid://ex55agd4o2wj"]
 
-[ext_resource type="Script" uid="uid://cv0cy4vqef3qh" path="res://scripts/world.gd" id="1_4h6ng"]
+[ext_resource type="Script" uid="uid://b7dt582nu1sxu" path="res://scripts/world.gd" id="1_4h6ng"]
 [ext_resource type="Texture2D" uid="uid://lg2bc8rys6fs" path="res://bg_cliffs.png" id="2_bc84e"]
 [ext_resource type="PackedScene" uid="uid://dv5l1qjf5gwfn" path="res://Player.tscn" id="2_o3ebs"]
 [ext_resource type="Texture2D" uid="uid://bvxkxaod0qfp" path="res://grass.png" id="2_tlwt5"]
 [ext_resource type="PackedScene" uid="uid://ds26o286r5vvn" path="res://ball.tscn" id="3_4h6ng"]
 [ext_resource type="Texture2D" uid="uid://iqnucbl6j3qr" path="res://fence.png" id="4_aqk2v"]
-[ext_resource type="Script" uid="uid://bu66qw2j47120" path="res://scripts/GoalTrigger.gd" id="5_2u3nc"]
+[ext_resource type="Script" uid="uid://6yehu4wm4wm2" path="res://scripts/GoalTrigger.gd" id="5_2u3nc"]
 [ext_resource type="Texture2D" uid="uid://ckyaiflvqt25u" path="res://teleporter.png" id="6_dwbse"]
-[ext_resource type="Script" uid="uid://bufq4j47x5qgd" path="res://scripts/teleporter_pad.gd" id="6_pkg7o"]
-[ext_resource type="Script" uid="uid://bt67ehls0nnft" path="res://scripts/spring_pad.gd" id="7_pkg7o"]
-[ext_resource type="Script" uid="uid://5ww5v7r64to" path="res://scripts/spring_mesh.gd" id="8_gbfbk"]
+[ext_resource type="Script" uid="uid://c16lvcs2s31j7" path="res://scripts/teleporter_pad.gd" id="6_pkg7o"]
+[ext_resource type="Script" uid="uid://uobuw5ls8m2w" path="res://scripts/spring_pad.gd" id="7_pkg7o"]
+[ext_resource type="Script" uid="uid://cw1hucpin5hpc" path="res://scripts/spring_mesh.gd" id="8_gbfbk"]
 [ext_resource type="PackedScene" uid="uid://dpicujbq5yvvi" path="res://PlayerCamera.tscn" id="8_o3ebs"]
-[ext_resource type="Script" uid="uid://noc67t8sii2r" path="res://scripts/joy_stick.gd" id="9_k3n1d"]
+[ext_resource type="Script" uid="uid://pfcvhibsl1rj" path="res://scripts/joy_stick.gd" id="9_k3n1d"]
 [ext_resource type="Texture2D" uid="uid://cl47ta5h6ne1t" path="res://JumpButtonTexture.png" id="10_ic0uy"]
-[ext_resource type="Script" uid="uid://dasht4kmkuhjk" path="res://scripts/ui.gd" id="11_wukud"]
-[ext_resource type="Script" uid="uid://dw055l6qafcw" path="res://scripts/goal_markers.gd" id="12_70uel"]
+[ext_resource type="Script" uid="uid://qy2wikuman02" path="res://scripts/ui.gd" id="11_wukud"]
+[ext_resource type="Script" uid="uid://biii28s4muarm" path="res://scripts/goal_markers.gd" id="12_70uel"]
 [ext_resource type="Texture2D" uid="uid://q6muixq3msuu" path="res://ShootButtonTexture.png" id="12_k3n1d"]
 [ext_resource type="Texture2D" uid="uid://cj3trlht0ycuh" path="res://BlueMarker.png" id="13_70uel"]
 [ext_resource type="Texture2D" uid="uid://dlck27v585nd0" path="res://StopButtonTexture.png" id="13_cbp6q"]
@@ -23,10 +23,9 @@
 [ext_resource type="Texture2D" uid="uid://sa84j336yugo" path="res://KnobTexture.png" id="13_il2jm"]
 [ext_resource type="Texture2D" uid="uid://cs11ipm60d843" path="res://TackleButtonTexture.png" id="14_26xuy"]
 [ext_resource type="Texture2D" uid="uid://bxp55xgu8bvdm" path="res://DribbleButtonTexture.png" id="15_bc84e"]
-[ext_resource type="Script" uid="uid://dhn5kjbbnwu4y" path="res://scripts/scoreboard.gd" id="15_hiqwa"]
 [ext_resource type="Texture2D" uid="uid://b8dabvdjlh5yx" path="res://BallMarker.png" id="19_26xuy"]
 [ext_resource type="Texture2D" uid="uid://b7gmnh5r1vvi1" path="res://FocusTexture.png" id="19_wjb0r"]
-[ext_resource type="Script" uid="uid://dcf54b1pdaose" path="res://scripts/focus.gd" id="20_mc2jv"]
+[ext_resource type="Script" uid="uid://bp6dvtew8jxpw" path="res://scripts/focus.gd" id="20_mc2jv"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_ayaqe"]
 sky_top_color = Color(0.403922, 0.72549, 0.776471, 1)
@@ -115,7 +114,7 @@ roughness = 0.2
 
 [sub_resource type="ArrayMesh" id="ArrayMesh_o3ebs"]
 _surfaces = [{
-"aabb": AABB(-0.559671, -0.0598102, -0.557261, 1.11934, 1.61962, 1.11452),
+"aabb": AABB(-0.5596713, -0.059810232, -0.55726093, 1.1193426, 1.6196206, 1.1145219),
 "format": 34359738375,
 "material": SubResource("StandardMaterial3D_4h6ng"),
 "primitive": 3,
@@ -193,6 +192,8 @@ shape = SubResource("ConvexPolygonShape3D_f1i8d")
 
 [node name="Ceiling" type="StaticBody3D" parent="Scene"]
 transform = Transform3D(1, 0, 0, 0, 0.2, 0, 0, 0, 1, 0, 75, 0)
+collision_layer = 255
+collision_mask = 255
 
 [node name="Mesh" type="MeshInstance3D" parent="Scene/Ceiling"]
 transform = Transform3D(5, 0, 0, 0, 0.5, 0, 0, 0, 5, -0.654282, -1, 0.276337)
@@ -222,6 +223,8 @@ shape = SubResource("BoxShape3D_aqk2v")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.860714, -0.665835, -2.33582)
 
 [node name="Wall_North" type="StaticBody3D" parent="Walls"]
+collision_layer = 255
+collision_mask = 255
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="Walls/Wall_North"]
 transform = Transform3D(250, 0, 0, 0, 150, 0, 0, 0, 0.125, 0, 1, -122.5)
@@ -233,6 +236,8 @@ transform = Transform3D(250, 0, 0, 0, 150, 0, 0, 0, 0.125, 0, 1, -122.5)
 shape = SubResource("BoxShape3D_036b0")
 
 [node name="Wall_West" type="StaticBody3D" parent="Walls"]
+collision_layer = 255
+collision_mask = 255
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="Walls/Wall_West"]
 transform = Transform3D(0.125, 0, 0, 0, 150, 0, 0, 0, 250, -124, 1, 0)
@@ -244,6 +249,8 @@ transform = Transform3D(0.125, 0, 0, 0, 150, 0, 0, 0, 250, -124, 1, 0)
 shape = SubResource("BoxShape3D_036b0")
 
 [node name="Wall_East" type="StaticBody3D" parent="Walls"]
+collision_layer = 255
+collision_mask = 255
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="Walls/Wall_East"]
 transform = Transform3D(0.125, 0, 0, 0, 150, 0, 0, 0, 250, 124, 1, 0)
@@ -255,6 +262,8 @@ transform = Transform3D(0.125, 0, 0, 0, 150, 0, 0, 0, 250, 124, 1, 0)
 shape = SubResource("BoxShape3D_036b0")
 
 [node name="Wall_South" type="StaticBody3D" parent="Walls"]
+collision_layer = 255
+collision_mask = 255
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="Walls/Wall_South"]
 transform = Transform3D(250, 0, 0, 0, 150, 0, 0, 0, 0.125, 0, 1, 126.5)
@@ -487,24 +496,6 @@ pivot_offset = Vector2(16, 16)
 mouse_filter = 2
 texture = ExtResource("19_26xuy")
 
-[node name="Scoreboard" type="Control" parent="CanvasLayer/UI"]
-layout_mode = 1
-anchors_preset = 10
-anchor_right = 1.0
-offset_top = 8.0
-offset_bottom = 56.0
-grow_horizontal = 2
-script = ExtResource("15_hiqwa")
-
-[node name="Text" type="Label" parent="CanvasLayer/UI/Scoreboard"]
-layout_mode = 1
-anchors_preset = -1
-anchor_right = 1.0
-anchor_bottom = 1.0
-theme_override_font_sizes/font_size = 32
-horizontal_alignment = 1
-vertical_alignment = 1
-
 [node name="PauseButton" type="Button" parent="CanvasLayer/UI"]
 custom_minimum_size = Vector2(120, 48)
 layout_mode = 1
@@ -555,7 +546,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.2, -0.1, 0)
 [node name="Goal_A" type="Node3D" parent="Teams/TeamBlue"]
 transform = Transform3D(2.5, 0, 0, 0, 2, 0, 0, 0, 2, 0, -0.5, -117)
 script = ExtResource("5_2u3nc")
-scoreboard_path = NodePath("../../../CanvasLayer/UI/Scoreboard")
+scoreboard_path = NodePath("")
 ball_spawn_path = NodePath("../../../BallSpawn")
 
 [node name="GoalBody" type="StaticBody3D" parent="Teams/TeamBlue/Goal_A"]
@@ -651,7 +642,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.231724, -206.045)
 transform = Transform3D(-2.5, 0, -3.01992e-07, 0, 2, 0, 3.77489e-07, 0, -2, 0, -0.5, 116)
 script = ExtResource("5_2u3nc")
 score_for = 0
-scoreboard_path = NodePath("../../../CanvasLayer/UI/Scoreboard")
+scoreboard_path = NodePath("")
 ball_spawn_path = NodePath("../../../BallSpawn")
 
 [node name="GoalBody" type="StaticBody3D" parent="Teams/TeamRed/Goal_B"]
