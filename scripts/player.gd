@@ -892,21 +892,21 @@ func focus_at(current_ball : Node3D) -> void:
 		pr.x = clamp(pitch, min_pitch, max_pitch)
 		aim_pivot.rotation = pr
 func _update_player_facing_server(delta: float) -> void:
-	if !multiplayer.is_server():
-		return
+	if !multiplayer.is_server(): return
 
-	# Read flags/deltas the way you already store them
 	var aiming := bool(_net.get("rmb", false))
-
 	if aiming:
-		# Ignore client deltas; force facing to ball
+		print("[SERVER] APPLY face_ball (rmb=true) for peer=", owner_peer_id)
 		_face_ball_server()
 		return
 
-	# Not aiming: apply client deltas as usual
 	var f: Dictionary = _net.get("facing", {})
 	var dy := float(f.get("yaw_delta", 0.0))
 	var dp := float(f.get("pitch_delta", 0.0))
+
+	# DEBUG: only print if anything would change
+	if absf(dy) > 1e-6 or absf(dp) > 1e-6:
+		print("[SERVER] APPLY facing dy=", dy, " dp=", dp, " for peer=", owner_peer_id)
 
 	if absf(dy) > 1e-6:
 		var r := rotation
@@ -917,6 +917,8 @@ func _update_player_facing_server(delta: float) -> void:
 		var pr := aim_pivot.rotation
 		pr.x = clamp(pr.x + clamp(dp, -0.35, 0.35), min_pitch, max_pitch)
 		aim_pivot.rotation = pr
+
+
 func _ensure_aim_arrow() -> void:
 	if !show_aim_arrow: return
 	aim_arrow = Node3D.new()

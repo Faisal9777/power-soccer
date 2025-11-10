@@ -741,21 +741,29 @@ func _gather_input() -> Dictionary:
 		var v2: Vector2 = joystick.vector
 		if v2.length() > 0.01:
 			mvx = v2.x
-			mvz = v2.y	
-	else: 
+			mvz = v2.y
+	else:
 		mvx = Input.get_action_strength("move_right") - Input.get_action_strength("move_left")
 		mvz = Input.get_action_strength("move_forward") - Input.get_action_strength("move_back")
-	
+
 	var yaw := 0.0
 	var cam := get_viewport().get_camera_3d()
 	if cam:
 		yaw = cam.global_transform.basis.get_euler().y
 	else:
-		# Fallback to local player rotation if camera not ready
 		var me: CharacterBody3D = _players.get(multiplayer.get_unique_id(), null) as CharacterBody3D
 		if me:
 			yaw = me.rotation.y
 	
+	var facing: Dictionary
+	if OS.has_feature("mobile"):
+		cam = get_viewport().get_camera_3d()
+		if cam and cam.has_method("consume_facing_delta"):
+			facing = cam.consume_facing_delta()
+		else:
+			facing = Dictionary()
+	else:
+		facing = (_my_player.get_yaw() if _my_player else Dictionary())
 	return {
 		"mvx": mvx,
 		"mvz": mvz,
@@ -767,10 +775,10 @@ func _gather_input() -> Dictionary:
 		"shoot_down": Input.is_action_pressed(_shoot_action()),
 		"shoot_up": shoot_edge_latched,
 		"rmb": Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT),
-		"facing": _my_player.get_yaw() if _my_player else {},
-		"aim_position":_my_player.get_aim_arrow_position() if _my_player and shoot_edge_latched else null
+		"facing": facing,               # <-- now carries swipe deltas on mobile
+		"aim_position": _my_player.get_aim_arrow_position() if _my_player and shoot_edge_latched else null,
+		"cam_yaw": yaw
 	}
-#
 func _send_local_input() -> void:
 	# 0) If there is no network peer yet (single-player / not joined / not hosting), do nothing
 	if multiplayer.multiplayer_peer == null:
@@ -814,49 +822,43 @@ func _notify_client_to_attach_camera(p: Node, peer_id: int) -> void:
 
 @rpc("any_peer", "reliable", "call_local")
 func _rpc_attach_cam(player_path: NodePath, _unused_joystick_path: NodePath, ball_path: NodePath) -> void:
-	# Resolve player locally
 	_my_player = get_node_or_null(player_path)
 	var p := _my_player
 	if p == null:
 		await get_tree().process_frame
 		p = get_node_or_null(player_path)
 	if p == null:
-		print("Camera attach: player not found on client")
 		return
 
-	# --- Resolve joystick on THIS client ---
-	var joystick: Node = null
-	if OS.has_feature("mobile"):
-		# Your tree: World/CanvasLayer/UI/JoyStick  (capital S)
-		joystick = get_node_or_null("/root/World/CanvasLayer/UI/JoyStick")
-		if joystick == null:
-			# Fallback: search by name anywhere under World
-			var world := get_node_or_null("/root/World")
-			if world:
-				joystick = world.find_child("JoyStick", true, false)
-	# (Desktop clients won’t have/need it; joystick stays null)
+	# Resolve joystick on THIS client
+	#var joystick: Control = null
+	#if OS.has_feature("mobile"):
+		#joystick = get_node_or_null("/root/World/CanvasLayer/UI/JoyStick") as Control
+		#if joystick == null:
+			#var world := get_node_or_null("/root/World")
+			#if world:
+				#joystick = world.find_child("JoyStick", true, false) as Control
 
-	# --- Resolve camera ---
+	# Resolve camera
 	var cam: Camera3D = get_node_or_null("/root/World/Scene/Camera3D") as Camera3D
 	if cam == null:
 		cam = p.get_node_or_null("Camera3D") as Camera3D
 	if cam == null:
-		print("No camera found to attach on client.")
 		return
 
-	# Wire camera
+	# Wire camera (existing)
 	cam.current = true
-	if cam.has_method("set_target"):
-		cam.call_deferred("set_target", p)
-	if cam.has_method("activate"):
-		cam.call_deferred("activate")
-	if cam.has_method("set_ball"):
-		cam.call_deferred("set_ball", ball_path)
+	if cam.has_method("set_target"): cam.call_deferred("set_target", p)
+	if cam.has_method("activate"):   cam.call_deferred("activate")
+	if cam.has_method("set_ball"):   cam.call_deferred("set_ball", ball_path)
 
-	# Hand joystick to player (your Player.attach_camera(cam, joystick) handles null fine)
+	# NEW: give the camera its joystick
+	if joystick and cam.has_method("set_joystick"):
+		cam.call_deferred("set_joystick", joystick)
+
+	# Hand joystick to player (as you already do)
 	if p.has_method("attach_camera"):
 		p.call_deferred("attach_camera", cam, joystick)
-
 func _focus_camera_on_player(p: Node, peer_id: int) -> void:
 	# Find your camera (adjust the path/group/name to your project)
 	var my_id := multiplayer.get_unique_id()
