@@ -23,11 +23,14 @@ var _look_touch_id: int = -1
 
 @export var lead_factor: float = 0.0   # (not used yet) try 0.1..0.25 to lead targets slightly
 
+var _dy_accum: float = 0.0    # yaw delta since last read
+var _dp_accum: float = 0.0    # pitch delta since last read
+
 var _aim_mode: bool = false
 var _target: Node3D
 var _target_ball: Node3D
 @export var joystick_path :NodePath
-@onready var joystick := get_node_or_null(joystick_path)
+var joystick: Control = null
 var _yaw: float = 0.0
 var _pitch: float = -0.25
 var _min_pitch: float = deg_to_rad(-70.0)
@@ -42,6 +45,9 @@ func _ready() -> void:
 	_target_ball = get_node_or_null("Ball")
 	# Auto-activate on clients / editor. On dedicated servers, activation will no-op.
 	activate()
+
+func set_joystick(n: Control) -> void:
+	joystick = n
 
 # ----------------------------
 # Activation / Deactivation API
@@ -201,16 +207,29 @@ func _input(event: InputEvent) -> void:
 			if st.index == _look_touch_id:
 				_look_touch_id = -1
 
+	# Camera.gd -> _input(event) inside:
 	elif event is InputEventScreenDrag:
 		var sd := event as InputEventScreenDrag
-		# ignore joystick area drags
 		if _touch_on_joystick(sd.position):
 			return
 		if sd.index == _look_touch_id:
 			var sy: float = (1.0 if invert_y else -1.0)
+			# keep your local camera feel if you want, but ALSO accumulate:
 			_yaw   -= sd.relative.x * mouse_sens
 			_pitch += sd.relative.y * mouse_sens * sy
 			_pitch  = clamp(_pitch, _min_pitch, _max_pitch)
+
+			# NEW: accumulate facing deltas for the player/server:
+			_dy_accum += -sd.relative.x * mouse_sens
+			_dp_accum +=  sd.relative.y * mouse_sens * sy
+
+func consume_facing_delta() -> Dictionary:
+	var dy := _dy_accum
+	var dp := _dp_accum
+	_dy_accum = 0.0
+	_dp_accum = 0.0
+	return {"yaw_delta": dy, "pitch_delta": dp}
+
 
 # ----------------------------
 # Camera follow / collision / FP/TP logic

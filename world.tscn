@@ -1,6 +1,6 @@
 [gd_scene load_steps=59 format=4 uid="uid://ex55agd4o2wj"]
 
-[ext_resource type="Script" uid="uid://b7dt582nu1sxu" path="res://scripts/world.gd" id="1_4h6ng"]
+[ext_resource type="Script" uid="uid://dpxiy5d6sjg2d" path="res://scripts/world.gd" id="1_4h6ng"]
 [ext_resource type="Texture2D" uid="uid://lg2bc8rys6fs" path="res://bg_cliffs.png" id="2_bc84e"]
 [ext_resource type="PackedScene" uid="uid://dv5l1qjf5gwfn" path="res://Player.tscn" id="2_o3ebs"]
 [ext_resource type="Texture2D" uid="uid://bvxkxaod0qfp" path="res://grass.png" id="2_tlwt5"]
@@ -107,16 +107,16 @@ uv1_scale = Vector3(24, 24, 24)
 
 [sub_resource type="BoxMesh" id="BoxMesh_wse8f"]
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_4h6ng"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_bo7i5"]
 albedo_color = Color(0.85, 0.85, 0.9, 1)
 metallic = 0.9
 roughness = 0.2
 
-[sub_resource type="ArrayMesh" id="ArrayMesh_o3ebs"]
+[sub_resource type="ArrayMesh" id="ArrayMesh_4h6ng"]
 _surfaces = [{
 "aabb": AABB(-0.5596713, -0.059810232, -0.55726093, 1.1193426, 1.6196206, 1.1145219),
 "format": 34359738375,
-"material": SubResource("StandardMaterial3D_4h6ng"),
+"material": SubResource("StandardMaterial3D_bo7i5"),
 "primitive": 3,
 "uv_scale": Vector4(0, 0, 0, 0),
 "vertex_count": 12960,
@@ -316,7 +316,7 @@ spring_mesh_path = NodePath("SpringMesh")
 top_plate_root_path = NodePath("TopPlateRoot")
 
 [node name="SpringMesh" type="MeshInstance3D" parent="SpringPad"]
-mesh = SubResource("ArrayMesh_o3ebs")
+mesh = SubResource("ArrayMesh_4h6ng")
 script = ExtResource("8_gbfbk")
 
 [node name="TopPlateRoot" type="Node3D" parent="SpringPad"]
