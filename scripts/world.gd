@@ -438,23 +438,29 @@ func _server_setup() -> void:
 		return
 	
 	_create_ball_server()
+
 	var ids: Array[int] = []
 	for k in GameState.roster.keys():
-		ids.append(int(k))   # ensure int
-		_server_begin_match(ids)
-		# Resolve to actual nodes in World context
+		var pid := int(k)
+		if GameState.is_dedicated_server() and pid == 1:
+			continue  # server is not a player in dedicated mode
+		ids.append(pid)
+
+	_server_begin_match(ids)
+
+	# Resolve to actual nodes in World context
 	var blue_spawns := get_node(TEAM_BLUE_PATH)  as Node3D
 	var red_spawns  := get_node(TEAM_RED_PATH)   as Node3D
 	var ball_spawn  := get_node(BALL_SPAWN_PATH) as Node3D
-	#var ball_scene := get_node(BALL_PATH) as Node3D
 
 	# Give Game everything it needs *before* it's added (so _ready can safely use them)
 	_game.setup({
-			"duration_sec": GameState.match_len_sec,
-			"goal_limit":   GameState.goal_limit,
-			"roster":       GameState.roster,
-		}, blue_spawns, red_spawns, ball_spawn, ball_scene)
+		"duration_sec": GameState.match_len_sec,
+		"goal_limit":   GameState.goal_limit,
+		"roster":       GameState.roster,
+	}, blue_spawns, red_spawns, ball_spawn, ball_scene)
 	_game.set_game()
+
 func _initialize_game() -> void:
 	var game := Game.new()
 	game.name = "Game"
@@ -606,16 +612,22 @@ func _whoami() -> String:
 
 func _on_server_started() -> void:
 	print("Server started (signal).")
-	# If you *don’t* have a preplaced Player, spawn one here for the host:
-	_spawn_player_for(1)
+	# In listen-server mode (editor host), we want a local player.
+	# In dedicated mode, server is NOT a player.
+	if not GameState.is_dedicated_server():
+		_spawn_player_for(1)
+
 
 func _on_joined_server() -> void:
 	print("Client joined server.")
-
+	
 func _on_peer_joined(id: int) -> void:
 	print("Peer joined: ", id)
 	if multiplayer.is_server():
+		if GameState.is_dedicated_server() and id == 1:
+			return  # never spawn the dedicated server as a player
 		_spawn_player_for2(id)
+
 
 func on_peer_joined(id: int) -> void:
 	print("Peer joined: ", id)

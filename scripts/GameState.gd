@@ -7,6 +7,7 @@ var player_name: String = ""
 var is_host: bool = false
 signal player_name_changed(id: int, name: String)
 var id:int
+var is_dedicated: bool = false 
 # { peer_id: { "name": String, "ready": bool, "team": int(Team) } }
 var roster: Dictionary = {}
 var pending_spawn_ids: Array[int] = []
@@ -16,6 +17,9 @@ var goal_limit = 50
 var _next_on_tie: int = Team.BLUE
 func get_team(peer_id: int) -> int:
 	return int(roster.get(peer_id, {}).get("team", TEAM_NONE))
+
+func is_dedicated_server() -> bool:
+	return is_dedicated and multiplayer.is_server()
 
 func is_team(peer_id: int, team_id: int) -> bool:
 	return get_team(peer_id) == team_id
