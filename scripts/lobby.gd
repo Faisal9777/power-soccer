@@ -1,144 +1,4 @@
-## Lobby.gd (Godot 4.x)
-#extends Control
-#
-#@onready var status_label: Label  = $PanelContainer/VBoxContainer/StatusLabel
-#@onready var player_list: ItemList = $PanelContainer/VBoxContainer/PlayerList
-#@onready var start_btn: Button    = $PanelContainer/VBoxContainer/HBoxContainer/StartButton
-#@onready var leave_btn: Button    = $PanelContainer/VBoxContainer/HBoxContainer/LeaveButton
-#@onready var ready_btn: Button    = $PanelContainer/VBoxContainer/HBoxContainer/ReadyButton  # <-- add a Ready button in your scene
-#
-#const WORLD_SCENE := "res://world.tscn"
-#
-#func _ready() -> void:
-	## If we opened this as host, ensure server is running (idempotent)
-	#if GameState.is_host:
-		#Network.host()
-		## Ensure host entry exists
-		#GameState.roster[1] = GameState.roster.get(1, {"name": GameState.player_name, "ready": false})
-	#else:
-		## As a client, tell the host our name (submit on first frame so multiplayer is ready)
-		#call_deferred("_deferred_submit_name")
-#
-	## UI wiring
-	#start_btn.disabled = !GameState.is_host
-	#ready_btn.text = "Unready" if _my_ready() else "Ready"
-#
-	#start_btn.pressed.connect(_on_press_start)
-	#leave_btn.pressed.connect(_on_press_leave)
-	#ready_btn.pressed.connect(_on_press_ready)
-#
-	## Update roster display regularly via signals and when RPCs arrive
-	#Network.peer_joined.connect(func(_id): _refresh_ui())
-	#Network.peer_left.connect(func(id):
-		#if GameState.is_host and GameState.roster.has(id):
-			#GameState.roster.erase(id)
-			#_broadcast_roster()
-		#_refresh_ui()
-	#)
-#
-	#_refresh_ui()
-#
-#func _deferred_submit_name() -> void:
-	#if multiplayer.multiplayer_peer == null: return
-	## Send name to host (peer 1). Host is authoritative about the roster.
-	#rpc_id(1, "_rpc_submit_name", GameState.player_name)
-#
-#func _on_press_ready() -> void:
-	#var new_ready := !_my_ready()
-	#_set_my_ready_local(new_ready)  # immediate feedback
-	## Tell host to update authoritative roster; host will broadcast back.
-	#rpc_id(1, "_rpc_set_ready", multiplayer.get_unique_id(), new_ready)
-	#ready_btn.text = "Unready" if new_ready else "Ready"
-	#_refresh_ui()
-#
-#func _on_press_start() -> void:
-	#if !GameState.is_host: return
-	## Optional: enforce all-ready
-	## for id in GameState.roster:
-	##     if GameState.roster[id].ready != true:
-	##         push_warning("Not everyone is ready.")
-	##         return
-	## Broadcast start to all peers; everyone switches scene together.
-	#rpc("_rpc_start_match", WORLD_SCENE)
-#
-#func _on_press_leave() -> void:
-	## Simple leave: go back to title and nuke local state (you can add disconnect if you want)
-	#GameState.reset_lobby()
-	#get_tree().change_scene_to_file("res://title_screen.tscn")
-#
-#func _refresh_ui() -> void:
-	#player_list.clear()
-#
-	## Show connected count from roster (host view) or from what we last received
-	#var roster := GameState.roster
-	#for id in roster.keys():
-		#var entry = roster[id]
-		#var host_tag  := " (Host)" if id == 1 else ""
-		#var ready_tag := "✓" if entry["ready"] else ""   # use entry.ready if it's an object; entry["ready"] if it's a Dictionary
-		#var label := "%s%s %s" % [entry["name"], host_tag, ready_tag]
-		#player_list.add_item(label)
-#
-	#status_label.text = "Connected: %d" % roster.size()
-#
-## ---------- Ready helpers ----------
-#func _my_ready() -> bool:
-	#var my_id := multiplayer.get_unique_id()
-	#if GameState.is_host and my_id == 1:
-		#return GameState.roster[1].ready
-	#if GameState.roster.has(my_id):
-		#return GameState.roster[my_id].ready
-	#return false
-#
-#func _set_my_ready_local(v: bool) -> void:
-	#var my_id := multiplayer.get_unique_id()
-	#if !GameState.roster.has(my_id):
-		#GameState.roster[my_id] = {"name": GameState.player_name, "ready": v}
-	#else:
-		#GameState.roster[my_id].ready = v
-#
-## ---------- RPCs ----------
-## Clients → Host: submit name (authoritative add)
-#@rpc("any_peer")
-#func _rpc_submit_name(name: String) -> void:
-	#if !GameState.is_host: return
-	#var from := multiplayer.get_remote_sender_id()
-	#GameState.roster[from] = {"name": name, "ready": false}
-	#_broadcast_roster()
-#
-## Clients → Host: set ready
-#@rpc("any_peer")
-#func _rpc_set_ready(peer_id: int, ready: bool) -> void:
-	#if !GameState.is_host: return
-	## Trust: only accept the caller updating their own state
-	#var from := multiplayer.get_remote_sender_id()
-	#if from != peer_id: return
-	#if GameState.roster.has(peer_id):
-		#GameState.roster[peer_id].ready = ready
-	#_broadcast_roster()
-#
-## Host → Everyone: send full roster snapshot
-#func _broadcast_roster() -> void:
-	#if !GameState.is_host: return
-	## Send as array of dicts with id included for stable rehydration
-	#var snapshot: Array = []
-	#for id in GameState.roster.keys():
-		#var e = GameState.roster[id]
-		#snapshot.append({"id": id, "name": e.name, "ready": e.ready})
-	#rpc("_rpc_set_roster", snapshot)
-	#_refresh_ui()
-#
-#@rpc("any_peer", "call_local")
-#func _rpc_set_roster(snapshot: Array) -> void:
-	#var dict := {}
-	#for e in snapshot:
-		#dict[int(e.id)] = {"name": String(e.name), "ready": bool(e.ready)}
-	#GameState.roster = dict
-	#_refresh_ui()
-#
-## Host → Everyone: start the match (switch scene)
-#@rpc("any_peer", "call_local")
-#func _rpc_start_match(scene_path: String) -> void:
-	#get_tree().change_scene_to_file(scene_path)
+#lobby
 extends Control
 
 @onready var status_label: Label = $PanelContainer/VBoxContainer/StatusLabel
@@ -185,25 +45,29 @@ func _ready() -> void:
 	# --- Debug info ---
 	print("[lobby] whoami=", multiplayer.get_unique_id(),
 		" is_host=", GameState.is_host,
+		" is_dedicated=", GameState.is_dedicated_server(),
 		" path=", get_path())
 
-	# --- Ensure host exists and has a team (host-only) ---
-	if GameState.is_host:
-		var host: Dictionary = GameState.roster.get(1, {})
+	# --- Ensure host exists and has a team (listen-server only) ---
+	if GameState.is_host and not GameState.is_dedicated_server():
+		var host_id := multiplayer.get_unique_id() # usually 1
+		var host: Dictionary = GameState.roster.get(host_id, {})
 		if host.is_empty():
-			GameState.roster[1] = {
+			GameState.roster[host_id] = {
 				"name": GameState.player_name,
 				"ready": false,
 				"team": GameState.pick_balanced_team()
 			}
 		elif !host.has("team"):
-			GameState.roster[1]["team"] = GameState.pick_balanced_team()
-	else:
+			GameState.roster[host_id]["team"] = GameState.pick_balanced_team()
+	elif not GameState.is_host:
 		# Client announces name to host after Multiplayer is ready
 		call_deferred("_submit_name_to_host")
+	# (Dedicated server: falls through, no roster entry for id=1)
 
 	# --- Buttons + initial state ---
-	start_btn.disabled = !GameState.is_host
+	# Start button enabled/disabled will be decided by _update_start_enabled()
+	start_btn.disabled = true
 	ready_btn.text = "Unready" if _my_ready() else "Ready"
 
 	start_btn.pressed.connect(_on_start)
@@ -215,11 +79,10 @@ func _ready() -> void:
 		_refresh_ui()
 		_update_start_enabled()
 	)
-	
+
 	multiplayer.connected_to_server.connect(_on_connected_to_server)
 	multiplayer.peer_connected.connect(_on_peer_connected)
-	
-	
+
 	# If the server (host) goes away, clients should bounce to title
 	multiplayer.server_disconnected.connect(_on_host_gone)
 	multiplayer.connection_failed.connect(_on_host_gone)
@@ -358,19 +221,16 @@ func _counts_by_team() -> Dictionary:
 			if e["team"] == Team.BLUE: counts[Team.BLUE] += 1
 			elif e["team"] == Team.RED: counts[Team.RED] += 1
 	return counts
-
 func _update_start_enabled() -> void:
-	var ok := GameState.is_host \
-		and _all_ready() \
+	# Anyone can *ask* to start; server will double-check.
+	var can_start := _all_ready() \
 		and _everyone_has_a_team() \
 		and _teams_equal_nonzero()
 
-	start_btn.disabled = not ok
+	start_btn.disabled = not can_start
 
-	# (Nice UX) show why it's disabled
-	if !GameState.is_host:
-		start_btn.tooltip_text = "Only the host can start."
-	elif !_all_ready():
+	# Nice UX for why it's disabled
+	if !_all_ready():
 		start_btn.tooltip_text = "Everyone must be Ready."
 	elif !_everyone_has_a_team():
 		start_btn.tooltip_text = "Everyone needs a team."
@@ -396,8 +256,12 @@ func _on_ready_toggle() -> void:
 	_update_start_enabled()
 
 func _on_start() -> void:
-	if !GameState.is_host: return
-	rpc("_rpc_start_match", WORLD_SCENE)
+	# In editor listen-host mode, you can still click Start locally.
+	if GameState.is_host:
+		_try_start_match()
+	else:
+		# Client asks the host/dedicated server to start.
+		rpc_id(1, "_rpc_request_start_match")
 
 func _on_leave() -> void:
 	if GameState.is_host:
@@ -496,3 +360,120 @@ func _rpc_set_my_name(name: String) -> void:
 		if GameState.roster.has(pid):
 			GameState.roster[pid]["name"] = name
 		# optionally broadcast a lobby refresh to everyone here
+# ---------- SERVER SIDE ----------
+
+@rpc("any_peer")
+func _sv_register_player(name: String) -> void:
+	if not multiplayer.is_server():
+		return
+
+	var from_id := multiplayer.get_remote_sender_id()
+
+	# Dedicated server: never register itself as a player
+	if GameState.is_dedicated_server() and from_id == 1:
+		return
+
+	var rec: Dictionary = GameState.roster.get(from_id, {})
+	rec["name"] = name
+	rec["ready"] = false
+	# balanced team using your helpers
+	rec["team"] = GameState.pick_balanced_team()
+	GameState.roster[from_id] = rec
+
+	_broadcast_lobby_state()
+
+@rpc("any_peer")
+func _sv_set_ready(ready: bool) -> void:
+	if not multiplayer.is_server():
+		return
+	var from_id := multiplayer.get_remote_sender_id()
+	if !GameState.roster.has(from_id):
+		return
+	GameState.roster[from_id]["ready"] = ready
+	_broadcast_lobby_state()
+
+@rpc("any_peer")
+func _sv_request_start_match() -> void:
+	if not multiplayer.is_server():
+		return
+	_try_start_match()
+func _all_players_ready() -> bool:
+	for id in GameState.roster.keys():
+		var rec: Dictionary = GameState.roster[id]
+		if !rec.get("ready", false):
+			return false
+	return true
+
+func _try_start_match() -> void:
+	if !_all_players_ready():
+		print("Not all players ready yet")
+		return
+
+	rpc("_rpc_start_match", WORLD_SCENE)
+
+func _broadcast_lobby_state() -> void:
+	# server -> all
+	rpc("_rpc_lobby_state", GameState.roster)
+	_refresh_ui()
+
+@rpc("any_peer", "call_local")
+func _rpc_lobby_state(new_roster: Dictionary) -> void:
+	# Keep everyone in sync
+	GameState.roster = new_roster.duplicate(true)
+	_refresh_ui()
+@rpc("any_peer")
+func _rpc_request_start_match() -> void:
+	if !GameState.is_host:
+		return  # ignore on clients
+	_try_start_match()
+
+# ---------- CLIENT BUTTON HANDLERS ----------
+
+func _on_ready_pressed() -> void:
+	if multiplayer.is_server():
+		# listen-server testing; not used in dedicated mode
+		var my_id := multiplayer.get_unique_id()
+		var current = GameState.roster.get(my_id, {}).get("ready", false)
+		GameState.roster[my_id]["ready"] = !current
+		_broadcast_lobby_state()
+	else:
+		var my_id := multiplayer.get_unique_id()
+		var current = GameState.roster.get(my_id, {}).get("ready", false)
+
+		rpc_id(1, "_sv_set_ready", !current)
+
+func _on_start_pressed() -> void:
+	if multiplayer.is_server():
+		_try_start_match()
+	else:
+		rpc_id(1, "_sv_request_start_match")
+
+func _on_leave_pressed() -> void:
+	GameState.reset_lobby()
+	get_tree().change_scene_to_file("res://title_screen.tscn")  # or wherever
+func _update_status() -> void:
+	if multiplayer.is_server():
+		status_label.text = "HOST (dedicated)" if GameState.is_dedicated_server() else "HOST"
+	else:
+		status_label.text = "CLIENT"
+func _on_server_started() -> void:
+	print("Lobby: server started")
+	_update_status()
+
+func _on_joined_server() -> void:
+	print("Lobby: joined server")
+	_update_status()
+
+func _on_peer_joined(id: int) -> void:
+	print("Lobby: peer joined ", id)
+
+func _on_peer_left(id: int) -> void:
+	print("Lobby: peer left ", id)
+	GameState.roster.erase(id)
+	_broadcast_lobby_state()
+
+func _on_connection_failed() -> void:
+	status_label.text = "Connection failed"
+
+func _on_server_disconnected() -> void:
+	status_label.text = "Server disconnected"
