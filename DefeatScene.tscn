@@ -1,7 +1,7 @@
 [gd_scene load_steps=5 format=3 uid="uid://m5et0rw3tfxl"]
 
-[ext_resource type="Script" uid="uid://b7s1sasv5a21r" path="res://scripts/win_screen.gd" id="1_xro01"]
-[ext_resource type="Texture2D" uid="uid://bjvw2ixmfv0my" path="res://ChatGPT Image Oct 30, 2025, 07_26_36 AM.png" id="2_xro01"]
+[ext_resource type="Script" uid="uid://duso4qhjj8m14" path="res://scripts/win_screen.gd" id="1_xro01"]
+[ext_resource type="Texture2D" uid="uid://uvo458y07hnx" path="res://DefeatPng.png" id="2_xro01"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_j4jwh"]
 bg_color = Color(0.011087578, 0.01108758, 0.011087572, 1)

@@ -159,20 +159,18 @@ func _on_connect_to_ip() -> void:
 	if ip == "":
 		ip = "127.0.0.1"
 
-	# Set a client name if you don't already have one
-	
-
 	GameState.is_host = false
 	GameState.reset_lobby()
 	GameState.player_name = Settings.player_name
 	GameState.id = randi()
-	GameState.roster[GameState.id ] = {"name": GameState.player_name, "ready": false}
-	# UI feedback
+	GameState.roster[GameState.id] = {"name": GameState.player_name, "ready": false}
+
 	_set_status("Connecting to %s…" % ip)
 	_set_connect_ui_enabled(false)
 
-	# Join server; on success we'll get _on_joined_server()
-	Network.join("140.245.210.219")
+	# Use the typed IP here:
+	Network.join(ip)
+
 func get_lan_ip() -> String:
 	for addr in IP.get_local_addresses():  # PackedStringArray of addresses
 		var is_ipv6 := String(addr).find(":") != -1

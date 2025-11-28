@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dlck27v585nd0"
-path="res://.godot/imported/StopButtonTexture.png-072d1d08b8391654409be83e2217a73b.ctex"
+uid="uid://bu11obilnduxx"
+path="res://.godot/imported/TeleporterRed.png-516363ff7e54ad15c9699afa71f3cf80.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://StopButtonTexture.png"
-dest_files=["res://.godot/imported/StopButtonTexture.png-072d1d08b8391654409be83e2217a73b.ctex"]
+source_file="res://TeleporterRed.png"
+dest_files=["res://.godot/imported/TeleporterRed.png-516363ff7e54ad15c9699afa71f3cf80.ctex"]
 
 [params]
 

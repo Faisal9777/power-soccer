@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cs11ipm60d843"
-path="res://.godot/imported/TackleButtonTexture.png-ee8fe3565c37b22ff250d43bcaf74bed.ctex"
+uid="uid://tau48kdvyy73"
+path="res://.godot/imported/ShootTexture.png-792561188605b94074d0cbbcab727df1.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://TackleButtonTexture.png"
-dest_files=["res://.godot/imported/TackleButtonTexture.png-ee8fe3565c37b22ff250d43bcaf74bed.ctex"]
+source_file="res://ShootTexture.png"
+dest_files=["res://.godot/imported/ShootTexture.png-792561188605b94074d0cbbcab727df1.ctex"]
 
 [params]
 
