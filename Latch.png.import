@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bxp55xgu8bvdm"
-path="res://.godot/imported/DribbleButtonTexture.png-64ee71a3da6cc3458b1e0cc876af2992.ctex"
+uid="uid://b5wv3oa7nrv41"
+path="res://.godot/imported/Latch.png-0b7ebb8029fb6dc93b404a2e4c76dd0d.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://DribbleButtonTexture.png"
-dest_files=["res://.godot/imported/DribbleButtonTexture.png-64ee71a3da6cc3458b1e0cc876af2992.ctex"]
+source_file="res://Latch.png"
+dest_files=["res://.godot/imported/Latch.png-0b7ebb8029fb6dc93b404a2e4c76dd0d.ctex"]
 
 [params]
 

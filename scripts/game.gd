@@ -12,12 +12,12 @@ signal match_ended(winner:int) # -1 draw, 0 blue, 1 red
 @onready var _red_zone:  Area3D = get_node("Teams/TeamRed/Goal_B/ScoreZone")
 var _goal_lock := false  # prevents double-trigger spam
 var match_config := {
-	"duration_sec": 180.0,         # 3 minutes
+	"duration_sec": 600.0,         # 3 minutes
 	"goal_limit": 5,
 	"roster": {},                  # {peer_id: {"name":..., "team": BLUE|RED}}
 }
 # config
-var _duration_sec := 180
+var _duration_sec := 600
 var _goal_limit := 0
 var _roster := {}
 var _end_ms: int = -1

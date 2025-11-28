@@ -140,13 +140,14 @@ func face_towards(target_pos: Vector3, from: Vector3) -> void:
 # ----------------------------
 func set_aim_mode(on: bool) -> void:
 	_aim_mode = on
-	if _is_mobile:
-		return
-	_captured = not on
-	if _captured:
-		Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
-	else:
-		Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+
+	# Desktop: also toggle mouse capture
+	if not _is_mobile:
+		_captured = not on
+		if _captured:
+			Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+		else:
+			Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 
 # ----------------------------
 # Desktop input (mouse)
@@ -198,11 +199,11 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventScreenTouch:
 		var st := event as InputEventScreenTouch
 		if st.pressed:
-			# ignore touches on joystick UI
 			if _touch_on_joystick(st.position):
 				return
-			if _look_touch_id == -1 and st.position.x >= vp_size.x * 0.5:
+			if _look_touch_id == -1:
 				_look_touch_id = st.index
+
 		else:
 			if st.index == _look_touch_id:
 				_look_touch_id = -1
@@ -244,6 +245,12 @@ func _look() -> void:
 	look_at(pos)
 func _physics_process(delta: float) -> void:
 	if _target == null:
+		return# --- FOCUS MODE: look at the ball from player's head ---
+	
+	if _aim_mode and is_instance_valid(_target_ball):
+		var focus := _target.global_transform.origin + Vector3(0.0, height, 0.0)
+		global_transform.origin = focus
+		look_at(_target_ball.global_transform.origin, Vector3.UP)
 		return
 
 	var t_player := _target.global_transform

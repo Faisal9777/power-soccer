@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cl47ta5h6ne1t"
-path="res://.godot/imported/JumpButtonTexture.png-50fd08a1dd6690ea37f5a000d6688bff.ctex"
+uid="uid://se185b5cs7ip"
+path="res://.godot/imported/StopTexture.png-f351c1bb43d12ef932776d6bb6fd774b.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://JumpButtonTexture.png"
-dest_files=["res://.godot/imported/JumpButtonTexture.png-50fd08a1dd6690ea37f5a000d6688bff.ctex"]
+source_file="res://StopTexture.png"
+dest_files=["res://.godot/imported/StopTexture.png-f351c1bb43d12ef932776d6bb6fd774b.ctex"]
 
 [params]
 

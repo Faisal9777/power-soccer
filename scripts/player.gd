@@ -67,6 +67,9 @@ extends CharacterBody3D
 @export var stamina_min_to_jump: float = 15
 @export var stamina_min_to_dribble: float = 10
 @export var stamina_min_to_stop_ball: float = 10    
+@export var latch_stamina_drain: float = 12.0   # per second while latched
+@export var latch_min_to_start: float = 20.0    # need at least this to turn on
+
 @export var mouse_sens: float = 0.008
 @onready var aim_pivot: Node3D = $AimPivot
 @export var min_pitch := deg_to_rad(-60)
@@ -125,6 +128,8 @@ var _latched_offset_local: Vector3 = Vector3.ZERO
 var _saved_ball_layer: int = 0
 var _saved_ball_mask: int = 0
 var _latched_ball: RigidBody3D = null
+var latch_mode_active: bool = false   # toggle state
+
 var cam: Camera3D = null  # local-only reference
 var _ui_charge := 0.0  # client-only visual charge
 @onready var name_tag: Label3D = $NameTag if has_node("NameTag") else null
@@ -138,20 +143,21 @@ var _cooldowns := {"shoot": 0.0, "move": 0.0, "jump": 0.0}
 
 # --- Net input state (fed by world.gd on the server) ---
 var _net := {
-	"mvx": 0.0,          # strafe/right (-1..1)
-	"mvz": 0.0,          # forward/back  (-1..1)
+	"mvx": 0.0,
+	"mvz": 0.0,
 	"sprint": false,
 	"jump_pressed": false,
 	"tackle_pressed": false,
 	"dribble": false,
 	"stop_ball": false,
-	"shoot_down": false,   # held
-	"shoot_up": false,     # edge
-	# optional (if you later send mouse aim):
-	"rmb": false,    # Vector3 or null
+	"shoot_down": false,
+	"shoot_up": false,
+	"rmb": false,
 	"facing": {"yaw_delta" : _yaw_delta_accum, "pitch_delta" : _pitch_delta_accum},
-	"aim_position": null
+	"aim_position": null,
+	"latch_toggle": false       # ⬅️ NEW
 }
+
 
 func apply_net_input(d: Dictionary) -> void:
 	# SERVER ONLY: called by world.gd before simulate_server()
@@ -414,17 +420,18 @@ func _update_charge_ui_from_replication() -> void:
 	_charge_bar.visible = _charge > 0.001 or _net["shoot_down"]
 
 func simulate_server(delta: float) -> void:
-	#if is_instance_valid(current_ball) and current_ball.linear_velocity.length() > 0.1:
-		#log_ball_velocity()
 	if not _is_frozen:
 		if current_ball_path:
-			_resolve_ball() 
+			_resolve_ball()
 		_update_cooldowns(delta)
 		_update_charge_server(delta)
+		_update_latched_ball_server(delta)
+
+		# ⬇️ NEW
+		_handle_latch_mode_server(delta)
+
 		apply_gravity(delta)
-		#_face_camera_yaw(delta)
 		_update_player_facing_server(delta)
-		#_calculate_arrow_position(delta)
 		var input_dir := _get_input_dir_server()
 		_pre_move_vel = velocity
 		_handle_tackle_input_server(delta)
@@ -774,7 +781,7 @@ func _start_tackle_server() -> void:
 func _update_tackle_server(delta: float) -> void:
 	# keep the ball glued while latched (server-side tick snap)
 	
-	_update_latched_ball_server(delta)
+	#_update_latched_ball_server(delta)
 	# slide & gravity
 	var v_xz := Vector3(tackle_velocity.x, 0.0, tackle_velocity.z)
 	var dec := tackle_decel * delta
@@ -836,6 +843,42 @@ func _unlatch_ball_server() -> void:
 	# Optional: give it a finishing shove
 	# ball.apply_impulse(impulse_vector, Vector3.ZERO)
 
+func _handle_latch_mode_server(delta: float) -> void:
+	# One-shot latch toggle from network input
+	var toggle := bool(_net.get("latch_toggle", false))
+
+	if toggle:
+		# consume the edge so it won't re-trigger
+		_net["latch_toggle"] = false
+
+		if latch_mode_active:
+			# TURN OFF
+			latch_mode_active = false
+			if ball_latched:
+				_unlatch_ball_server()
+		else:
+			# TURN ON (only if enough stamina)
+			if _stamina >= latch_min_to_start:
+				latch_mode_active = true
+
+				# ⬇️ IMPORTANT: if we already have a ball in range, latch it now
+				var ball := _resolve_ball()
+				if ball != null and is_instance_valid(ball):
+					_latch_ball_server(ball)
+				# otherwise: the next time a ball enters KickArea / TackleField,
+				# _on_kick_area_body_entered or _on_tackle_field_body_entered
+				# will latch it because latch_mode_active == true
+
+	# While active, drain stamina and auto-unlatch when empty
+	if latch_mode_active:
+		if ball_latched or current_ball != null:
+			_stamina = maxf(0.0, _stamina - latch_stamina_drain * delta)
+			if _stamina <= 0.0:
+				latch_mode_active = false
+				if ball_latched:
+					_unlatch_ball_server()
+
+
 func _update_latched_ball_server(delta: float) -> void:
 	if ball_latched and _latched_ball != null and ball_latch_anchor != null:
 		var target_xf: Transform3D = ball_latch_anchor.global_transform * _ball_offset
@@ -843,14 +886,16 @@ func _update_latched_ball_server(delta: float) -> void:
 		# keep velocities calm while carried
 		_latched_ball.linear_velocity  = Vector3.ZERO
 		_latched_ball.angular_velocity = Vector3.ZERO
-
+		
 func _end_tackle_server() -> void:
 	tackle_active = false
 	if characters_layer_bit > 0:
 		collision_mask = collision_mask # (restore if you modify it elsewhere)
-	if ball_latched:
+
+	# ⬇️ ONLY unlatch if we are *not* in latch mode
+	if ball_latched and !latch_mode_active:
 		_unlatch_ball_server()
-	
+
 
 
 # --- Misc / UI / aim ---
@@ -1038,15 +1083,13 @@ func _on_kick_area_body_entered(body: Node) -> void:
 	if body is RigidBody3D and body.is_in_group("ball"):
 		var ball := body as RigidBody3D
 
-		#var C: Vector3 = ball.global_transform.origin
-		#var P: Vector3 = global_transform.origin
-		#var dir: Vector3 = (C - P).normalized()
-
 		current_ball_path = ball.get_path()
 		aim_active = true
-		#var R: float = _get_ball_radius(ball)
-		#aim_contact = C - dir * R
-		#aim_dir = (aim_contact - P).normalized()
+
+		# ⬇️ optional: if latch mode is already on, auto-latch immediately
+		if latch_mode_active:
+			_latch_ball_server(ball)
+
 func _on_kick_area_body_exited(body: Node) -> void:
 	if not multiplayer.is_server(): return
 	if body == current_ball:
@@ -1065,5 +1108,5 @@ func _on_tackle_field_body_entered(body: Node) -> void:
 		return
 
 	# start follow-with-offset latch (no reparent)
-	if tackle_active:
+	if tackle_active or latch_mode_active:
 		_latch_ball_server(rb)

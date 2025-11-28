@@ -35,7 +35,7 @@ func _ready() -> void:
 func _on_body_entered(body: Node) -> void:
 	if _cooling:
 		return
-	if only_player and not body.is_in_group("player"):
+	if only_player and  not (body is CharacterBody3D):
 		return
 
 	var dir := _get_launch_dir()

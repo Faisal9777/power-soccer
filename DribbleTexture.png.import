@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://q6muixq3msuu"
-path="res://.godot/imported/ShootButtonTexture.png-6bd3595a5fbc66fe52e2ef57d0a8e9bb.ctex"
+uid="uid://dechhtwgygxuo"
+path="res://.godot/imported/DribbleTexture.png-f941f883387f05d874761f7a35fbf4cc.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://ShootButtonTexture.png"
-dest_files=["res://.godot/imported/ShootButtonTexture.png-6bd3595a5fbc66fe52e2ef57d0a8e9bb.ctex"]
+source_file="res://DribbleTexture.png"
+dest_files=["res://.godot/imported/DribbleTexture.png-f941f883387f05d874761f7a35fbf4cc.ctex"]
 
 [params]
 

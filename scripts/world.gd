@@ -15,6 +15,9 @@ extends Node
 @onready var is_mobile: bool = OS.has_feature("mobile") 
 @export var joystick_path: NodePath
 @onready var joystick: Node = get_node(joystick_path) 
+@onready var ball_spawn: Node3D = get_node(BALL_SPAWN_PATH) as Node3D
+@onready var out_bounds: Area3D = $BallOutOfBounds
+
 # Keep a typed map of peer-id -> Player node
 var _players: Dictionary[int, CharacterBody3D] = {}    # { int: Node }
 var _game : Game
@@ -44,8 +47,10 @@ var  tackle_edge_latched := false
 var  stop_ball_edge_latched := false
 var  jump_edge_latched := false
 var  shoot_edge_latched := false
-
+var latch_edge_latched := false 
 func _ready() -> void:
+	if multiplayer.is_server():
+		out_bounds.body_entered.connect(_on_ball_out_of_bounds)
 	if OS.has_feature("mobile"):
 		pause_btn.show()
 		score_btn.show()
@@ -542,13 +547,18 @@ func _update_inputs() -> void:
 	if Input.is_action_just_pressed("stop_ball") and not stop_ball_edge_latched:
 		stop_ball_edge_latched = true		
 	if Input.is_action_just_released(_shoot_action()) and not shoot_edge_latched:
-		shoot_edge_latched = true	
+		shoot_edge_latched = true
+	# ⬇️ NEW: toggle input (press once = "edge" event)
+	if Input.is_action_just_pressed("ball_latch") and not latch_edge_latched:
+		 
+		latch_edge_latched = true
 
 func _reset_inputs() -> void:
 	jump_edge_latched = false
 	tackle_edge_latched = false
 	stop_ball_edge_latched = false
 	shoot_edge_latched = false
+	latch_edge_latched = false     # ⬅️ NEW
 
 
 func _process(delta: float) -> void:
@@ -777,20 +787,22 @@ func _gather_input() -> Dictionary:
 	else:
 		facing = (_my_player.get_yaw() if _my_player else Dictionary())
 	return {
-		"mvx": mvx,
-		"mvz": mvz,
-		"sprint": Input.is_action_pressed("sprint"),
-		"jump_pressed": jump_edge_latched,
-		"tackle_pressed": tackle_edge_latched,
-		"dribble": Input.is_action_pressed("dribble"),
-		"stop_ball": stop_ball_edge_latched,
-		"shoot_down": Input.is_action_pressed(_shoot_action()),
-		"shoot_up": shoot_edge_latched,
-		"rmb": Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT),
-		"facing": facing,               # <-- now carries swipe deltas on mobile
-		"aim_position": _my_player.get_aim_arrow_position() if _my_player and shoot_edge_latched else null,
-		"cam_yaw": yaw
-	}
+	"mvx": mvx,
+	"mvz": mvz,
+	"sprint": Input.is_action_pressed("sprint"),
+	"jump_pressed": jump_edge_latched,
+	"tackle_pressed": tackle_edge_latched,
+	"dribble": Input.is_action_pressed("dribble"),
+	"stop_ball": stop_ball_edge_latched,
+	"shoot_down": Input.is_action_pressed(_shoot_action()),
+	"shoot_up": shoot_edge_latched,
+	"rmb": Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT),
+	"facing": facing,
+	"aim_position": _my_player.get_aim_arrow_position() if _my_player and shoot_edge_latched else null,
+	"cam_yaw": yaw,
+	"latch_toggle": latch_edge_latched   # ⬅️ NEW
+}
+
 func _send_local_input() -> void:
 	# 0) If there is no network peer yet (single-player / not joined / not hosting), do nothing
 	if multiplayer.multiplayer_peer == null:
@@ -902,3 +914,30 @@ func _rpc_enable_local_view(player_path: NodePath) -> void:
 		_enable_local_view_now(p)
 	else:
 		print("there is no player scene attached in the player_path when in rpc enable local view now")
+func _on_ball_out_of_bounds(body: Node) -> void:
+	if !multiplayer.is_server():
+		return
+	if body == null or !body.is_in_group("ball"):
+		return
+
+	_respawn_ball(body as RigidBody3D)
+func _respawn_ball(ball: RigidBody3D) -> void:
+	if ball == null:
+		return
+
+	# stop all motion
+	ball.linear_velocity = Vector3.ZERO
+	ball.angular_velocity = Vector3.ZERO
+	ball.sleeping = true  # pause it a moment so it doesn't instantly re-fall
+
+	# move it back to spawn
+	if ball_spawn:
+		ball.global_transform = ball_spawn.global_transform
+	else:
+		# fallback: BallHolder origin
+		ball.global_position = ball_root.global_position
+
+	# wake next frame
+	ball.call_deferred("_wake_ball")
+
+# helper method on the ball (or inline with deferred lambda)

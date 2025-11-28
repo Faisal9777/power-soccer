@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://q3mj6x207jgg"
-path="res://.godot/imported/SprintButtonTexture.png-631a20a607578afe1988ec0593d42e6b.ctex"
+uid="uid://dhk06cl0msh23"
+path="res://.godot/imported/TackleTexture.png-ed6b714f6b81f42c3676964c48d98560.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://SprintButtonTexture.png"
-dest_files=["res://.godot/imported/SprintButtonTexture.png-631a20a607578afe1988ec0593d42e6b.ctex"]
+source_file="res://TackleTexture.png"
+dest_files=["res://.godot/imported/TackleTexture.png-ed6b714f6b81f42c3676964c48d98560.ctex"]
 
 [params]
 

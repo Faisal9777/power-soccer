@@ -13,9 +13,9 @@ func _ready() -> void:
 func _on_body_entered(body: Node) -> void:
 	if _cooling_down:
 		return
-	if not body.is_in_group("player"):
+	if not (body is CharacterBody3D):
 		return
-
+		
 	var dest = _find_destination()
 	if dest == null:
 		return
