@@ -155,7 +155,8 @@ var _net := {
 	"rmb": false,
 	"facing": {"yaw_delta" : _yaw_delta_accum, "pitch_delta" : _pitch_delta_accum},
 	"aim_position": null,
-	"latch_toggle": false       # ⬅️ NEW
+	"latch_toggle": false,
+	"cam_yaw": 0.0        # ⬅️ ADD THIS
 }
 
 
@@ -609,27 +610,36 @@ func _fling_ball_server() -> void:
 func perform_dribble_server(direction: int) -> void:
 	if current_ball == null or !is_instance_valid(current_ball):
 		return
+
 	var player_pos := global_transform.origin
 	var ball_pos := current_ball.global_transform.origin
 	var to_ball := ball_pos - player_pos
 	var to_ball_xz := Vector3(to_ball.x, 0.0, to_ball.z)
-	if to_ball_xz == Vector3.ZERO: return
-	var fwd := -global_transform.basis.z; fwd.y = 0.0
-	if fwd.length() == 0.0: return
+	if to_ball_xz == Vector3.ZERO:
+		return
+
+	# 🔁 Use camera yaw, same as movement
+	var yaw := float(_net.get("cam_yaw", rotation.y))
+	var fwd := Vector3.FORWARD.rotated(Vector3.UP, yaw)
+	fwd.y = 0.0
+	if fwd.length() == 0.0:
+		return
 	fwd = fwd.normalized()
+
+	# ball must be roughly in front of the *camera*
 	if fwd.dot(to_ball_xz.normalized()) < dribble_cone_dot:
 		return
+
 	var right_xz := fwd.cross(Vector3.UP).normalized()
 	# remove forward drift
 	var v := current_ball.linear_velocity
 	current_ball.linear_velocity = v - fwd * v.dot(fwd)
-	# impulse
+
 	var J := right_xz * float(direction) * dribble_impulse + Vector3.UP * dribble_up
 	var radius := _get_ball_radius(current_ball)
 	var approx_contact := ball_pos - fwd * radius
 	var local_contact := current_ball.to_local(approx_contact).lerp(Vector3.ZERO, 0.4)
 	current_ball.sleeping = false
-	print("about to apply impulse in dribble with values: ", J)
 	current_ball.apply_impulse(J, local_contact)
 
 func _handle_shoot_server() -> void:
@@ -950,9 +960,7 @@ func _update_player_facing_server(delta: float) -> void:
 	var dp := float(f.get("pitch_delta", 0.0))
 
 	# DEBUG: only print if anything would change
-	if absf(dy) > 1e-6 or absf(dp) > 1e-6:
-		print("[SERVER] APPLY facing dy=", dy, " dp=", dp, " for peer=", owner_peer_id)
-
+	 
 	if absf(dy) > 1e-6:
 		var r := rotation
 		r.y = wrapf(r.y + clamp(dy, -0.35, 0.35), -PI, PI)

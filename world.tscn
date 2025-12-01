@@ -1,11 +1,11 @@
-[gd_scene load_steps=58 format=4 uid="uid://ex55agd4o2wj"]
+[gd_scene load_steps=59 format=4 uid="uid://ex55agd4o2wj"]
 
 [ext_resource type="Script" uid="uid://dx5tfh7u8t6mb" path="res://scripts/world.gd" id="1_4h6ng"]
-[ext_resource type="Texture2D" uid="uid://lg2bc8rys6fs" path="res://bg_cliffs.png" id="2_bc84e"]
 [ext_resource type="PackedScene" uid="uid://dv5l1qjf5gwfn" path="res://Player.tscn" id="2_o3ebs"]
 [ext_resource type="Texture2D" uid="uid://bvxkxaod0qfp" path="res://grass.png" id="2_tlwt5"]
 [ext_resource type="PackedScene" uid="uid://ds26o286r5vvn" path="res://ball.tscn" id="3_4h6ng"]
 [ext_resource type="Texture2D" uid="uid://iqnucbl6j3qr" path="res://fence.png" id="4_aqk2v"]
+[ext_resource type="Texture2D" uid="uid://bqhs74vsxvwoq" path="res://bg_cliffs (2).png" id="4_k83mh"]
 [ext_resource type="Script" uid="uid://6yehu4wm4wm2" path="res://scripts/GoalTrigger.gd" id="5_2u3nc"]
 [ext_resource type="Texture2D" uid="uid://ckyaiflvqt25u" path="res://teleporter.png" id="6_dwbse"]
 [ext_resource type="Script" uid="uid://c16lvcs2s31j7" path="res://scripts/teleporter_pad.gd" id="6_pkg7o"]
@@ -28,24 +28,22 @@
 [ext_resource type="Texture2D" uid="uid://b7gmnh5r1vvi1" path="res://FocusTexture.png" id="19_wjb0r"]
 [ext_resource type="Texture2D" uid="uid://b5wv3oa7nrv41" path="res://Latch.png" id="20_gggvi"]
 [ext_resource type="Script" uid="uid://bp6dvtew8jxpw" path="res://scripts/focus.gd" id="20_mc2jv"]
+[ext_resource type="Texture2D" uid="uid://d0awa0dudam3l" path="res://SprintTexture.png" id="21_k83mh"]
 
-[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_ayaqe"]
-sky_top_color = Color(0.403922, 0.72549, 0.776471, 1)
-sky_horizon_color = Color(0.941176, 0.811765, 0.541176, 1)
-sky_energy_multiplier = 0.25
-sky_cover = ExtResource("2_bc84e")
-ground_bottom_color = Color(0.941176, 0.811765, 0.541176, 1)
-ground_horizon_color = Color(0.941176, 0.811765, 0.541176, 1)
-ground_energy_multiplier = 0.5
-sun_angle_max = 45.0
+[sub_resource type="PanoramaSkyMaterial" id="PanoramaSkyMaterial_qktwf"]
+panorama = ExtResource("4_k83mh")
+energy_multiplier = 0.4
 
 [sub_resource type="Sky" id="Sky_cwee5"]
-sky_material = SubResource("ProceduralSkyMaterial_ayaqe")
+sky_material = SubResource("PanoramaSkyMaterial_qktwf")
 
 [sub_resource type="Environment" id="Environment_2tuav"]
 background_mode = 2
 background_energy_multiplier = 2.5
 sky = SubResource("Sky_cwee5")
+ambient_light_source = 3
+ambient_light_color = Color(0.9411765, 0.8117647, 0.5411765, 1)
+ambient_light_energy = 0.0
 
 [sub_resource type="BoxMesh" id="BoxMesh_37uin"]
 size = Vector3(50, 1, 50)
@@ -67,16 +65,16 @@ points = PackedVector3Array(-25, -0.5, -25, -25, 0.5, -25, 25, -0.5, -25, -25, -
 
 [sub_resource type="BoxMesh" id="BoxMesh_wse8f"]
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_o3ebs"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_k83mh"]
 albedo_color = Color(0.85, 0.85, 0.9, 1)
 metallic = 0.9
 roughness = 0.2
 
-[sub_resource type="ArrayMesh" id="ArrayMesh_k83mh"]
+[sub_resource type="ArrayMesh" id="ArrayMesh_qktwf"]
 _surfaces = [{
 "aabb": AABB(-0.5596713, -0.059810232, -0.55726093, 1.1193426, 1.6196206, 1.1145219),
 "format": 34359738375,
-"material": SubResource("StandardMaterial3D_o3ebs"),
+"material": SubResource("StandardMaterial3D_k83mh"),
 "primitive": 3,
 "uv_scale": Vector4(0, 0, 0, 0),
 "vertex_count": 12960,
@@ -91,16 +89,16 @@ radial_segments = 32
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_wse8f"]
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_qktwf"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_bh8nc"]
 albedo_color = Color(0.85, 0.85, 0.9, 1)
 metallic = 0.9
 roughness = 0.2
 
-[sub_resource type="ArrayMesh" id="ArrayMesh_bh8nc"]
+[sub_resource type="ArrayMesh" id="ArrayMesh_jjr1n"]
 _surfaces = [{
 "aabb": AABB(-0.5596713, -0.059810232, -0.55726093, 1.1193426, 1.6196206, 1.1145219),
 "format": 34359738375,
-"material": SubResource("StandardMaterial3D_qktwf"),
+"material": SubResource("StandardMaterial3D_bh8nc"),
 "primitive": 3,
 "uv_scale": Vector4(0, 0, 0, 0),
 "vertex_count": 12960,
@@ -182,7 +180,7 @@ ball_target_path = NodePath("")
 joystick_path = NodePath("../../CanvasLayer/UI/JoyStick")
 
 [node name="StaticBody3D" type="StaticBody3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 254.784)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 70, 254.784)
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="StaticBody3D"]
 transform = Transform3D(6, 0, 0, 0, 0.5, 0, 0, 0, 6, 0, 1.5, 0)
@@ -311,7 +309,7 @@ top_plate_root_path = NodePath("TopPlateRoot")
 launch_speed = 2000.0
 
 [node name="SpringMesh" type="MeshInstance3D" parent="SpringPad"]
-mesh = SubResource("ArrayMesh_k83mh")
+mesh = SubResource("ArrayMesh_qktwf")
 script = ExtResource("8_gbfbk")
 
 [node name="TopPlateRoot" type="Node3D" parent="SpringPad"]
@@ -343,7 +341,7 @@ top_plate_root_path = NodePath("TopPlateRoot")
 launch_speed = 2000.0
 
 [node name="SpringMesh" type="MeshInstance3D" parent="SpringPad2"]
-mesh = SubResource("ArrayMesh_bh8nc")
+mesh = SubResource("ArrayMesh_jjr1n")
 script = ExtResource("8_gbfbk")
 
 [node name="TopPlateRoot" type="Node3D" parent="SpringPad2"]
@@ -382,22 +380,19 @@ layout_mode = 1
 anchors_preset = 2
 anchor_top = 1.0
 anchor_bottom = 1.0
-offset_top = -348.0
-offset_right = 500.0
-offset_bottom = 152.0
+offset_left = 50.0
+offset_top = -320.0
+offset_right = 550.0
+offset_bottom = 180.0
 grow_vertical = 0
 scale = Vector2(0.5, 0.5)
 mouse_filter = 1
 script = ExtResource("9_k3n1d")
 
 [node name="Base" type="TextureRect" parent="CanvasLayer/UI/JoyStick"]
-layout_mode = 1
-anchors_preset = -1
-offset_left = -50.0
-offset_top = -50.0
-offset_right = 250.0
-offset_bottom = 200.0
-scale = Vector2(1.2, 1.2)
+layout_mode = 0
+offset_top = -100.0
+offset_bottom = -100.0
 stretch_mode = 6
 
 [node name="Knob" type="TextureRect" parent="CanvasLayer/UI/JoyStick"]
@@ -405,10 +400,10 @@ layout_mode = 1
 anchors_preset = -1
 anchor_top = 0.5
 anchor_bottom = 0.5
-offset_left = 50.0
-offset_top = -100.0
-offset_right = 300.0
-offset_bottom = 100.0
+offset_left = -50.0
+offset_top = -125.0
+offset_right = 150.0
+offset_bottom = 75.0
 grow_vertical = 2
 texture = ExtResource("13_il2jm")
 stretch_mode = 6
@@ -426,11 +421,11 @@ offset_bottom = 350.0
 grow_horizontal = 0
 grow_vertical = 0
 rotation = 3.14159
-scale = Vector2(0.7, 0.7)
+scale = Vector2(0.4, 0.4)
 mouse_filter = 1
 
 [node name="Jump" type="TouchScreenButton" parent="CanvasLayer/UI/ActionPad"]
-position = Vector2(250, 110)
+position = Vector2(220, 110)
 rotation = 3.14159
 scale = Vector2(0.8, 0.8)
 texture_normal = ExtResource("15_o3ebs")
@@ -454,7 +449,7 @@ shape = SubResource("RectangleShape2D_ioo17")
 action = "stop_ball"
 
 [node name="Tackle" type="TouchScreenButton" parent="CanvasLayer/UI/ActionPad"]
-position = Vector2(250, 250)
+position = Vector2(220, 250)
 rotation = 3.14159
 scale = Vector2(0.8, 0.8)
 texture_normal = ExtResource("18_bh8nc")
@@ -471,7 +466,7 @@ passby_press = true
 action = "dribble"
 
 [node name="Latch" type="TouchScreenButton" parent="CanvasLayer/UI/ActionPad"]
-position = Vector2(250, 380)
+position = Vector2(220, 380)
 rotation = 3.14159
 scale = Vector2(0.8, 0.8)
 texture_normal = ExtResource("20_gggvi")
@@ -479,15 +474,14 @@ shape = SubResource("RectangleShape2D_ioo17")
 passby_press = true
 action = "ball_latch"
 
-[node name="Focus" type="TouchScreenButton" parent="CanvasLayer/UI/ActionPad"]
-position = Vector2(1221.427, 598.5745)
+[node name="Latch2" type="TouchScreenButton" parent="CanvasLayer/UI/ActionPad"]
+position = Vector2(322.5, 250)
 rotation = 3.14159
-scale = Vector2(0.7, 0.69999665)
-texture_normal = ExtResource("19_wjb0r")
+scale = Vector2(0.8, 0.8)
+texture_normal = ExtResource("21_k83mh")
 shape = SubResource("RectangleShape2D_ioo17")
 passby_press = true
-script = ExtResource("20_mc2jv")
-camera_path = NodePath("../../../../Scene/Camera3D")
+action = "sprint"
 
 [node name="GoalMarkers" type="Control" parent="CanvasLayer/UI"]
 anchors_preset = 0
@@ -532,31 +526,47 @@ mouse_filter = 2
 texture = ExtResource("19_26xuy")
 
 [node name="PauseButton" type="Button" parent="CanvasLayer/UI"]
-custom_minimum_size = Vector2(120, 48)
+custom_minimum_size = Vector2(60, 24)
 layout_mode = 1
 anchors_preset = -1
 anchor_left = 1.0
 anchor_right = 1.0
-offset_left = -125.0
-offset_top = 43.0
-offset_right = -5.0
-offset_bottom = 91.0
+offset_left = -75.0
+offset_top = 47.0
+offset_right = -15.0
+offset_bottom = 83.0
 grow_horizontal = 0
 text = "Pause"
 
 [node name="ScoreButton" type="Button" parent="CanvasLayer/UI"]
-custom_minimum_size = Vector2(120, 48)
+custom_minimum_size = Vector2(60, 24)
 layout_mode = 1
 anchors_preset = -1
 anchor_left = 1.0
 anchor_right = 1.0
-offset_left = -277.0
-offset_top = 44.0
-offset_right = -157.0
-offset_bottom = 92.0
+offset_left = -152.0
+offset_top = 46.0
+offset_right = -92.0
+offset_bottom = 82.0
 grow_horizontal = 0
 text = "Score
 "
+
+[node name="Focus button" type="Control" parent="CanvasLayer/UI"]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 50.0
+offset_top = 50.0
+offset_right = 140.0
+offset_bottom = 140.0
+
+[node name="Focus" type="TouchScreenButton" parent="CanvasLayer/UI/Focus button"]
+scale = Vector2(0.6, 0.6)
+texture_normal = ExtResource("19_wjb0r")
+shape = SubResource("RectangleShape2D_ioo17")
+passby_press = true
+script = ExtResource("20_mc2jv")
+camera_path = NodePath("../../../../Scene/Camera3D")
 
 [node name="BallSpawn" type="Marker3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.153519)
