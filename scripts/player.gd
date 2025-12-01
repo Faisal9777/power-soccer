@@ -179,10 +179,10 @@ func attach_camera(c: Camera3D, j : Node) -> void:
 		#print("hiding mesh for player: ", owner_peer_id)
 		#_log_pid("done in: ")
 	# Tag ONLY this player's visuals with the extra bit (additive!)
-		_mark_self_layer_recursive(self)
-		#_disable_self_shadows_recursive(self)
-		# Cull only this extra bit on this camera
-		cam.cull_mask &= ~SELF_LAYER_MASK
+		#_mark_self_layer_recursive(self)
+		##_disable_self_shadows_recursive(self)
+		## Cull only this extra bit on this camera
+		#cam.cull_mask &= ~SELF_LAYER_MASK
 		cam.current = true
 		cam.near = max(cam.near, 0.12) # small near-plane helps
 
@@ -767,9 +767,23 @@ func _handle_tackle_input_server(delta: float) -> void:
 	#_net["tackle_pressed"] = false
 
 func _start_tackle_server() -> void:
+	var fwd := Vector3.ZERO
 
-	var fwd := -global_transform.basis.z; fwd.y = 0.0
-	if fwd.length() == 0.0: return
+	# 1) If we’re aiming and have a ball, tackle TOWARD the ball
+	_resolve_ball()
+	if aim_active and current_ball != null and is_instance_valid(current_ball):
+		var to_ball := current_ball.global_transform.origin - global_transform.origin
+		to_ball.y = 0.0
+		if to_ball.length() > 0.001:
+			fwd = to_ball.normalized()
+
+	# 2) Fallback: old behavior (use character's forward)
+	if fwd == Vector3.ZERO:
+		fwd = -global_transform.basis.z
+		fwd.y = 0.0
+
+	if fwd.length() == 0.0:
+		return
 	fwd = fwd.normalized()
 
 	var v0_xz := Vector3(_pre_move_vel.x, 0.0, _pre_move_vel.z)
@@ -777,16 +791,18 @@ func _start_tackle_server() -> void:
 	var s_norm := clampf(speed0 / maxf(0.001, sprint_speed), 0.0, 1.0)
 
 	var w_dur := pow(s_norm, maxf(1.0, tackle_dur_curve))
-	
+
 	var slide_speed := clampf(speed0 * tackle_speed_mul, tackle_speed_min, tackle_speed_max)
 	var w_spd := pow(s_norm, maxf(1.0, tackle_speed_curve))
 	slide_speed = lerpf(slide_speed, tackle_speed_max, 0.25 * w_spd)
+
 	tackle_velocity = fwd * slide_speed
-	if not _can_perform("tackle", stamina_tackle_cost + tackle_cost_mul * slide_speed): return
+
+	if not _can_perform("tackle", stamina_tackle_cost + tackle_cost_mul * slide_speed):
+		return
+
 	tackle_time_left = lerpf(tackle_dur_min, tackle_dur_max, w_dur)
 	tackle_active = true
-
-	#_latch_ball_server2(current_ball)
 
 func _update_tackle_server(delta: float) -> void:
 	# keep the ball glued while latched (server-side tick snap)
@@ -951,7 +967,7 @@ func _update_player_facing_server(delta: float) -> void:
 
 	var aiming := bool(_net.get("rmb", false))
 	if aiming:
-		print("[SERVER] APPLY face_ball (rmb=true) for peer=", owner_peer_id)
+		
 		_face_ball_server()
 		return
 
