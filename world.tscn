@@ -1,4 +1,4 @@
-[gd_scene load_steps=59 format=4 uid="uid://ex55agd4o2wj"]
+[gd_scene load_steps=61 format=4 uid="uid://ex55agd4o2wj"]
 
 [ext_resource type="Script" uid="uid://dx5tfh7u8t6mb" path="res://scripts/world.gd" id="1_4h6ng"]
 [ext_resource type="PackedScene" uid="uid://dv5l1qjf5gwfn" path="res://Player.tscn" id="2_o3ebs"]
@@ -29,6 +29,8 @@
 [ext_resource type="Texture2D" uid="uid://b5wv3oa7nrv41" path="res://Latch.png" id="20_gggvi"]
 [ext_resource type="Script" uid="uid://bp6dvtew8jxpw" path="res://scripts/focus.gd" id="20_mc2jv"]
 [ext_resource type="Texture2D" uid="uid://d0awa0dudam3l" path="res://SprintTexture.png" id="21_k83mh"]
+[ext_resource type="Texture2D" uid="uid://cm70r7dvy1ejj" path="res://TPTexture.PNG" id="28_qktwf"]
+[ext_resource type="Script" uid="uid://ck4pxkt0frem3" path="res://scripts/tp.gd" id="29_bh8nc"]
 
 [sub_resource type="PanoramaSkyMaterial" id="PanoramaSkyMaterial_qktwf"]
 panorama = ExtResource("4_k83mh")
@@ -561,18 +563,24 @@ offset_right = 140.0
 offset_bottom = 140.0
 
 [node name="Focus" type="TouchScreenButton" parent="CanvasLayer/UI/Focus button"]
-scale = Vector2(0.6, 0.6)
+scale = Vector2(0.5, 0.5)
 texture_normal = ExtResource("19_wjb0r")
 shape = SubResource("RectangleShape2D_ioo17")
 passby_press = true
 script = ExtResource("20_mc2jv")
 camera_path = NodePath("../../../../Scene/Camera3D")
 
+[node name="TP" type="TouchScreenButton" parent="CanvasLayer/UI/Focus button"]
+position = Vector2(65, 0)
+scale = Vector2(0.5, 0.5)
+texture_normal = ExtResource("28_qktwf")
+shape = SubResource("RectangleShape2D_ioo17")
+passby_press = true
+script = ExtResource("29_bh8nc")
+camera_path = NodePath("../../../../Scene/Camera3D")
+
 [node name="BallSpawn" type="Marker3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.153519)
-
-[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
-light_color = Color(1, 0.843137, 0.639216, 1)
 
 [node name="SpawnPoints" type="Node3D" parent="."]
 
