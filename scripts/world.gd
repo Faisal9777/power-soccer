@@ -577,25 +577,11 @@ func _process(delta: float) -> void:
 			print("Already connected (ENet)")
 		else:
 			Network.join("127.0.0.1")
-	#if Input.is_action_just_pressed("debug_win"):
-		#Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
-		#get_tree().paused = false
-		#get_tree().change_scene_to_file(win_scene_path)
-	##if Input.is_action_just_pressed("scoreboard"):
-		##get_tree().change_scene_to_file(scoreboard_scene_path)
-	#elif Input.is_action_just_pressed("debug_lose"):
-		#Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
-		#get_tree().paused = false
-		#get_tree().change_scene_to_file(defeat_scene_path)
-	##print("am i connected? ", multiplayer.multiplayer_peer != null and multiplayer.is_server())
-	##print("total numbers of players joined: ", multiplayer.get_peers())
-	## Input pump
-	##_input_accum += delta
-	##var step: float = 1.0 / NET_INPUT_HZ
-	##while _input_accum >= step:
-		##_input_accum -= step
-		##_send_local_input()
+	if Input.is_action_just_pressed("debug_third") and is_instance_valid(_game):
+		_game._rpc_set_goal_camera_third_person()  # direct local call
 
+	if Input.is_action_just_pressed("debug_first") and is_instance_valid(_game):
+		_game._rpc_set_camera_first_person()       # direct local call
 func _is_really_hosting() -> bool:
 	return multiplayer.multiplayer_peer is ENetMultiplayerPeer and multiplayer.is_server()
 

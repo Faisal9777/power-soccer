@@ -9,9 +9,12 @@ extends Camera3D
 # Distance: FP if ~0, TP if > 0
 @export var distance: float = 0.0
 @export var min_distance: float = 0.0
-@export var max_distance: float = 0.0
+@export var max_distance: float =    10.0
+@export var goal_third_person_distance: float = 6.0  # tweak in inspector
 
-@export var mouse_sens: float = 0.008
+
+@export var mouse_sens: float = 0.008		
+
 @export var invert_y: bool = false
 @export var follow_speed: float = 12.0
 
@@ -245,8 +248,9 @@ func _look() -> void:
 	look_at(pos)
 func _physics_process(delta: float) -> void:
 	if _target == null:
-		return# --- FOCUS MODE: look at the ball from player's head ---
-	
+		return
+
+	# --- FOCUS MODE: look at the ball from player's head ---
 	if _aim_mode and is_instance_valid(_target_ball):
 		var focus := _target.global_transform.origin + Vector3(0.0, height, 0.0)
 		global_transform.origin = focus
@@ -254,21 +258,30 @@ func _physics_process(delta: float) -> void:
 		return
 
 	var t_player := _target.global_transform
-	var focus     := t_player.origin + Vector3(0.0, height, 0.0)
+	var focus    := t_player.origin + Vector3(0.0, height, 0.0)
 
 	# Use AimPivot if present, else fall back to the player body
 	var pivot := _target.get_node_or_null("AimPivot") as Node3D
 	var t_piv: Transform3D = pivot.global_transform if is_instance_valid(pivot) else t_player
-	var forward := (-t_piv.basis.z).normalized()  # includes vertical pitch
+
+	# Full 3D forward (with pitch) – good for look_at
+	var fwd_3d := (-t_piv.basis.z).normalized()
+
+	# Flat forward on XZ – good for camera position
+	var fwd_xz := Vector3(fwd_3d.x, 0.0, fwd_3d.z)
+	if fwd_xz.length_squared() < 1e-6:
+		fwd_xz = Vector3.FORWARD
+	else:
+		fwd_xz = fwd_xz.normalized()
 
 	# ===== First-person =====
 	if distance <= 0.05:
 		global_transform.origin = focus
-		look_at(focus + forward, Vector3.UP)
+		look_at(focus + fwd_3d, Vector3.UP)
 		return
 
 	# ===== Third-person =====
-	var desired_pos := focus - forward * distance
+	var desired_pos := focus - fwd_xz * distance
 
 	# Wall avoidance: from head to desired camera position
 	var space := get_world_3d().direct_space_state
@@ -284,4 +297,11 @@ func _physics_process(delta: float) -> void:
 	# Smooth follow and face the same direction as the character
 	var t := 1.0 - exp(-follow_speed * delta)
 	global_transform.origin = global_transform.origin.lerp(desired_pos, t)
-	look_at(focus + forward, Vector3.UP)
+	# still use the full 3D forward (keeps your pitch)
+	look_at(focus + fwd_3d, Vector3.UP)
+
+func set_goal_third_person_view() -> void:
+	_aim_mode = false  # make sure focus-at-ball mode doesn't steal control
+	distance = clamp(goal_third_person_distance, min_distance, max_distance)
+func set_first_person_view() -> void:
+	distance = min_distance  # usually 0.0

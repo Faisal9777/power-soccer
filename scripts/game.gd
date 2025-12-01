@@ -134,7 +134,8 @@ func _start_game() -> void:
 func _set_game() -> void:
 	_spawn_ball_at(ball_spawn.global_transform.origin)
 	#_spawn_players_from_roster()
-	
+	if multiplayer.is_server():
+		rpc("_rpc_set_camera_first_person")
 	_position_players2()
 	_start_countdown_server()
 
@@ -616,9 +617,12 @@ func _handle_goal(which_goal: String, ball : Node3D) -> void:
 	_add_point(scoring_team, ball)
 	# Wait 3 seconds, then reset
 	# Show "Goal!" on every client (server does NOT run it)
-	var secs := 3
+	var secs := 8
 	rpc("_cl_handle_goal_outcome", "Goal!", secs)
 	# server waits locally; this does not block clients
+	if multiplayer.is_server():
+		print("Trigggeffrdfrr")
+		rpc("_rpc_set_goal_camera_third_person")
 	await get_tree().create_timer(secs).timeout
 	_set_game()
 	_goal_lock = false
@@ -683,6 +687,18 @@ func _cl_set_game(game : String) -> void:
 	print("_cl_set_game: ", game)
 	print("multiplayer.get_unique_id(): ", multiplayer.get_unique_id())
 	#_game = game
+@rpc("any_peer", "reliable", "call_local")
+func _rpc_set_goal_camera_third_person() -> void:
+	var cam := get_viewport().get_camera_3d()
+	print("GOAL CAM RPC on peer=", multiplayer.get_unique_id(), " cam=", cam)
+	if cam and cam.has_method("set_goal_third_person_view"):
+		cam.set_goal_third_person_view()
+		
+@rpc("any_peer", "reliable", "call_local")
+func _rpc_set_camera_first_person() -> void:
+	var cam := get_viewport().get_camera_3d()
+	if cam and cam.has_method("set_first_person_view"):
+		cam.set_first_person_view()
 
 
 

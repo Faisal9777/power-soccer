@@ -65,7 +65,7 @@ func _prompt_for_player_name() -> void:
 	var win := Window.new()
 	win.title = "Set Your Player Name"
 	win.initial_position = Window.WINDOW_INITIAL_POSITION_CENTER_MAIN_WINDOW_SCREEN
-	win.size = Vector2i(800, 400)
+	win.size = Vector2i(800,400)
 	win.unresizable = true
 	add_child(win)
 
