@@ -6,6 +6,15 @@ extends Control
 @onready var start_btn: Button = $PanelContainer/VBoxContainer/HBoxContainer/StartButton
 @onready var leave_btn: Button = $PanelContainer/VBoxContainer/HBoxContainer/LeaveButton
 @onready var ready_btn: Button = $PanelContainer/VBoxContainer/HBoxContainer/ReadyButton
+@onready var match_size_opt: OptionButton = $PanelContainer/VBoxContainer/HBoxContainer/MatchSizeOption
+@onready var fill_bots_check: CheckButton = $PanelContainer/VBoxContainer/HBoxContainer/FillBotsCheck
+
+const MIN_TEAM_SIZE := 1
+const MAX_TEAM_SIZE := 5
+
+var _team_size: int = MIN_TEAM_SIZE  # players per team (1..5)
+var _next_bot_id: int = 100000  # fake peer ids for bots
+
 # (Optional: if you kept a bottom TeamButton, you can remove it or ignore it.)
 
 var _ui_ids: Array[int] = []  # peer_id order as shown (not needed for Tree, kept for reference)
@@ -14,6 +23,12 @@ const Team = GameState.Team
 const TEAM_COLOR := {
 	GameState.Team.BLUE: Color(0.2, 0.6, 1.0),
 	GameState.Team.RED:  Color(1.0, 0.3, 0.3)
+}
+# ⬇ NEW: Human-readable role names
+var ROLE_NAME := { 
+	GameState.Role.GOALKEEPER: "Goalkeeper",
+	GameState.Role.MIDFIELDER: "Midfielder",
+	GameState.Role.FORWARD: "Forward",
 }
 
 func _ready() -> void:
@@ -74,11 +89,32 @@ func _ready() -> void:
 	leave_btn.pressed.connect(_on_leave)
 	ready_btn.pressed.connect(_on_ready_toggle)
 
+	# --- Match-size dropdown (1v1 .. 5v5) ---
+	if match_size_opt:
+		match_size_opt.clear()
+		for s in range(MIN_TEAM_SIZE, MAX_TEAM_SIZE + 1):
+			match_size_opt.add_item("%dv%d" % [s, s], s)  # id = team size
+		match_size_opt.select(0)  # default 1v1
+		# Only the host can change the mode
+		match_size_opt.disabled = !GameState.is_host
+		match_size_opt.item_selected.connect(_on_match_size_selected)
+
+		if GameState.is_host:
+			# Make sure clients see the same initial value
+			rpc("_rpc_set_team_size", _team_size)
+	# --- Fill with bots checkbox ---
+	if fill_bots_check:
+		fill_bots_check.disabled = !GameState.is_host
+		fill_bots_check.toggled.connect(_on_fill_bots_toggled)
+	
 	# --- P2P events: refresh UI & keep roster tidy (host removes leavers) ---
 	Network.peer_joined.connect(func(_id):
 		_refresh_ui()
+		if GameState.is_host and fill_bots_check and fill_bots_check.button_pressed:
+			_update_bots_for_team_size()
 		_update_start_enabled()
 	)
+
 
 	multiplayer.connected_to_server.connect(_on_connected_to_server)
 	multiplayer.peer_connected.connect(_on_peer_connected)
@@ -95,9 +131,12 @@ func _ready() -> void:
 		if GameState.is_host and GameState.roster.has(id):
 			GameState.roster.erase(id)
 			_broadcast_roster()
+			if fill_bots_check and fill_bots_check.button_pressed:
+				_update_bots_for_team_size()
 		_refresh_ui()
 		_update_start_enabled()
 	)
+
 
 	# --- First paint ---
 	_refresh_ui()
@@ -124,15 +163,19 @@ func _on_peer_connected(pid: int) -> void:
 # -------------------- Tree setup / UI --------------------
 
 func _setup_player_tree() -> void:
-	player_list.columns = 3
+	player_list.columns = 4              # ⬅ was 3
 	player_list.hide_root = true
 	player_list.set_column_titles_visible(true)
 	player_list.set_column_title(0, "Player")
 	player_list.set_column_title(1, "Team")
 	player_list.set_column_title(2, "Swap")
+	player_list.set_column_title(3, "Role")   # ⬅ NEW
+
 	player_list.set_column_expand(0, true)   # name expands
 	player_list.set_column_expand(1, false)
 	player_list.set_column_expand(2, false)
+	player_list.set_column_expand(3, false)  # role is compact
+	player_list.set_column_custom_minimum_width(3, 140)
 	# Per-row button signal
 	player_list.button_clicked.connect(_on_tree_button_clicked)
 
@@ -153,6 +196,8 @@ func _refresh_ui() -> void:
 		var name_str  := String(e.get("name", "Player"))
 		var is_ready  := bool(e.get("ready", false))
 		var team_val  := int(e.get("team", -1))
+		var role_val  := int(e.get("role", GameState.Role.MIDFIELDER))  # ⬅ NEW
+		var is_bot    := bool(e.get("is_bot", false))                   # ⬅ NEW
 		var host_tag  := " (Host)" if pid == 1 else ""
 		var ready_tag := " ✓" if is_ready else ""
 
@@ -179,19 +224,53 @@ func _refresh_ui() -> void:
 		else:
 			item.set_text(2, "")
 
+		# Column 3: Role text + button (host only, bots only)
+		if is_bot:
+			item.set_text(3, ROLE_NAME.get(role_val, "Midfielder"))
+		else:
+			item.set_text(3, "")  # you can leave empty for human players
+
+		if GameState.is_host and is_bot:
+			var role_icon: Texture2D = player_list.get_theme_icon("Edit", "EditorIcons")
+			if role_icon == null:
+				role_icon = player_list.get_theme_icon("RightArrow", "Tree")
+			item.add_button(3, role_icon, 0, false, "Change role")
+
 	status_label.text = "Connected: %d" % int(GameState.roster.size())
 	_update_start_enabled()
 
 func _on_tree_button_clicked(item: TreeItem, column: int, id: int, mouse_button_index: int) -> void:
-	if !GameState.is_host: return
-	if column != 2: return
+	if !GameState.is_host:
+		return
+
 	var pid := int(item.get_metadata(0))
-	if !GameState.roster.has(pid): return
-	var cur := int(GameState.roster[pid].get("team", GameState.Team.BLUE))
-	var next := GameState.Team.RED if cur == GameState.Team.BLUE else GameState.Team.BLUE
-	GameState.roster[pid]["team"] = next
-	_broadcast_roster()
-	_update_start_enabled()
+	if !GameState.roster.has(pid):
+		return
+
+	var rec: Dictionary = GameState.roster[pid]
+
+	if column == 2:
+		# Team swap (existing behaviour)
+		var cur := int(rec.get("team", GameState.Team.BLUE))
+		var next := GameState.Team.RED if cur == GameState.Team.BLUE else GameState.Team.BLUE
+		rec["team"] = next
+		GameState.roster[pid] = rec
+		_broadcast_roster()
+		_update_start_enabled()
+
+	elif column == 3:
+		# Role cycle (bots only)
+		if !bool(rec.get("is_bot", false)):
+			return
+
+		var cur_role := int(rec.get("role", GameState.Role.MIDFIELDER))
+		var next_role := (cur_role + 1) % 3  # 0→1→2→0
+		rec["role"] = next_role
+		GameState.roster[pid] = rec
+
+		_broadcast_roster()
+		_update_start_enabled()
+
 # -------------------- Start button enable/disable --------------------
 func _all_ready() -> bool:
 	for id in GameState.roster.keys():
@@ -221,21 +300,24 @@ func _counts_by_team() -> Dictionary:
 			if e["team"] == Team.BLUE: counts[Team.BLUE] += 1
 			elif e["team"] == Team.RED: counts[Team.RED] += 1
 	return counts
+
 func _update_start_enabled() -> void:
-	# Anyone can *ask* to start; server will double-check.
+	var enough_players_for_setting := _teams_match_selected_size()
+
 	var can_start := _all_ready() \
 		and _everyone_has_a_team() \
-		and _teams_equal_nonzero()
+		and enough_players_for_setting
 
 	start_btn.disabled = not can_start
 
-	# Nice UX for why it's disabled
 	if !_all_ready():
 		start_btn.tooltip_text = "Everyone must be Ready."
 	elif !_everyone_has_a_team():
 		start_btn.tooltip_text = "Everyone needs a team."
-	elif !_teams_equal_nonzero():
-		start_btn.tooltip_text = "Teams must be equal (e.g., 1v1, 2v2…)."
+	elif !enough_players_for_setting:
+		var need := _required_team_size()
+		start_btn.tooltip_text = "Lobby must be exactly %dv%d (%d players, balanced teams)." \
+			% [need, need, need * 2]
 	else:
 		start_btn.tooltip_text = ""
 
@@ -322,16 +404,22 @@ func _rpc_host_is_leaving() -> void:
 		_on_host_gone()
 
 func _broadcast_roster() -> void:
-	if !GameState.is_host: return
+	if !GameState.is_host:
+		return
+
 	var snapshot: Array = []
 	for id in GameState.roster.keys():
 		var e = GameState.roster[id]
 		snapshot.append({
 			"id": id,
-			"name": e["name"],
-			"ready": e["ready"],
-			"team": e.get("team", Team.BLUE)
+			"name": e.get("name", "Player"),
+			"ready": e.get("ready", false),
+			"team": e.get("team", Team.BLUE),
+			"is_bot": e.get("is_bot", false),  # <--- keep bot flag
+			"role": e.get("role", GameState.Role.MIDFIELDER),  # ⬅ NEW
 		})
+
+
 	rpc("_rpc_set_roster", snapshot)
 	_refresh_ui()
 
@@ -342,8 +430,11 @@ func _rpc_set_roster(snapshot: Array) -> void:
 		dict[int(e["id"])] = {
 			"name": String(e["name"]),
 			"ready": bool(e["ready"]),
-			"team":  int(e.get("team", Team.BLUE))
+			"team": int(e.get("team", Team.BLUE)),
+			"is_bot": bool(e.get("is_bot", false)),
+			"role": int(e.get("role", GameState.Role.MIDFIELDER)),  # ⬅ NEW
 		}
+
 	print("ROSTERRRRRR")
 	GameState.roster = dict
 	print(GameState.roster)
@@ -409,7 +500,17 @@ func _try_start_match() -> void:
 		print("Not all players ready yet")
 		return
 
+	if !_everyone_has_a_team():
+		print("Not everyone has a team")
+		return
+
+	if !_teams_match_selected_size():
+		var need := _required_team_size()
+		print("Need exactly %d players per team for %dv%d before starting." % [need, need])
+		return
+
 	rpc("_rpc_start_match", WORLD_SCENE)
+
 
 func _broadcast_lobby_state() -> void:
 	# server -> all
@@ -477,3 +578,150 @@ func _on_connection_failed() -> void:
 
 func _on_server_disconnected() -> void:
 	status_label.text = "Server disconnected"
+func _required_team_size() -> int:
+	# Always follow what the dropdown is currently showing
+	if match_size_opt:
+		var idx := match_size_opt.selected
+		if idx >= 0:
+			var val := match_size_opt.get_item_id(idx)
+			if val > 0:
+				_team_size = val  # keep cache in sync
+				return clamp(val, MIN_TEAM_SIZE, MAX_TEAM_SIZE)
+	# Fallback to cached value
+	return clamp(_team_size, MIN_TEAM_SIZE, MAX_TEAM_SIZE)
+
+func _teams_match_selected_size() -> bool:
+	var counts := _counts_by_team()
+	var need := _required_team_size()
+	var blue: int = int(counts[Team.BLUE])
+	var red:  int = int(counts[Team.RED])
+	return blue == need and red == need and need > 0
+
+func _on_match_size_selected(index: int) -> void:
+	if !GameState.is_host:
+		# Only host changes the mode; clients just receive via RPC
+		return
+	if match_size_opt == null:
+		return
+
+	var new_size := match_size_opt.get_item_id(index)
+	if new_size <= 0:
+		new_size = MIN_TEAM_SIZE
+
+	_team_size = clamp(new_size, MIN_TEAM_SIZE, MAX_TEAM_SIZE)
+	rpc("_rpc_set_team_size", _team_size)
+	_update_bots_for_team_size()
+	_update_start_enabled()
+
+@rpc("any_peer", "call_local")
+func _rpc_set_team_size(size: int) -> void:
+	_team_size = clamp(size, MIN_TEAM_SIZE, MAX_TEAM_SIZE)
+
+	if match_size_opt:
+		var idx := match_size_opt.get_item_index(_team_size)
+		if idx != -1:
+			match_size_opt.select(idx)
+
+	# Only host manages bots
+	if GameState.is_host and fill_bots_check and fill_bots_check.button_pressed:
+		_update_bots_for_team_size()
+
+	_update_start_enabled()
+
+func _is_bot_entry(e: Dictionary) -> bool:
+	return bool(e.get("is_bot", false))
+
+func _alloc_bot_id() -> int:
+	var id := _next_bot_id
+	_next_bot_id += 1
+	return id
+
+func _current_bot_count() -> int:
+	var c := 0
+	for id in GameState.roster.keys():
+		var e: Dictionary = GameState.roster[id]
+		if _is_bot_entry(e):
+			c += 1
+	return c
+
+func _remove_all_bots() -> void:
+	var to_remove: Array[int] = []
+	for id in GameState.roster.keys():
+		var e: Dictionary = GameState.roster[id]
+		if _is_bot_entry(e):
+			to_remove.append(int(id))
+	for id in to_remove:
+		GameState.roster.erase(id)
+func _update_bots_for_team_size() -> void:
+	if !GameState.is_host:
+		return
+	if fill_bots_check == null:
+		return
+
+	print("FILL BOTS: pressed=", fill_bots_check.button_pressed,
+		" need=", _required_team_size(),
+		" roster_before=", GameState.roster)
+
+	# If checkbox is off -> remove all bots and exit
+	if !fill_bots_check.button_pressed:
+		_remove_all_bots()
+		_broadcast_roster()
+		_refresh_ui()
+		_update_start_enabled()
+		return
+
+	var need := _required_team_size()
+	if need <= 0:
+		return
+
+	# Count current players + bots on each team, and track bot ids per team
+	var counts := { Team.BLUE: 0, Team.RED: 0 }
+	var bot_ids_blue: Array[int] = []
+	var bot_ids_red: Array[int] = []
+
+	for k in GameState.roster.keys():
+		var pid := int(k)
+		var e: Dictionary = GameState.roster[pid]
+		var team_val := int(e.get("team", GameState.TEAM_NONE))
+		if team_val == Team.BLUE:
+			counts[Team.BLUE] += 1
+			if _is_bot_entry(e):
+				bot_ids_blue.append(pid)
+		elif team_val == Team.RED:
+			counts[Team.RED] += 1
+			if _is_bot_entry(e):
+				bot_ids_red.append(pid)
+
+	# 1) Remove extra bots if team has more than 'need'
+	for team in [Team.BLUE, Team.RED]:
+		var bot_list := bot_ids_blue if team == Team.BLUE else bot_ids_red
+		while counts[team] > need and bot_list.size() > 0:
+			var remove_id: int = bot_list.pop_back()
+			GameState.roster.erase(remove_id)
+			counts[team] -= 1
+
+	# 2) Add bots until each team reaches 'need'
+	for team in [Team.BLUE, Team.RED]:
+		while counts[team] < need:
+			var new_id := _alloc_bot_id()
+			var bot_index := _current_bot_count() + 1
+			var bot_name := "Bot%d" % bot_index
+			GameState.roster[new_id] = {
+				"name": bot_name,
+				"ready": true,
+				"team": team,
+				"is_bot": true,
+				"role": GameState.Role.MIDFIELDER,  # default; host can change
+			}
+
+			counts[team] += 1
+
+	_broadcast_roster()
+	_refresh_ui()
+	_update_start_enabled()
+func _on_fill_bots_toggled(pressed: bool) -> void:
+	if !GameState.is_host:
+		if fill_bots_check:
+			fill_bots_check.button_pressed = false
+		return
+	_update_bots_for_team_size()

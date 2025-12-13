@@ -2,6 +2,7 @@
 extends Node
 
 enum Team { BLUE = 0, RED = 1 }
+enum Role { GOALKEEPER = 0, MIDFIELDER = 1, FORWARD = 2 }  # ⬅ NEW
 const TEAM_NONE := -1
 var player_name: String = ""
 var is_host: bool = false
@@ -17,6 +18,14 @@ var goal_limit = 50
 var _next_on_tie: int = Team.BLUE
 func get_team(peer_id: int) -> int:
 	return int(roster.get(peer_id, {}).get("team", TEAM_NONE))
+
+func get_role(peer_id: int) -> int:
+	return int(roster.get(peer_id, {}).get("role", Role.MIDFIELDER))
+
+func set_role(peer_id: int, role: int) -> void:
+	var rec: Dictionary = roster.get(peer_id, {})
+	rec["role"] = role
+	roster[peer_id] = rec
 
 func is_dedicated_server() -> bool:
 	return is_dedicated and multiplayer.is_server()

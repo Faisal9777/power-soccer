@@ -1,6 +1,6 @@
 [gd_scene load_steps=2 format=3 uid="uid://duglm4trbrvn7"]
 
-[ext_resource type="Script" uid="uid://cb6tvtjxs5xfy" path="res://scripts/lobby.gd" id="1_gv8if"]
+[ext_resource type="Script" uid="uid://oo8lr2n7gk1f" path="res://scripts/lobby.gd" id="1_gv8if"]
 
 [node name="Lobby" type="Control"]
 layout_mode = 3
@@ -52,6 +52,13 @@ text = "Leave
 layout_mode = 2
 text = "Ready
 "
+
+[node name="MatchSizeOption" type="OptionButton" parent="PanelContainer/VBoxContainer/HBoxContainer"]
+layout_mode = 2
+
+[node name="FillBotsCheck" type="CheckButton" parent="PanelContainer/VBoxContainer/HBoxContainer"]
+layout_mode = 2
+text = "Fill with bots"
 
 [node name="PlayerList" type="Tree" parent="PanelContainer/VBoxContainer"]
 custom_minimum_size = Vector2(0, 50)

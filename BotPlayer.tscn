@@ -1,7 +1,7 @@
-[gd_scene load_steps=8 format=3 uid="uid://dv5l1qjf5gwfn"]
+[gd_scene load_steps=8 format=3 uid="uid://c7c8psuolfrbi"]
 
-[ext_resource type="Script" uid="uid://cpn8a4o2wga3b" path="res://scripts/player.gd" id="1_xhfnw"]
-[ext_resource type="ArrayMesh" uid="uid://dfkb3j37cjp2g" path="res://android_phone.obj" id="2_kpjcp"]
+[ext_resource type="Script" uid="uid://d27tl46wdl1bi" path="res://scripts/bot.gd" id="1_0djdi"]
+[ext_resource type="ArrayMesh" uid="uid://dfkb3j37cjp2g" path="res://android_phone.obj" id="2_temvm"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_ld6s0"]
 radius = 1.0
@@ -41,15 +41,14 @@ properties/0/replication_mode = 1
 [node name="Player" type="CharacterBody3D"]
 collision_layer = 2
 collision_mask = 5
-script = ExtResource("1_xhfnw")
+script = ExtResource("1_0djdi")
+slide_move_strength = 80.0
 walk_speed = 9.0
 sprint_speed = 12.0
-latch_stamina_drain = 95.0
-latch_min_to_start = 100.0
 
 [node name="Mesh" type="MeshInstance3D" parent="."]
 transform = Transform3D(3.821371e-17, 8.7422775e-10, 0.02, 0.02, -8.7422775e-10, 0, 8.7422775e-10, 0.02, -8.7422775e-10, 0.8497119, -1.4332567, 0.239928)
-mesh = ExtResource("2_kpjcp")
+mesh = ExtResource("2_temvm")
 
 [node name="PlayerCollision" type="CollisionShape3D" parent="."]
 shape = SubResource("CapsuleShape3D_ld6s0")

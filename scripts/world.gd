@@ -8,6 +8,8 @@ extends Node
 @export var defeat_scene_path: String = "res://DefeatScene.tscn"
 @export var scoreboard_scene_path: String = "res://ScoreboardScene.tscn"
 @export var player_scene: PackedScene
+@export var bot_player_scene: PackedScene
+
 @export var ball_packed: PackedScene
 @onready var spawn_points := $SpawnPoints   # optional, if you have markers named SpawnPoint0/1/2...
 @onready var players_root := $Players
@@ -671,32 +673,47 @@ func _spawn_player_for(id: int) -> void:
 		#_focus_camera_on_player(p, id)
 
 func _spawn_player_for2(id: int) -> void:
-	#print("spawining player for id: ", id)
-	if not multiplayer.is_server():
+	if !multiplayer.is_server():
 		return
+
 	# Avoid duplicates
 	if _players.has(id) and is_instance_valid(_players[id]):
 		return
 
-	var p: Node = null
-	if player_scene == null:
-		push_error("player_scene not assigned"); return
-	p = player_scene.instantiate()
-	p.name = GameState.player_name
+	# ----------------------------
+	# Choose bot scene or player scene
+	# ----------------------------
+	var scene_to_use: PackedScene = player_scene
 
-	p.set_multiplayer_authority(1)  # SERVER owns/simulates in server-auth
-	#print("the id bbeofre setting owner peer id: ", id)
-	p.owner_peer_id = id  # who should see/control this player locally
+	if GameState.roster.has(id):
+		var rec: Dictionary = GameState.roster[id]
+		if rec.get("is_bot", false) and bot_player_scene:
+			scene_to_use = bot_player_scene
+
+	if scene_to_use == null:
+		push_error("No player scene assigned (player_scene / bot_player_scene)")
+		return
+
+	var p: Node = scene_to_use.instantiate()
+
+	# Use the name from roster if present (so bots show “Bot1”, etc.)
+	var display_name := GameState.player_name
+	if GameState.roster.has(id):
+		display_name = String(GameState.roster[id].get("name", display_name))
+	p.name = display_name
+
+	p.set_multiplayer_authority(1)        # SERVER owns/simulates in server-auth
+	p.owner_peer_id = id                  # who should see/control this player locally
 	_players[id] = p
 	players_root.add_child(p, true)
 	GameState.roster[id]["player_path"] = p.get_path()
-	
-	print("Spawned/registered player for peer ", id, " authority=", p.get_multiplayer_authority())
-		# Tell only that client to attach their camera to this player
-	_notify_client_to_attach_camera(p, id)
-		# Focus camera if this is *our* player on this machine
-		#_focus_camera_on_player(p, id)
 
+	print("Spawned/registered player for peer ", id,
+		" (bot=", GameState.roster.get(id, {}).get("is_bot", false),
+		") authority=", p.get_multiplayer_authority())
+
+	# Tell only that client to attach their camera to this player
+	_notify_client_to_attach_camera(p, id)
 
 func _spawn_players() -> void:
 	#print("spawining player for id: ", id)

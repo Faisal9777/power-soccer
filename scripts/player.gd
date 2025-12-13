@@ -92,6 +92,7 @@ const WORLD_LAYER_MASK := 1 << 0   # Layer 1 (default / visible to camera)
 const EPS := 1e-6
 # --- Stamina runtime (authoritative on server; replicated to owner) ---
 var _stamina: float = 100.0
+var _using_sprint: bool = false 
 
 # UI nodes (client-local)
 var _stam_layer: CanvasLayer
@@ -171,6 +172,7 @@ func apply_net_input(d: Dictionary) -> void:
 				#_net[k] = _net[k] + d[k]
 			#else:
 				#_net[k] = d[k]
+
 func attach_camera(c: Camera3D, j : Node) -> void:
 
 	joystick = j
@@ -421,33 +423,54 @@ func _update_charge_ui_from_replication() -> void:
 	_charge_bar.visible = _charge > 0.001 or _net["shoot_down"]
 
 func simulate_server(delta: float) -> void:
-	if not _is_frozen:
-		if current_ball_path:
-			_resolve_ball()
-		_update_cooldowns(delta)
-		_update_charge_server(delta)
-		_update_latched_ball_server(delta)
+	if _is_frozen:
+		return
 
-		# ⬇️ NEW
-		_handle_latch_mode_server(delta)
+	if current_ball_path:
+		_resolve_ball()
 
-		apply_gravity(delta)
-		_update_player_facing_server(delta)
-		var input_dir := _get_input_dir_server()
-		_pre_move_vel = velocity
-		_handle_tackle_input_server(delta)
-		_handle_action_server(input_dir, delta)
-		_update_stamina_server(delta)
+	_update_cooldowns(delta)
+	_update_charge_server(delta)
+	_update_latched_ball_server(delta)
+	_handle_latch_mode_server(delta)
 
-func _can_perform(action: String, stamina_required : float) -> bool:
-	
-	if _is_valid_action(action) and _stamina > stamina_min_to_sprint:
-		_stamina = maxf(0.0, _stamina - stamina_required)
-		return true
+	apply_gravity(delta)
+	_update_player_facing_server(delta)
+
+	var input_dir := _get_input_dir_server()
+
+	# --- Decide sprint for this tick (shared by move + stamina) ---
+	var mvx := float(_net.get("mvx", 0.0))
+	var mvz := float(_net.get("mvz", 0.0))
+	var mv_len := Vector2(mvx, mvz).length()
+	var has_movement := mv_len > 0.01
+
+	var want_sprint := _btn_down("sprint")          # from _net["sprint"]
+	_using_sprint = want_sprint and has_movement and _stamina > stamina_min_to_sprint
+
+	_pre_move_vel = velocity
+	_handle_tackle_input_server(delta)
+	_handle_action_server(input_dir, delta)
+	_update_stamina_server(delta)
+
+func _can_perform(action: String, stamina_required: float, spend: bool = true) -> bool:
+	# Special case: "stamina_regen" is just a condition check (no cost)
 	if action == "stamina_regen":
-		if not tackle_active and is_on_floor():
-			return true
-	return false	
+		# Only regen when on floor and not sliding in tackle
+		return not tackle_active and is_on_floor()
+
+	if not _is_valid_action(action):
+		return false
+
+	# Not enough stamina for this action
+	if _stamina < stamina_required:
+		return false
+
+	# Spend stamina once when requested
+	if spend and stamina_required > 0.0:
+		_stamina = maxf(0.0, _stamina - stamina_required)
+
+	return true
 
 func _is_valid_action(action: String) -> bool:
 	return ["sprint", "tackle", "shoot", "dribble", "jump", "stop"].has(action)
@@ -501,10 +524,13 @@ func _update_stamina_ui_from_replication() -> void:
 	# _stam_bar.visible = pct < 99.9
 
 func _update_stamina_server(delta: float) -> void:
-	# Drain while actually sprinting & moving
-	if _can_perform("stamina_regen", 0.0): 
-		_stamina = minf(stamina_max, _stamina + stamina_regen_rate * delta)	
-# --- Server versions of your previous methods (Input → _net) ---
+	# Drain while actually sprinting
+	if _using_sprint:
+		_stamina = maxf(0.0, _stamina - stamina_sprint_drain * delta)
+	else:
+		# Regenerate when allowed
+		if _can_perform("stamina_regen", 0.0, false):
+			_stamina = minf(stamina_max, _stamina + stamina_regen_rate * delta)
 
 func _update_charge_server(delta: float) -> void:
 	var down := _btn_down("shoot")
@@ -548,14 +574,21 @@ func _handle_action_server(input_dir: Vector3, delta: float) -> void:
 func _move_server(input_dir: Vector3, delta: float) -> void:
 	var mag := 1.0
 	if is_mobile and is_instance_valid(joystick):
-		mag = joystick.mag
-		walk_speed = walk_speed + (sprint_speed - walk_speed) * mag
+		# 0..1 how hard the stick is pushed
+		mag = clamp(joystick.mag, 0.0, 1.0)
 
-	var target_speed := sprint_speed if _btn_down("sprint") and _can_perform("sprint", stamina_sprint_drain * delta) else walk_speed
-	var lateral := velocity; lateral.y = 0.0
+	# Base speed is picked ONLY from sprint toggle.
+	# Joystick magnitude just scales it down (analog walk).
+	var base_speed := sprint_speed if _using_sprint else walk_speed
+	var target_speed := base_speed * mag
+
+	var lateral := velocity
+	lateral.y = 0.0
+
 	var target_vel := input_dir * target_speed
 	var accel := 12.0 if is_on_floor() else 12.0 * air_control
 	lateral = lateral.lerp(target_vel, clamp(accel * delta, 0.0, 1.0))
+
 	velocity.x = lateral.x
 	velocity.z = lateral.z
 	move_and_slide()
