@@ -438,12 +438,17 @@ func _position_players() -> void:
 			var sp := spawns_blue.get_node_or_null("Spawn%d" % blue_placed) as Node3D
 			if sp:
 				p.global_transform = sp.global_transform
+					# NEW: tell bots "this is your home spawn"
+				if p.has_method("set_spawn_to_current"):
+					p.call_deferred("set_spawn_to_current")
 				blue_placed += 1
 				if not _all_team_assinged_color: rpc("_cl_set_team_id", p.get_path(), true)
 		else:
 			var sp := spawns_red.get_node_or_null("Spawn%d" % red_placed) as Node3D
 			if sp:
 				p.global_transform = sp.global_transform
+				if p.has_method("set_spawn_to_current"):
+					p.call_deferred("set_spawn_to_current")
 				red_placed += 1
 				if not _all_team_assinged_color:  rpc("_cl_set_team_id", p.get_path(), false)
 		# tell that specific client to aim their camera
@@ -455,19 +460,17 @@ func _position_players2() -> void:
 	var blue_placed := 1
 	var red_placed  := 1
 
-	# Find a target to face: live Ball if it exists, else the BallSpawn
 	var ball := ball_scene
-	#var target_pos := ball.global_transform.origin if ball != null else ball_spawn.global_transform.origin
 	var target_pos := ball_spawn.global_position
+
 	for k in GameState.roster.keys():
 		var pid := int(k)
 		var name := String(GameState.roster.get(pid, {}).get("name", ""))
 		var team := int(GameState.roster.get(pid, {}).get("team", 0))
-		#print("about to calll _cl_init_entry: ", multiplayer.get_unique_id())
-		# initialize only if missing
+
 		rpc("_cl_init_entry", pid, name, team)
+
 		var p := get_node(GameState.roster[k]["player_path"]) as Node3D
-		#print("the player's id is: ", pid)
 		if p == null:
 			continue
 
@@ -475,17 +478,30 @@ func _position_players2() -> void:
 			var sp := spawns_blue.get_node_or_null("Spawn%d" % blue_placed) as Node3D
 			if sp:
 				p.global_transform = sp.global_transform
+
+				# 👇 NEW: mark this as the bot’s home spawn (if it’s a bot)
+				if p.has_method("set_spawn_to_current"):
+					p.call_deferred("set_spawn_to_current")
+
 				blue_placed += 1
-				if not _all_team_assinged_color: rpc("_cl_set_team_id", p.get_path(), true)
+				if not _all_team_assinged_color:
+					rpc("_cl_set_team_id", p.get_path(), true)
 		else:
 			var sp := spawns_red.get_node_or_null("Spawn%d" % red_placed) as Node3D
 			if sp:
 				p.global_transform = sp.global_transform
+
+				# 👇 NEW: same for red-side bots
+				if p.has_method("set_spawn_to_current"):
+					p.call_deferred("set_spawn_to_current")
+
 				red_placed += 1
-				if not _all_team_assinged_color:  rpc("_cl_set_team_id", p.get_path(), false)
-		# tell that specific client to aim their camera
+				if not _all_team_assinged_color:
+					rpc("_cl_set_team_id", p.get_path(), false)
+
 		p.focus_at(ball)
 		p.freeze(true)
+
 	_all_team_assinged_color = true
 
 # Put this anywhere in the same script (or a synced autoload) -----------------
@@ -646,17 +662,32 @@ func _add_point(scoring_team: String, ball : Node3D) -> void:
 	rpc("_cl_apply_goal_update", scoring_team, goal_player, assist_player, GameState.is_in_the_same_team(goal_player, scoring_team))
 
 @rpc("authority", "reliable", "call_local")
-func _cl_apply_goal_update(scoring_team : String, goal_player : int, assist_player : int, is_in_the_same_team : bool) -> void:
-	if goal_player != -1 and not is_in_the_same_team:
-		game[goal_player]["goals"] += 1
-	else:
-		game[goal_player]["goals"] -= 1
-	if assist_player != -1 and not is_in_the_same_team:
-		game[goal_player]["assists"] += 1
+func _cl_apply_goal_update(
+	scoring_team : String,
+	goal_player : int,
+	assist_player : int,
+	is_in_the_same_team : bool
+) -> void:
+	# --- GOAL SCORER ---
+	if goal_player != -1 and game.has(goal_player):
+		if not is_in_the_same_team:
+			game[goal_player]["goals"] += 1
+		else:
+			# whatever your design is here: undo prediction / own-goal / etc.
+			game[goal_player]["goals"] -= 1
+	# if goal_player == -1 → bot or unknown → skip player stats
+
+	# --- ASSIST ---
+	if assist_player != -1 and game.has(assist_player) and not is_in_the_same_team:
+		game[assist_player]["assists"] += 1   # ✅ use assist_player, not goal_player
+
+	# --- TEAM SCORE ---
+	# (if scoring_team means "team that scored", this is the usual logic)
 	if scoring_team == "red":
-		blue_score += 1
-	else:
 		red_score += 1
+	else:
+		blue_score += 1
+
 	var stats_array = get_stats_in_array()
 	_scoreboard_instance.set_stats(stats_array)
 
