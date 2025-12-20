@@ -9,6 +9,8 @@ var is_host: bool = false
 signal player_name_changed(id: int, name: String)
 var id:int
 var is_dedicated: bool = false 
+var lobby_leader_id: int = 0
+signal lobby_leader_changed(id: int)
 # { peer_id: { "name": String, "ready": bool, "team": int(Team) } }
 var roster: Dictionary = {}
 var pending_spawn_ids: Array[int] = []
@@ -81,3 +83,7 @@ func set_player_name_for(id: int, name: String) -> void:
 	rec["name"] = name
 	roster[id] = rec
 	player_name_changed.emit(id, name)
+@rpc("authority", "call_local", "reliable")
+func _rpc_set_lobby_leader(id: int) -> void:
+	lobby_leader_id = id
+	lobby_leader_changed.emit(id)

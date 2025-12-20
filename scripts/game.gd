@@ -541,8 +541,12 @@ func _process_game_end() -> void:
 
 @rpc("authority", "reliable", "call_local")
 func _cl_set_team_id(p_path: NodePath, is_blue : bool) -> void:
-	var p := get_node(p_path)
-	_set_player_team_color(p, is_blue)
+	var p := get_node_or_null(p_path) # Use get_node_or_null to avoid errors
+	if p:
+		_set_player_team_color(p, is_blue)
+	else:
+		# If it's null, the client hasn't spawned this player yet.
+		print("Warning: Player node not found on client yet: ", p_path)
 
 
 func _set_player_team_color(p: Node3D, is_blue: bool) -> void:
@@ -551,6 +555,7 @@ func _set_player_team_color(p: Node3D, is_blue: bool) -> void:
 	_tint_recursive(p, col)
 
 func _tint_recursive(n: Node, col: Color) -> void:
+	if n == null: return # <--- ADD THIS LINE
 	if n is MeshInstance3D:
 		var mi: MeshInstance3D = n as MeshInstance3D
 		var mesh: Mesh = mi.mesh

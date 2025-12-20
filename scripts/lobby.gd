@@ -12,6 +12,7 @@ extends Control
 const MIN_TEAM_SIZE := 1
 const MAX_TEAM_SIZE := 5
 
+var _server_bots_enabled: bool = false
 var _team_size: int = MIN_TEAM_SIZE  # players per team (1..5)
 var _next_bot_id: int = 100000  # fake peer ids for bots
 
@@ -79,6 +80,10 @@ func _ready() -> void:
 		# Client announces name to host after Multiplayer is ready
 		call_deferred("_submit_name_to_host")
 	# (Dedicated server: falls through, no roster entry for id=1)
+# --- Ensure a lobby leader exists (server side) ---
+	if multiplayer.is_server():
+		_ensure_leader_exists()
+		_broadcast_roster()  # so everyone immediately sees leader + roster
 
 	# --- Buttons + initial state ---
 	# Start button enabled/disabled will be decided by _update_start_enabled()
@@ -96,7 +101,7 @@ func _ready() -> void:
 			match_size_opt.add_item("%dv%d" % [s, s], s)  # id = team size
 		match_size_opt.select(0)  # default 1v1
 		# Only the host can change the mode
-		match_size_opt.disabled = !GameState.is_host
+		match_size_opt.disabled = true
 		match_size_opt.item_selected.connect(_on_match_size_selected)
 
 		if GameState.is_host:
@@ -104,7 +109,7 @@ func _ready() -> void:
 			rpc("_rpc_set_team_size", _team_size)
 	# --- Fill with bots checkbox ---
 	if fill_bots_check:
-		fill_bots_check.disabled = !GameState.is_host
+		fill_bots_check.disabled = true
 		fill_bots_check.toggled.connect(_on_fill_bots_toggled)
 	
 	# --- P2P events: refresh UI & keep roster tidy (host removes leavers) ---
@@ -128,14 +133,20 @@ func _ready() -> void:
 		if id == 1 and !GameState.is_host:
 			_on_host_gone()
 			return
-		if GameState.is_host and GameState.roster.has(id):
+
+		if multiplayer.is_server() and GameState.roster.has(id):
 			GameState.roster.erase(id)
+
+			_ensure_leader_exists()   # ✅ leader might have left
 			_broadcast_roster()
+
 			if fill_bots_check and fill_bots_check.button_pressed:
 				_update_bots_for_team_size()
+
 		_refresh_ui()
 		_update_start_enabled()
 	)
+
 
 
 	# --- First paint ---
@@ -145,7 +156,8 @@ func _ready() -> void:
 func _on_connected_to_server() -> void:
 	# Client: tell server our name right after connect
 	#print("CLIENT ID %d" % GameState.)
-	rpc_id(GameState.id, "_rpc_submit_name", GameState.player_name)
+	rpc_id(1, "_rpc_submit_name", GameState.player_name)
+
 
 func _peer_name(pid: int) -> String:
 	return GameState.roster.get(pid, {}).get("name", "Player %d" % pid)
@@ -215,7 +227,7 @@ func _refresh_ui() -> void:
 		item.set_custom_color(1, col)
 
 		# Column 2: Per-row swap button (host only; show only if assigned)
-		if GameState.is_host and team_val != -1:
+		if _i_am_leader() and team_val != -1:
 			var icon: Texture2D = player_list.get_theme_icon("Reload", "EditorIcons")
 			if icon == null:
 				# Fallback to a built-in control icon that exists at runtime more reliably
@@ -230,7 +242,7 @@ func _refresh_ui() -> void:
 		else:
 			item.set_text(3, "")  # you can leave empty for human players
 
-		if GameState.is_host and is_bot:
+		if _i_am_leader() and is_bot:
 			var role_icon: Texture2D = player_list.get_theme_icon("Edit", "EditorIcons")
 			if role_icon == null:
 				role_icon = player_list.get_theme_icon("RightArrow", "Tree")
@@ -238,38 +250,41 @@ func _refresh_ui() -> void:
 
 	status_label.text = "Connected: %d" % int(GameState.roster.size())
 	_update_start_enabled()
+	_apply_admin_ui_state()
+
 
 func _on_tree_button_clicked(item: TreeItem, column: int, id: int, mouse_button_index: int) -> void:
-	if !GameState.is_host:
+	if !_i_am_leader():
 		return
 
 	var pid := int(item.get_metadata(0))
 	if !GameState.roster.has(pid):
 		return
 
-	var rec: Dictionary = GameState.roster[pid]
-
-	if column == 2:
-		# Team swap (existing behaviour)
-		var cur := int(rec.get("team", GameState.Team.BLUE))
-		var next := GameState.Team.RED if cur == GameState.Team.BLUE else GameState.Team.BLUE
-		rec["team"] = next
-		GameState.roster[pid] = rec
-		_broadcast_roster()
-		_update_start_enabled()
-
-	elif column == 3:
-		# Role cycle (bots only)
-		if !bool(rec.get("is_bot", false)):
-			return
-
-		var cur_role := int(rec.get("role", GameState.Role.MIDFIELDER))
-		var next_role := (cur_role + 1) % 3  # 0→1→2→0
-		rec["role"] = next_role
-		GameState.roster[pid] = rec
-
-		_broadcast_roster()
-		_update_start_enabled()
+	if multiplayer.is_server():
+		# Server can apply immediately (same behavior as before)
+		if column == 2:
+			var rec: Dictionary = GameState.roster[pid]
+			var cur := int(rec.get("team", GameState.Team.BLUE))
+			rec["team"] = (GameState.Team.RED if cur == GameState.Team.BLUE else GameState.Team.BLUE)
+			GameState.roster[pid] = rec
+			_broadcast_roster()
+			_update_start_enabled()
+		elif column == 3:
+			var rec: Dictionary = GameState.roster[pid]
+			if !bool(rec.get("is_bot", false)):
+				return
+			var cur_role := int(rec.get("role", GameState.Role.MIDFIELDER))
+			rec["role"] = (cur_role + 1) % 3
+			GameState.roster[pid] = rec
+			_broadcast_roster()
+			_update_start_enabled()
+	else:
+		# Client leader -> request
+		if column == 2:
+			rpc_id(1, "_rpc_request_swap_team", pid)
+		elif column == 3:
+			rpc_id(1, "_rpc_request_cycle_role", pid)
 
 # -------------------- Start button enable/disable --------------------
 func _all_ready() -> bool:
@@ -320,6 +335,9 @@ func _update_start_enabled() -> void:
 			% [need, need, need * 2]
 	else:
 		start_btn.tooltip_text = ""
+	if !_i_am_leader():
+		start_btn.disabled = true
+		start_btn.tooltip_text = "Only the lobby leader can start."
 
 # -------------------- Lobby flow --------------------
 
@@ -338,11 +356,12 @@ func _on_ready_toggle() -> void:
 	_update_start_enabled()
 
 func _on_start() -> void:
-	# In editor listen-host mode, you can still click Start locally.
-	if GameState.is_host:
+	if !_i_am_leader():
+		return
+
+	if multiplayer.is_server():
 		_try_start_match()
 	else:
-		# Client asks the host/dedicated server to start.
 		rpc_id(1, "_rpc_request_start_match")
 
 func _on_leave() -> void:
@@ -363,6 +382,45 @@ func _on_host_gone() -> void:
 
 # -------------------- Helpers --------------------
 
+func _apply_admin_ui_state() -> void:
+	var admin := _i_am_leader()
+	if match_size_opt: match_size_opt.disabled = !admin
+	if fill_bots_check: fill_bots_check.disabled = !admin
+
+
+func _i_am_leader() -> bool:
+	return multiplayer.get_unique_id() == GameState.lobby_leader_id
+
+func _sender_is_leader() -> bool:
+	return multiplayer.get_remote_sender_id() == GameState.lobby_leader_id
+
+func _pick_next_leader() -> int:
+	var best := 0
+	for k in GameState.roster.keys():
+		var pid := int(k)
+		var rec: Dictionary = GameState.roster[pid]
+		if bool(rec.get("is_bot", false)):
+			continue
+		if best == 0 or pid < best:
+			best = pid
+	return best
+
+func _ensure_leader_exists() -> void:
+	if !multiplayer.is_server():
+		return
+
+	# Keep current if valid
+	if GameState.lobby_leader_id != 0 and GameState.roster.has(GameState.lobby_leader_id):
+		var rec: Dictionary = GameState.roster[GameState.lobby_leader_id]
+		if !bool(rec.get("is_bot", false)):
+			return
+
+	var next := _pick_next_leader() 
+	GameState.lobby_leader_id = next
+	
+	# CHANGE: Call a local RPC in this script, not GameState
+	rpc("_rpc_set_lobby_leader", next)
+
 func _my_ready() -> bool:
 	var me := multiplayer.get_unique_id()
 	return GameState.roster.has(me) and GameState.roster[me]["ready"]
@@ -379,14 +437,13 @@ func _set_my_ready_local(v: bool) -> void:
 
 @rpc("any_peer")
 func _rpc_submit_name(name: String) -> void:
-	if !GameState.is_host: return
+	if !multiplayer.is_server(): return
+
 	var from := multiplayer.get_remote_sender_id()
 	var team := GameState.pick_balanced_team()
-	GameState.roster[from] = {
-		"name": name,
-		"ready": false,
-		"team": team
-	}
+	GameState.roster[from] = {"name": name, "ready": false, "team": team}
+
+	_ensure_leader_exists()   # ✅ IMPORTANT
 	_broadcast_roster()
 
 @rpc("any_peer")
@@ -423,7 +480,7 @@ func _broadcast_roster() -> void:
 	rpc("_rpc_set_roster", snapshot)
 	_refresh_ui()
 
-@rpc("any_peer", "call_local")
+@rpc("authority", "call_local", "reliable")
 func _rpc_set_roster(snapshot: Array) -> void:
 	var dict := {}
 	for e in snapshot:
@@ -441,7 +498,7 @@ func _rpc_set_roster(snapshot: Array) -> void:
 	_refresh_ui()
 	_update_start_enabled()
 
-@rpc("any_peer", "call_local")
+@rpc("authority", "call_local", "reliable")
 func _rpc_start_match(scene_path: String) -> void:
 	get_tree().change_scene_to_file(scene_path)
 @rpc("any_peer", "reliable")
@@ -522,12 +579,64 @@ func _rpc_lobby_state(new_roster: Dictionary) -> void:
 	# Keep everyone in sync
 	GameState.roster = new_roster.duplicate(true)
 	_refresh_ui()
-@rpc("any_peer")
+
+@rpc("any_peer", "reliable")
+func _rpc_request_team_size(size: int) -> void:
+	if !multiplayer.is_server(): return
+	if !_sender_is_leader(): return
+	_team_size = clamp(size, MIN_TEAM_SIZE, MAX_TEAM_SIZE)
+	rpc("_rpc_set_team_size", _team_size)
+	_update_bots_for_team_size()
+	_broadcast_roster()
+
+@rpc("any_peer", "reliable")
+func _rpc_request_swap_team(pid: int) -> void:
+	if !multiplayer.is_server(): return
+	if !_sender_is_leader(): return
+	if !GameState.roster.has(pid): return
+
+	var rec: Dictionary = GameState.roster[pid]
+	var cur := int(rec.get("team", GameState.Team.BLUE))
+	rec["team"] = (GameState.Team.RED if cur == GameState.Team.BLUE else GameState.Team.BLUE)
+	GameState.roster[pid] = rec
+	_broadcast_roster()
+
+@rpc("any_peer", "reliable")
+func _rpc_request_cycle_role(pid: int) -> void:
+	if !multiplayer.is_server(): return
+	if !_sender_is_leader(): return
+	if !GameState.roster.has(pid): return
+
+	var rec: Dictionary = GameState.roster[pid]
+	if !bool(rec.get("is_bot", false)): return
+
+	var cur_role := int(rec.get("role", GameState.Role.MIDFIELDER))
+	rec["role"] = (cur_role + 1) % 3
+	GameState.roster[pid] = rec
+	_broadcast_roster()
+
+@rpc("any_peer", "reliable")
 func _rpc_request_start_match() -> void:
-	if !GameState.is_host:
-		return  # ignore on clients
+	if !multiplayer.is_server(): return
+	if !_sender_is_leader(): return
 	_try_start_match()
 
+@rpc("any_peer", "reliable")
+func _rpc_request_fill_bots(pressed: bool) -> void:
+	if !multiplayer.is_server(): return
+	if !_sender_is_leader(): return
+
+	# 1. Update the logic variable
+	_server_bots_enabled = pressed
+	
+	# 2. Update the UI visually (if this is a host/listen server)
+	if fill_bots_check:
+		# ✅ FIX: Use set_pressed_no_signal to avoid loops
+		fill_bots_check.set_pressed_no_signal(pressed)
+
+	# 3. Run logic
+	_update_bots_for_team_size()
+	_broadcast_roster()
 # ---------- CLIENT BUTTON HANDLERS ----------
 
 func _on_ready_pressed() -> void:
@@ -579,28 +688,24 @@ func _on_connection_failed() -> void:
 func _on_server_disconnected() -> void:
 	status_label.text = "Server disconnected"
 func _required_team_size() -> int:
-	# Always follow what the dropdown is currently showing
-	if match_size_opt:
-		var idx := match_size_opt.selected
-		if idx >= 0:
-			var val := match_size_opt.get_item_id(idx)
-			if val > 0:
-				_team_size = val  # keep cache in sync
-				return clamp(val, MIN_TEAM_SIZE, MAX_TEAM_SIZE)
-	# Fallback to cached value
+	# Rely on the variable, not the UI node. 
+	# The variable is synced via _rpc_set_team_size already.
 	return clamp(_team_size, MIN_TEAM_SIZE, MAX_TEAM_SIZE)
-
+	
 func _teams_match_selected_size() -> bool:
 	var counts := _counts_by_team()
 	var need := _required_team_size()
 	var blue: int = int(counts[Team.BLUE])
 	var red:  int = int(counts[Team.RED])
+	
+	# Strict equality check
 	return blue == need and red == need and need > 0
-
+	
 func _on_match_size_selected(index: int) -> void:
-	if !GameState.is_host:
-		# Only host changes the mode; clients just receive via RPC
+	if !_i_am_leader():
+		_apply_admin_ui_state()
 		return
+
 	if match_size_opt == null:
 		return
 
@@ -608,12 +713,16 @@ func _on_match_size_selected(index: int) -> void:
 	if new_size <= 0:
 		new_size = MIN_TEAM_SIZE
 
-	_team_size = clamp(new_size, MIN_TEAM_SIZE, MAX_TEAM_SIZE)
-	rpc("_rpc_set_team_size", _team_size)
-	_update_bots_for_team_size()
-	_update_start_enabled()
+	if multiplayer.is_server():
+		_team_size = clamp(new_size, MIN_TEAM_SIZE, MAX_TEAM_SIZE)
+		rpc("_rpc_set_team_size", _team_size)
+		if fill_bots_check and fill_bots_check.button_pressed:
+			_update_bots_for_team_size()
+		_broadcast_roster()
+	else:
+		rpc_id(1, "_rpc_request_team_size", new_size)
 
-@rpc("any_peer", "call_local")
+@rpc("authority", "call_local", "reliable")
 func _rpc_set_team_size(size: int) -> void:
 	_team_size = clamp(size, MIN_TEAM_SIZE, MAX_TEAM_SIZE)
 
@@ -655,15 +764,8 @@ func _remove_all_bots() -> void:
 func _update_bots_for_team_size() -> void:
 	if !GameState.is_host:
 		return
-	if fill_bots_check == null:
-		return
-
-	print("FILL BOTS: pressed=", fill_bots_check.button_pressed,
-		" need=", _required_team_size(),
-		" roster_before=", GameState.roster)
-
-	# If checkbox is off -> remove all bots and exit
-	if !fill_bots_check.button_pressed:
+# CHANGE: Check the variable, not the UI element
+	if !_server_bots_enabled:
 		_remove_all_bots()
 		_broadcast_roster()
 		_refresh_ui()
@@ -719,9 +821,26 @@ func _update_bots_for_team_size() -> void:
 	_broadcast_roster()
 	_refresh_ui()
 	_update_start_enabled()
+
 func _on_fill_bots_toggled(pressed: bool) -> void:
-	if !GameState.is_host:
+	if !_i_am_leader():
 		if fill_bots_check:
-			fill_bots_check.button_pressed = false
+			fill_bots_check.set_pressed_no_signal(false)
 		return
-	_update_bots_for_team_size()
+
+	if multiplayer.is_server():
+		# ✅ FIX: You must update the variable here!
+		_server_bots_enabled = pressed 
+		
+		_update_bots_for_team_size()
+		_broadcast_roster()
+	else:
+		rpc_id(1, "_rpc_request_fill_bots", pressed)
+@rpc("authority", "call_local", "reliable")
+func _rpc_set_lobby_leader(id: int) -> void:
+	GameState.lobby_leader_id = id
+	print("[Lobby] Leader updated to: ", id)
+	# CRITICAL: Force UI to re-check if "I am leader" is now true
+	_refresh_ui()
+	_apply_admin_ui_state()
+	_update_start_enabled()

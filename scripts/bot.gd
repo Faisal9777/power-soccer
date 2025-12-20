@@ -20,11 +20,11 @@ const MID_ARRIVE_RADIUS := 5.0    # how close to the ball is “reached”
 const MID_HOME_TOL := 0.5         # how close to spawn is “home”
 
 # 🔹 NEW: tackle behaviour
-const OPP_HUG_RADIUS := 5.0       # how close to the ball the opponent must be ("hugging")
-const BOT_TACKLE_RADIUS := 6    # how close WE must be to start tackling
+const OPP_HUG_RADIUS := 10.0    # how close to the ball the opponent must be ("hugging")
+const BOT_TACKLE_RADIUS := 12.0   # how close WE must be to start tackling
 
 # 🔹 NEW: pass behaviour (midfielder)
-const BOT_CONTROL_RADIUS := 4.5    # how close WE must be to "own" the ball
+const BOT_CONTROL_RADIUS := 5.0   # how close WE must be to "own" the ball
 const PASS_MIN_FORCE := 1.0       # soft short pass
 const PASS_MAX_FORCE := 6.0       # strongest pass
 const PASS_MAX_DIST  := 25.0      # distance at which we use MAX_FORCE
@@ -36,18 +36,39 @@ const TEAMMATE_BALL_RADIUS := 5.0   # how close a teammate must be to "own" the 
 const CENTER_BAND_Z := 4.0   # how wide the "centre zone" is around FIELD_MID_Z
 
 const FWD_CONTROL_RADIUS := 4.0        # how close forward must be to "own" the ball
-const FWD_DRIBBLE_FORCE := 0.6         # soft nudge towards goal
+const FWD_DRIBBLE_FORCE :=1.0       # soft nudge towards goal
 const FWD_FINAL_SHOT_FORCE := 10.0     # big shot near goal
 const FWD_FINAL_SHOT_DIST := 35.0      # if ball is this close to goal → use final shot
 const FWD_KICK_COOLDOWN_SEC := 0.8     # delay between touches so it doesn't spam
-const FWD_DANGER_RADIUS := 10.0  
-const FWD_TRAP_MAX_AGE_SEC := 2.0   # how long after a pass the special first-trap is allowed
+const FWD_DANGER_RADIUS := 9.5
+
+const FWD_WING_OFFSET := 15.0  # fallback width if we can't read goal posts
+
+const FWD_HOME_LEFT   := 0
+const FWD_HOME_CENTER := 1
+const FWD_HOME_RIGHT  := 2
+
+const FWD_FIRST_TRAP_RADIUS := 10.0  # only for the first trap after a pass
+
+@export var forward_idle_home: int = FWD_HOME_LEFT
+# 0 = left edge, 1 = centre, 2 = right edge
+
+# 🔹 NEW: pass-lane + trap for ANY receiver (forward or midfielder)
+const PASS_LANE_BLOCK_RADIUS := 2.2   # meters: opponent near the pass line = blocked
+const PASS_TRAP_META_KEY := "pass_trap_info"
+const PASS_TRAP_MAX_AGE_SEC := 2.0
+const MID_FIRST_TRAP_RADIUS := 8.0    # how close midfielder must get to do the first-trap
+
 
 const BALL_CONTROL_MAX_HEIGHT := 1.8
 # how many meters above/below the player's origin we still consider "reachable"
 
 var _forward_home_point: Vector3 = Vector3.ZERO
 var _forward_home_valid: bool = false
+
+var _forward_home_center: Vector3 = Vector3.ZERO
+var _forward_home_left:   Vector3 = Vector3.ZERO
+var _forward_home_right:  Vector3 = Vector3.ZERO
 
 var _next_pass_time_sec := 0.0
 var _next_forward_kick_time_sec := 0.0
@@ -59,8 +80,6 @@ var _goal_valid: bool = false
 var _cached_team: int = -1
 
 var _spawn_point: Vector3
-
-var _debug_last_tackle := false
 
 var ROLE_GOALKEEPER = GameState.Role.GOALKEEPER
 var ROLE_MIDFIELDER = GameState.Role.MIDFIELDER
@@ -76,6 +95,8 @@ var _has_goal_line: bool = false
 
 # forward direction out of the goal, projected on XZ
 var _goal_forward: Vector3 = Vector3.ZERO
+
+var _mid_return_home_until_sec := 0.0
 
 
 func _ready() -> void:
@@ -309,6 +330,7 @@ func _update_goalkeeper_input(delta: float) -> void:
 		_net["mvx"] = clampf(mvx, -1.0, 1.0)
 		_net["mvz"] = clampf(mvz, -1.0, 1.0)
 		_net["sprint"] = true
+		
 		return
 
 	# ---------- DEFAULT: walk to home guard point in front of goal ----------
@@ -466,6 +488,11 @@ func _is_ball_in_center_band(ball: Node3D) -> bool:
 func _go_forward_home() -> void:
 	if not _forward_home_valid:
 		_compute_forward_home()
+		if not _forward_home_valid:
+			return
+
+	# 👉 choose the safest home each frame based on opponent positions
+	_pick_best_forward_idle_home_by_opponents()
 
 	var origin := global_transform.origin
 	var home := _forward_home_point
@@ -496,6 +523,103 @@ func _go_forward_home() -> void:
 
 
 # ---------- OPPONENT / TEAMMATE QUERIES ----------
+
+func _is_opponent_in_pass_lane(
+	ball_pos: Vector3,
+	target_pos: Vector3,
+	lane_radius: float,
+	max_height_diff: float = 9999.0
+) -> bool:
+	var my_team := _get_my_team()
+
+	var a := Vector2(ball_pos.x, ball_pos.z)
+	var b := Vector2(target_pos.x, target_pos.z)
+	var ab := b - a
+	var ab_len2 := ab.length_squared()
+	if ab_len2 < 0.0001:
+		return false
+
+	var world := get_tree().current_scene
+	if world == null:
+		return false
+
+	for pid in GameState.roster.keys():
+		var rec: Dictionary = GameState.roster[pid]
+		var team := int(rec.get("team", GameState.Team.BLUE))
+		if team == my_team:
+			continue
+
+		if not rec.has("player_path"):
+			continue
+
+		var n := world.get_node_or_null(rec["player_path"]) as Node3D
+		if n == null:
+			continue
+
+		var p3 := n.global_transform.origin
+		if abs(p3.y - ball_pos.y) > max_height_diff:
+			continue
+
+		var p := Vector2(p3.x, p3.z)
+
+		# projection of p onto segment a->b
+		var t := clampf((p - a).dot(ab) / ab_len2, 0.0, 1.0)
+
+		# ignore opponents basically at the endpoints (near ball or near receiver)
+		if t < 0.08 or t > 0.92:
+			continue
+
+		var proj := a + ab * t
+		if p.distance_to(proj) <= lane_radius:
+			return true
+
+	return false
+
+
+func _find_best_midfielder_target(ball_pos: Vector3) -> Node3D:
+	var my_team := _get_my_team()
+	var world := get_tree().current_scene
+	if world == null:
+		return null
+
+	var best: Node3D = null
+	var best_score := INF
+	var ball2 := Vector2(ball_pos.x, ball_pos.z)
+
+	for pid in GameState.roster.keys():
+		var rec: Dictionary = GameState.roster[pid]
+
+		var team := int(rec.get("team", GameState.Team.BLUE))
+		if team != my_team:
+			continue
+
+		if int(pid) == owner_peer_id:
+			continue
+
+		var role := int(rec.get("role", ROLE_MIDFIELDER))
+		if role != ROLE_MIDFIELDER:
+			continue
+
+		if not rec.has("player_path"):
+			continue
+
+		var n := world.get_node_or_null(rec["player_path"]) as Node3D
+		if n == null:
+			continue
+
+		var p := n.global_transform.origin
+		var d := Vector2(p.x, p.z).distance_to(ball2)
+
+		# Prefer humans slightly (optional, but nice)
+		var penalty := 0.0 if _is_human_player(rec) else 5.0
+		var score := d + penalty
+
+		if score < best_score:
+			best_score = score
+			best = n
+
+	return best
+
 
 func _find_nearest_opponent_to_ball(ball_pos: Vector3, max_ball_dist: float, max_height_diff: float = 9999.0) -> Node3D:
 	var my_team := _get_my_team()
@@ -535,7 +659,7 @@ func _find_nearest_opponent_to_ball(ball_pos: Vector3, max_ball_dist: float, max
 
 	return best
 
-func _find_best_human_teammate_target(ball_pos: Vector3) -> Node3D:
+func _find_best_human_teammate_target(ball_pos: Vector3, exclude_path: NodePath = NodePath("")) -> Node3D:
 	var my_team := _get_my_team()
 	var best: Node3D = null
 	var best_dist := INF
@@ -543,16 +667,13 @@ func _find_best_human_teammate_target(ball_pos: Vector3) -> Node3D:
 	for pid in GameState.roster.keys():
 		var rec: Dictionary = GameState.roster[pid]
 
-		# same team only
 		var team := int(rec.get("team", GameState.Team.BLUE))
 		if team != my_team:
 			continue
 
-		# skip myself
 		if int(pid) == owner_peer_id:
 			continue
 
-		# must be human-controlled
 		if not _is_human_player(rec):
 			continue
 
@@ -561,6 +682,10 @@ func _find_best_human_teammate_target(ball_pos: Vector3) -> Node3D:
 
 		var n := get_tree().current_scene.get_node_or_null(rec["player_path"]) as Node3D
 		if n == null:
+			continue
+
+		# ✅ NEW: exclude the passer
+		if exclude_path != NodePath("") and n.get_path() == exclude_path:
 			continue
 
 		var pos := n.global_transform.origin
@@ -574,7 +699,7 @@ func _find_best_human_teammate_target(ball_pos: Vector3) -> Node3D:
 	return best
 
 
-func _find_best_forward_target(ball_pos: Vector3) -> Node3D:
+func _find_best_forward_target(ball_pos: Vector3, exclude_path: NodePath = NodePath("")) -> Node3D:
 	var my_team := _get_my_team()
 	var best: Node3D = null
 	var best_dist := INF
@@ -583,16 +708,13 @@ func _find_best_forward_target(ball_pos: Vector3) -> Node3D:
 	for pid in GameState.roster.keys():
 		var rec: Dictionary = GameState.roster[pid]
 
-		# same team only
 		var team := int(rec.get("team", GameState.Team.BLUE))
 		if team != my_team:
 			continue
 
-		# ❌ skip myself completely
 		if int(pid) == owner_peer_id:
 			continue
 
-		# must be a forward
 		var role := int(rec.get("role", ROLE_MIDFIELDER))
 		if role != ROLE_FORWARD:
 			continue
@@ -602,6 +724,10 @@ func _find_best_forward_target(ball_pos: Vector3) -> Node3D:
 
 		var n := get_tree().current_scene.get_node_or_null(rec["player_path"]) as Node3D
 		if n == null:
+			continue
+
+		# ✅ NEW: don't pass back to excluded player
+		if exclude_path != NodePath("") and n.get_path() == exclude_path:
 			continue
 
 		var pos := n.global_transform.origin
@@ -614,7 +740,7 @@ func _find_best_forward_target(ball_pos: Vector3) -> Node3D:
 
 	return best
 
-func _mark_ball_pass_for_forward_trap(
+func _mark_ball_pass_trap(
 	ball: RigidBody3D,
 	from_role: int,
 	now_sec: float,
@@ -625,54 +751,150 @@ func _mark_ball_pass_for_forward_trap(
 
 	var info := {
 		"team": _get_my_team(),
-		"from_role": from_role,   # ROLE_MIDFIELDER or ROLE_FORWARD
+		"from_role": from_role,
 		"timestamp": now_sec,
 		"used": false,
-		"receiver_path": receiver.get_path(),   # 👈 who should get the special trap
+		"receiver_path": receiver.get_path(),
+		"from_path": get_path(),  # ✅ NEW: who made the pass
 	}
-	ball.set_meta("forward_trap_info", info)
+	ball.set_meta(PASS_TRAP_META_KEY, info)
 
 
-func _forward_consume_pass_trap(ball: RigidBody3D, now_sec: float) -> bool:
+func _has_pending_pass_trap(ball: RigidBody3D, now_sec: float) -> bool:
 	if ball == null:
 		return false
-	if not ball.has_meta("forward_trap_info"):
+	if not ball.has_meta(PASS_TRAP_META_KEY):
 		return false
 
-	var info = ball.get_meta("forward_trap_info")
+	var info = ball.get_meta(PASS_TRAP_META_KEY)
 	if not (info is Dictionary):
 		return false
 
-	# already used by someone
 	if bool(info.get("used", false)):
 		return false
 
-	# Must be same team as passer
-	var team := int(info.get("team", -1))
-	if team != _get_my_team():
+	if int(info.get("team", -1)) != _get_my_team():
 		return false
 
-	# 👇 NEW: must be the *intended* receiver
 	if info.has("receiver_path"):
 		var expected_path: NodePath = info["receiver_path"]
 		if expected_path != get_path():
-			# not my pass to trap
 			return false
 
-	# Only for a short time after the pass
 	var age := now_sec - float(info.get("timestamp", now_sec))
-	if age > FWD_TRAP_MAX_AGE_SEC:
+	if age > PASS_TRAP_MAX_AGE_SEC:
 		return false
 
-	# Only if the pass came from MID or FWD
 	var from_role := int(info.get("from_role", ROLE_MIDFIELDER))
 	if from_role != ROLE_MIDFIELDER and from_role != ROLE_FORWARD:
 		return false
 
-	# ✅ OK, this forward is the correct receiver → consume the trap
-	info["used"] = true
-	ball.set_meta("forward_trap_info", info)
 	return true
+
+
+func _consume_pass_trap(ball: RigidBody3D, now_sec: float) -> bool:
+	if not _has_pending_pass_trap(ball, now_sec):
+		return false
+
+	var info: Dictionary = ball.get_meta(PASS_TRAP_META_KEY)
+	info["used"] = true
+	ball.set_meta(PASS_TRAP_META_KEY, info)
+	return true
+
+func _find_best_human_forward_target(ball_pos: Vector3, exclude_path: NodePath = NodePath("")) -> Node3D:
+	var my_team := _get_my_team()
+	var best: Node3D = null
+	var best_dist := INF
+
+	for pid in GameState.roster.keys():
+		var rec: Dictionary = GameState.roster[pid]
+
+		var team := int(rec.get("team", GameState.Team.BLUE))
+		if team != my_team:
+			continue
+		if int(pid) == owner_peer_id:
+			continue
+
+		if not _is_human_player(rec):
+			continue
+
+		var role := int(rec.get("role", ROLE_MIDFIELDER))
+		if role != ROLE_FORWARD:
+			continue
+
+		if not rec.has("player_path"):
+			continue
+
+		var n := get_tree().current_scene.get_node_or_null(rec["player_path"]) as Node3D
+		if n == null:
+			continue
+
+		if exclude_path != NodePath("") and n.get_path() == exclude_path:
+			continue
+
+		var p := n.global_transform.origin
+		p.y = 0.0
+		var d := p.distance_to(ball_pos)
+
+		if d < best_dist:
+			best_dist = d
+			best = n
+
+	return best
+
+
+
+func _try_pass_to_forward_only(ball: RigidBody3D, ignore_cooldown: bool = false, exclude_path: NodePath = NodePath("")) -> void:
+	if ball == null:
+		return
+
+	var now_sec := Time.get_ticks_msec() / 1000.0
+	if (not ignore_cooldown) and now_sec < _next_pass_time_sec:
+		return
+
+	var ball_pos := ball.global_transform.origin
+
+	# 1) Prefer HUMAN forward (not the passer)
+	var target := _find_best_human_forward_target(ball_pos, exclude_path)
+
+	# 2) else any forward (not the passer)
+	if target == null:
+		target = _find_best_forward_target(ball_pos, exclude_path)
+
+	# 3) else any HUMAN teammate (not the passer)
+	if target == null:
+		target = _find_best_human_teammate_target(ball_pos, exclude_path)
+
+	# 🚫 If the ONLY available option is the passer, then just don't pass.
+	if target == null:
+		return
+
+	# --- normal ground pass ---
+	var target_pos := target.global_transform.origin
+	target_pos.y = ball_pos.y
+
+	var dir := target_pos - ball_pos
+	dir.y = 0.0
+	var dist := dir.length()
+	if dist < 0.1:
+		return
+
+	dir = dir.normalized()
+
+	var t := clampf(dist / PASS_MAX_DIST, 0.0, 1.0)
+	var force = lerp(PASS_MIN_FORCE, PASS_MAX_FORCE, t)
+	var impulse = dir * force
+
+	var lv := ball.linear_velocity
+	lv.y = 0.0
+	ball.linear_velocity = lv
+
+	ball.apply_impulse(impulse, Vector3.ZERO)
+	_next_pass_time_sec = now_sec + PASS_COOLDOWN_SEC
+
+	# mark trap for receiver
+	_mark_ball_pass_trap(ball, _get_my_role(), now_sec, target)
+
 
 func _try_pass_to_forward(ball: RigidBody3D) -> void:
 	if ball == null:
@@ -727,7 +949,8 @@ func _try_pass_to_forward(ball: RigidBody3D) -> void:
 	# so the receiving forward can do a first-touch trap.
 	var target_role := _get_role_for_node(target)
 	if target_role == ROLE_FORWARD:
-		_mark_ball_pass_for_forward_trap(ball, _get_my_role(), now_sec, target)
+		_mark_ball_pass_trap(ball, _get_my_role(), now_sec, target)
+
 
 
 	print("BOT", owner_peer_id, " PASS to ", target.name,
@@ -781,6 +1004,18 @@ func _forward_try_safety_pass(ball: RigidBody3D) -> bool:
 	var target_pos := target.global_transform.origin
 	target_pos.y = ball_pos.y  # ground pass
 
+	# If we were about to safety-pass to a FORWARD, but an opponent blocks the lane,
+	# redirect to a MIDFIELDER instead.
+	var target_role := _get_role_for_node(target)
+	if target_role == ROLE_FORWARD:
+		if _is_opponent_in_pass_lane(ball_pos, target_pos, PASS_LANE_BLOCK_RADIUS, BALL_CONTROL_MAX_HEIGHT):
+			var mid_target := _find_best_midfielder_target(ball_pos)
+			if mid_target != null:
+				target = mid_target
+				target_pos = target.global_transform.origin
+				target_pos.y = ball_pos.y
+				print("FORWARD", owner_peer_id, " SAFETY PASS lane blocked → switching to MID:", target.name)
+
 	var dir := target_pos - ball_pos
 	dir.y = 0.0
 	var dist := dir.length()
@@ -805,9 +1040,8 @@ func _forward_try_safety_pass(ball: RigidBody3D) -> bool:
 
 	# 👇 NEW: if this was FORWARD → FORWARD (or to a human forward),
 	# mark it so the receiving forward can do a first-touch trap.
-	var target_role := _get_role_for_node(target)
-	if target_role == ROLE_FORWARD:
-		_mark_ball_pass_for_forward_trap(ball, _get_my_role(), now_sec, target)
+	_mark_ball_pass_trap(ball, _get_my_role(), now_sec, target)
+
 
 
 	print("FORWARD", owner_peer_id, " SAFETY PASS to ", target.name,
@@ -858,6 +1092,93 @@ func _teammate_near_ball(ball_pos: Vector3, radius: float, my_dist: float) -> bo
 
 	return false
 
+func _teammate_controls_ball(ball_pos: Vector3) -> bool:
+	var my_team := _get_my_team()
+	var ball2 := Vector2(ball_pos.x, ball_pos.z)
+
+	for pid in GameState.roster.keys():
+		var rec: Dictionary = GameState.roster[pid]
+
+		# same team only
+		var team := int(rec.get("team", GameState.Team.BLUE))
+		if team != my_team:
+			continue
+
+		# skip myself
+		if int(pid) == owner_peer_id:
+			continue
+
+		if not rec.has("player_path"):
+			continue
+
+		var n := get_tree().current_scene.get_node_or_null(rec["player_path"]) as Node3D
+		if n == null:
+			continue
+
+		var p := n.global_transform.origin
+
+		# must be reachable height-wise
+		if abs(ball_pos.y - p.y) > BALL_CONTROL_MAX_HEIGHT:
+			continue
+
+		# teammate is close enough to be considered "controlling"
+		var p2 := Vector2(p.x, p.z)
+		var d := p2.distance_to(ball2)
+		if d <= TEAMMATE_BALL_RADIUS:
+			return true
+
+	return false
+
+
+func _bot_forward_closer_to_ball_than_me(ball_pos: Vector3, my_dist: float) -> bool:
+	var my_team := _get_my_team()
+	var ball2 := Vector2(ball_pos.x, ball_pos.z)
+
+	const EPS := 0.05  # small tolerance to avoid jitter ties
+
+	for pid in GameState.roster.keys():
+		var rec: Dictionary = GameState.roster[pid]
+
+		# same team only
+		var team := int(rec.get("team", GameState.Team.BLUE))
+		if team != my_team:
+			continue
+
+		var other_pid := int(pid)
+
+		# skip myself
+		if other_pid == owner_peer_id:
+			continue
+
+		# ONLY bot forwards
+		if not bool(rec.get("is_bot", false)):
+			continue
+
+		var role := int(rec.get("role", ROLE_MIDFIELDER))
+		if role != ROLE_FORWARD:
+			continue
+
+		if not rec.has("player_path"):
+			continue
+
+		var n := get_tree().current_scene.get_node_or_null(rec["player_path"]) as Node3D
+		if n == null:
+			continue
+
+		var p2 := Vector2(n.global_transform.origin.x, n.global_transform.origin.z)
+		var d := p2.distance_to(ball2)
+
+		# another bot forward is clearly closer
+		if d < my_dist - EPS:
+			return true
+
+		# tie-break: if basically equal distance, let the lower pid "win"
+		if abs(d - my_dist) <= EPS and other_pid < owner_peer_id:
+			return true
+
+	return false
+
+
 func _teammate_closer_to_ball_than_me(ball_pos: Vector3, my_dist: float) -> bool:
 	var my_team := _get_my_team()
 	var ball2 := Vector2(ball_pos.x, ball_pos.z)
@@ -904,39 +1225,147 @@ func _compute_forward_home() -> void:
 
 	var am_blue := GameState.is_blue(owner_peer_id)
 
-	var center: Vector3
+	# --- centre spot (kickoff point) ---
+	var center_spot: Vector3
 	if ball_spawn:
-		center = ball_spawn.global_transform.origin
+		center_spot = ball_spawn.global_transform.origin
 	else:
-		center = Vector3.ZERO
+		center_spot = Vector3.ZERO
 
+	var y := global_transform.origin.y
+	center_spot.y = y
+
+	# --- opponent goal (the side we attack) ---
 	var opp_goal: Node3D = null
 	if am_blue:
 		opp_goal = red_goal
 	else:
 		opp_goal = blue_goal
 
-	var home := center
+	if opp_goal == null:
+		return
 
-	if opp_goal != null:
-		var opp_pos := opp_goal.global_transform.origin
-		# midpoint between centre spot and opponent goal → "centre of their half"
-		home = (center + opp_pos) * 0.5
+	var opp_pos := opp_goal.global_transform.origin
+	opp_pos.y = y
 
-	# keep at our ground height
-	home.y = global_transform.origin.y
+	# --- 1) CENTRE HOME: middle of opponent half line ---
+	var home_mid := (center_spot + opp_pos) * 0.5
+	home_mid.y = y
 
-	# make sure it's actually in opponent half (relative to FIELD_MID_Z)
+	# ensure it's actually in opponent half (relative to FIELD_MID_Z)
 	if am_blue:
-		home.z = max(home.z, FIELD_MID_Z + 1.0)
+		home_mid.z = max(home_mid.z, FIELD_MID_Z + 1.0)
 	else:
-		home.z = min(home.z, FIELD_MID_Z - 1.0)
+		home_mid.z = min(home_mid.z, FIELD_MID_Z - 1.0)
 
-	_forward_home_point = home
+	# --- 2) FORWARD & SIDEWAYS DIRECTIONS ---
+	var forward_dir := opp_pos - center_spot
+	forward_dir.y = 0.0
+	if forward_dir.length() < 0.001:
+		# fallback if something is weird
+		forward_dir = Vector3(0.0, 0.0, 1.0) if am_blue else Vector3(0.0, 0.0, -1.0)
+	forward_dir = forward_dir.normalized()
+
+	# right = UP × forward
+	var right_dir := Vector3.UP.cross(forward_dir)
+	right_dir.y = 0.0
+	if right_dir.length() < 0.001:
+		right_dir = Vector3.RIGHT
+	right_dir = right_dir.normalized()
+	var left_dir := -right_dir
+
+	# --- 3) WING OFFSET: use opp goal posts if available, else constant ---
+	var wing_offset := FWD_WING_OFFSET
+
+	var post_left := opp_goal.find_child("Post_L", true, false) as Node3D
+	var post_right := opp_goal.find_child("Post_R", true, false) as Node3D
+	if post_left != null and post_right != null:
+		var L := post_left.global_transform.origin
+		var R := post_right.global_transform.origin
+		L.y = y
+		R.y = y
+
+		var goal_center := (L + R) * 0.5
+		var half_vec := L * 0.5#- goal_center
+		var half_width := half_vec.length()
+		if half_width > 0.5:
+			wing_offset = half_width  # put wings roughly in line with posts
+
+	# --- 4) BUILD THREE HOMES ON THAT LINE ---
+	_forward_home_center = home_mid
+	_forward_home_left   = home_mid + left_dir  * wing_offset
+	_forward_home_right  = home_mid + right_dir * wing_offset
+
+	# we don't choose which one yet, that will be done per-frame based on opponents
+	_forward_home_point = _forward_home_left  # temporary default
 	_forward_home_valid = true
 
-	print("FORWARD", owner_peer_id, " home set to ", _forward_home_point, " am_blue=", am_blue)
+	print("FORWARD", owner_peer_id,
+		" homes:",
+		" center=", _forward_home_center,
+		" left=", _forward_home_left,
+		" right=", _forward_home_right,
+		" wing_offset=", wing_offset,
+		" am_blue=", am_blue)
 
+func _pick_best_forward_idle_home_by_opponents() -> void:
+	if not _forward_home_valid:
+		_compute_forward_home()
+		if not _forward_home_valid:
+			return
+
+	var world := get_tree().current_scene
+	if world == null:
+		return
+
+	var my_team := _get_my_team()
+
+	var candidates: Array[Vector3] = [
+		_forward_home_left,
+		_forward_home_center,
+		_forward_home_right,
+	]
+
+	var best_point := _forward_home_left
+	var best_score := -INF
+
+	for p in candidates:
+		var min_dist := INF
+		var any_opp := false
+
+		for pid in GameState.roster.keys():
+			var rec: Dictionary = GameState.roster[pid]
+
+			var team := int(rec.get("team", GameState.Team.BLUE))
+			if team == my_team:
+				continue
+
+			if not rec.has("player_path"):
+				continue
+
+			var n := world.get_node_or_null(rec["player_path"]) as Node3D
+			if n == null:
+				continue
+
+			any_opp = true
+
+			var opp_pos := n.global_transform.origin
+			opp_pos.y = p.y  # compare on ground plane
+
+			var d := opp_pos.distance_to(p)
+			if d < min_dist:
+				min_dist = d
+
+		# if somehow there are no opponents, don't change best_score here
+		if not any_opp:
+			continue
+
+		# we want the home whose *nearest* opponent is farthest away
+		if min_dist > best_score:
+			best_score = min_dist
+			best_point = p
+
+	_forward_home_point = best_point
 
 # ---------- MIDFIELDER ----------
 
@@ -947,11 +1376,59 @@ func _update_midfielder_input(delta: float) -> void:
 		_go_home_idle()
 		return
 
+	var now_sec := Time.get_ticks_msec() / 1000.0
+
+	# If we recently received+released the ball, ignore it and go home
+	if now_sec < _mid_return_home_until_sec:
+		_go_home_idle()
+		return
+
 	var origin := global_transform.origin
 	var ball_pos := ball.global_transform.origin
 
+	
+	var pending_trap := _has_pending_pass_trap(ball, now_sec)
+
+	# ✅ If a forward safety-passed to THIS midfielder, chase + first-touch trap anywhere
+	if pending_trap:
+		var flat := ball_pos - origin
+		flat.y = 0.0
+		var dist_flat := flat.length()
+		var height_diff = abs(ball_pos.y - origin.y)
+
+		_face_point(ball_pos)
+
+		# close enough → trap like the forward does
+		if dist_flat <= MID_FIRST_TRAP_RADIUS and height_diff <= BALL_CONTROL_MAX_HEIGHT:
+			if _consume_pass_trap(ball, now_sec):
+				ball.linear_velocity = Vector3.ZERO
+
+				# ✅ EXCLUDE the passer so we don't return it
+				var exclude_path := NodePath("")
+				if ball.has_meta(PASS_TRAP_META_KEY):
+					var info = ball.get_meta(PASS_TRAP_META_KEY)
+					if info is Dictionary and info.has("from_path"):
+						exclude_path = info["from_path"]
+
+				_try_pass_to_forward_only(ball, true, exclude_path)
+
+				_mid_return_home_until_sec = now_sec + 1.2
+				_go_home_idle()
+				return
+
+
+		# not there yet → sprint to receive it
+		var dir3 = flat / max(dist_flat, 0.0001)
+		_move_towards_direction(dir3, true)
+		return
+
 	# 1) Only chase if ball is in my half
 	if _is_ball_in_my_half(ball):
+		# ✅ if teammate owns the ball, midfielder goes home
+		if _teammate_controls_ball(ball_pos):
+			_go_home_idle()
+			return
+
 		# horizontal distance (XZ)
 		var flat := ball_pos - origin
 		flat.y = 0.0
@@ -991,7 +1468,7 @@ func _update_midfielder_input(delta: float) -> void:
 		# If we're under the ball but it's too high, just keep moving under it (no pass)
 
 		# --- SPRINT LOGIC ---
-		var want_sprint := my_dist_flat > 12.0  # far = sprint, close = jog
+		var want_sprint := my_dist_flat > 10  # far = sprint, close = jog
 		var dir3 = flat / max(my_dist_flat, 0.0001)
 		_move_towards_direction(dir3, want_sprint)
 		return
@@ -1039,10 +1516,11 @@ func _forward_handle_kick(ball: RigidBody3D, ball_pos: Vector3) -> void:
 
 	# If any teammate is closer to the ball than this forward,
 	# stop chasing and go back to home.
-	if _teammate_closer_to_ball_than_me(ball_pos, dist_to_ball):
+	if _bot_forward_closer_to_ball_than_me(ball_pos, dist_to_ball):
 		_forward_dribble_phase = 0
 		_go_forward_home()
 		return
+
 
 	var world := get_tree().current_scene
 	if world == null:
@@ -1067,13 +1545,16 @@ func _forward_handle_kick(ball: RigidBody3D, ball_pos: Vector3) -> void:
 
 	var now_sec := Time.get_ticks_msec() / 1000.0
 
-	# If we're not close enough to control the ball → chase it
-	if dist_to_ball > FWD_CONTROL_RADIUS or height_diff > BALL_CONTROL_MAX_HEIGHT:
+	var pending_trap := _has_pending_pass_trap(ball, now_sec)
+	var control_radius := FWD_FIRST_TRAP_RADIUS if pending_trap else FWD_CONTROL_RADIUS
 
+	# If we're not close enough to control the ball → chase it
+	if dist_to_ball > control_radius or height_diff > BALL_CONTROL_MAX_HEIGHT:
 		_face_point(ball_pos)
 		var dir_chase = to_ball / max(dist_to_ball, 0.0001)
 		_move_towards_direction(dir_chase, true)
 		return
+
 
 	# We are close: we "own" the ball now
 	_face_point(goal_pos)
@@ -1082,10 +1563,10 @@ func _forward_handle_kick(ball: RigidBody3D, ball_pos: Vector3) -> void:
 	# If this ball was just passed from a MID/FWD on our team
 	# (midfielder → forward, or forward → forward),
 	# then on the first touch we simply stop it and use stop_ball once.
-	if _forward_consume_pass_trap(ball, now_sec):
+	if pending_trap and _consume_pass_trap(ball, now_sec):
 		ball.linear_velocity = Vector3.ZERO
 		_net["stop_ball"] = true
-		_forward_dribble_phase = 0               # next time we start normal dribble cycle
+		_forward_dribble_phase = 0
 		_next_forward_kick_time_sec = now_sec + 0.3
 		print("FORWARD", owner_peer_id, " FIRST-TOUCH TRAP after pass")
 		return
@@ -1138,7 +1619,6 @@ func _forward_handle_kick(ball: RigidBody3D, ball_pos: Vector3) -> void:
 	# Keep the bot right around the ball
 	var dir_stick = to_ball / max(dist_to_ball, 0.0001)
 	_move_towards_direction(dir_stick, false)
-
 # ---------- MISC ----------
 
 func set_spawn_to_current() -> void:
@@ -1146,4 +1626,4 @@ func set_spawn_to_current() -> void:
 func _is_human_player(rec: Dictionary) -> bool:
 	# Assumes your roster sets `is_bot = true` for bot entries.
 	# Humans either don't have `is_bot` or have it = false.
-	return not bool(rec.get("is_bot", false))
+	return not bool(rec.get("is_bot", false))  
