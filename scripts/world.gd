@@ -74,8 +74,15 @@ func _ready() -> void:
 		spawner = MultiplayerSpawner.new()
 		spawner.name = "MultiplayerSpawner"
 		spawner.spawn_path = players_root.get_path()
-		spawner.add_spawnable_scene(player_scene.resource_path)
 		players_root.add_child(spawner)
+
+	# Register ALL player-type scenes that might be spawned
+	if player_scene:
+		spawner.add_spawnable_scene(player_scene.resource_path)
+
+	if bot_player_scene:
+		spawner.add_spawnable_scene(bot_player_scene.resource_path)
+
 	_create_ball_spawner()
 	_initialize_game()
 	_setup_pause_dialog()
