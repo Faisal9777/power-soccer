@@ -96,6 +96,13 @@ var _stam_root: Control
 var _stam_bar: ProgressBar
 var _can_stamina_regen : bool = true
 
+# client-side prediction bookkeeping
+var _next_input_seq: int = 0
+var _pending_inputs: Array = []   # [{seq, yaw_delta, pitch_delta}, ...]
+
+# server-side bookkeeping (used on server, and snapshot->client)
+var last_server_seq: int = -1
+
 # --- Runtime state ---
 var current_ball_path: NodePath = NodePath("")
 var current_ball: RigidBody3D = null
@@ -191,18 +198,51 @@ func get_yaw() -> Dictionary:
 	_yaw_delta_accum = 0.0
 	_pitch_delta_accum = 0.0
 	return {"yaw_delta" : yaw_delta, "pitch_delta" : pitch_delta}
-#func _debug_list_visible_to_cam():
-	#if cam == null: return
-	#for ch in get_tree().get_nodes_in_group("**unused**"): pass # no group? do recursive walk
-	#_debug_walk(self)
-#
-#func _debug_walk(n: Node) -> void:
-	#for ch in n.get_children():
-		#if ch is VisualInstance3D:
-			#var vi := ch as VisualInstance3D
-			#if (vi.layers & cam.cull_mask) != 0:
-				#print("Still visible: ", vi.get_path(), " layers=", vi.layers)
-		#_debug_walk(ch)
+
+
+func get_snapshot() -> Dictionary:
+	var snapshot := {
+			"yaw": rotation.y,
+			"pitch": (aim_pivot.rotation.x if is_instance_valid(aim_pivot) else 0.0)
+		}
+	return snapshot
+func apply_snapshot(snap: Dictionary) -> void:
+	var yaw := snap["yaw"] as float
+	var pitch := snap["pitch"] as float
+	_apply_facing_absolute(yaw, pitch)
+
+
+func get_input_data() -> Dictionary:
+	var mvx : float = 0.0
+	var mvz : float = 0.0
+	if is_mobile and is_instance_valid(joystick):
+		var v2: Vector2 = joystick.vector
+		if v2.length() > 0.01:
+			mvx = v2.x
+			mvz = v2.y	
+	else: 
+		mvx = Input.get_action_strength("move_right") - Input.get_action_strength("move_left")
+		mvz = Input.get_action_strength("move_forward") - Input.get_action_strength("move_back")
+	
+	var input := {
+			"mvx": mvx,
+			"mvz": mvz,
+			"yaw_delta": _yaw_delta_accum,
+			"pitch_delta": _pitch_delta_accum,
+			"sprint" : Input.is_action_pressed("sprint")
+		}
+	return input
+
+func update_player_states(input: Dictionary, delta) -> void:
+	if _is_frozen:
+		return
+	
+	_update_player_facing(input)
+	_handle_movement(input, delta)
+	_yaw_delta_accum = 0.0
+	_pitch_delta_accum = 0.0
+
+
 
 func _mark_self_layer_recursive(n: Node) -> void:
 	for ch in n.get_children():
@@ -232,6 +272,14 @@ func _btn_down(name: String) -> bool:
 		"shoot": return bool(_net["shoot_down"])
 		_: return false
 
+func _btn_down2(name: String, net : Dictionary) -> bool:
+	match name:
+		"sprint": return bool(net["sprint"])
+		"dribble": return bool(net["dribble"])
+		"stop_ball": return bool(net["stop_ball"])
+		"shoot": return bool(net["shoot_down"])
+		_: return false
+
 func _btn_just_pressed(name: String) -> bool:
 	match name:
 		"jump": return bool(_net["jump_pressed"])
@@ -247,6 +295,7 @@ func _btn_just_released(name: String) -> bool:
 # --- Engine callbacks ---
 
 func _ready() -> void:
+		#add a script called ClientPlayer
 	if tackle_field:
 		tackle_field.body_entered.connect(_on_tackle_field_body_entered)
 	if $KickArea:
@@ -295,8 +344,8 @@ func _process(delta: float) -> void:
 func _local_physics_process(delta: float) -> void:
 	if get_tree().get_multiplayer().get_unique_id() == owner_peer_id: 
 		#request_arrow_calculation()
+		#_handle_player_facing(delta)
 		_update_arrow_position(delta)
-
 
 func _update_arrow_position(delta: float) -> void:
 	var ball := _resolve_ball() as RigidBody3D
@@ -387,7 +436,7 @@ func simulate_server(delta: float) -> void:
 		_update_charge_server(delta)
 		apply_gravity(delta)
 		#_face_camera_yaw(delta)
-		_update_player_facing_server(delta)
+		#_update_player_facing_server(delta)
 		#_calculate_arrow_position(delta)
 		var input_dir := _get_input_dir_server()
 		_pre_move_vel = velocity
@@ -495,19 +544,30 @@ func _get_input_dir_server() -> Vector3:
 	return (right * mvx + fwd * mvz).normalized()
 
 func _handle_action_server(input_dir: Vector3, delta: float) -> void:
-	if _cooldowns["move"] == 0.0:
-		_move_server(input_dir, delta)
+	#if _cooldowns["move"] == 0.0:
+		#_move_server(input_dir, delta)
 	if _cooldowns["jump"] == 0.0:
 		_handle_jump_server()
 	_handle_kick_action_server()
 
-func _move_server(input_dir: Vector3, delta: float) -> void:
+func _handle_movement(inp, delta) -> void:
+	if _cooldowns["move"] == 0.0:
+		var yaw := rotation.y
+		var fwd := Vector3.FORWARD.rotated(Vector3.UP, yaw); fwd.y = 0.0; fwd = fwd.normalized()
+		var right := Vector3.RIGHT.rotated(Vector3.UP, yaw); right.y = 0.0; right = right.normalized()
+		var mvx := float(inp["mvx"])
+		var mvz := float(inp["mvz"])
+		var input_dir := (right * mvx + fwd * mvz).normalized()
+		var is_sprinting : bool = inp.get("sprint")
+		_move_server(input_dir, delta, is_sprinting)
+
+func _move_server(input_dir: Vector3, delta: float, is_sprinting : bool) -> void:
 	var mag := 1.0
 	if is_mobile and is_instance_valid(joystick):
 		mag = joystick.mag
 		walk_speed = walk_speed + (sprint_speed - walk_speed) * mag
 
-	var target_speed := sprint_speed if _btn_down("sprint") and _can_perform("sprint", stamina_sprint_drain * delta) else walk_speed
+	var target_speed := sprint_speed if is_sprinting and _can_perform("sprint", stamina_sprint_drain * delta) else walk_speed
 	var lateral := velocity; lateral.y = 0.0
 	var target_vel := input_dir * target_speed
 	var accel := 12.0 if is_on_floor() else 12.0 * air_control
@@ -881,6 +941,36 @@ func _update_player_facing_server(delta: float) -> void:
 		var pr := aim_pivot.rotation
 		pr.x = clamp(pr.x + clamp(dp, -0.35, 0.35), min_pitch, max_pitch)
 		aim_pivot.rotation = pr
+func _update_player_facing(cmd: Dictionary) -> void:
+	var aiming := bool(_net.get("rmb", false))
+	if aiming:
+		_face_ball_server()
+		return
+
+	var dy := float(cmd.get("yaw_delta", 0.0))
+	var dp := float(cmd.get("pitch_delta", 0.0))
+
+	# Compute new absolute yaw/pitch from deltas
+	var new_yaw := rotation.y
+	if absf(dy) > 1e-6:
+		new_yaw = wrapf(new_yaw + clamp(dy, -0.35, 0.35), -PI, PI)
+
+	var new_pitch := 0.0
+	if is_instance_valid(aim_pivot):
+		new_pitch = aim_pivot.rotation.x
+		if absf(dp) > 1e-6:
+			new_pitch = clamp(new_pitch + clamp(dp, -0.35, 0.35), min_pitch, max_pitch)
+
+	# Apply (no smoothing here; this is “input apply”)
+	_apply_facing_absolute(new_yaw, new_pitch, 1.0)
+
+func _apply_facing_absolute(yaw: float, pitch: float, alpha: float = 1.0) -> void:
+	# alpha=1.0 means snap, alpha<1 means smooth/lerp
+	rotation.y = lerp_angle(rotation.y, yaw, alpha)
+
+	if is_instance_valid(aim_pivot):
+		aim_pivot.rotation.x = lerp(aim_pivot.rotation.x, pitch, alpha)
+
 func _ensure_aim_arrow() -> void:
 	if !show_aim_arrow: return
 	aim_arrow = Node3D.new()
