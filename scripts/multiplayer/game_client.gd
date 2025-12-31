@@ -15,6 +15,10 @@ var _countdown_label: Label
 var _is_player_frozen:= true
 var _network_endpoint : Node
 
+var ball_scene : Node
+var spawns_blue : Node
+var spawns_red : Node
+
 const BLUE := Color(0.20, 0.60, 1.00)
 const RED  := Color(1.00, 0.30, 0.30)  
 func set_scoreboard(scoreboard : Control) -> void:
@@ -196,10 +200,13 @@ func _tint_recursive(n: Node, col: Color) -> void:
 		var child: Node = children[i] as Node
 		_tint_recursive(child, col)
 
-func initialize(roster : Dictionary, network_endpoint : Node, state_path : NodePath) -> void:
-	state = get_node(state_path)
+func initialize(roster : Dictionary, network_endpoint : Node, state_path : NodePath, ball_path : NodePath, blue_path : NodePath, red_path : NodePath) -> void:
+
+	state = get_node_or_null(state_path)
 	_network_endpoint = network_endpoint
-	_color_all_players(roster)
+	ball_scene = get_node_or_null(ball_path)
+	spawns_blue = get_node_or_null(blue_path)
+	spawns_red = get_node_or_null(red_path)
 
 func _ready() -> void:
 	
@@ -221,11 +228,12 @@ func _physics_process(delta: float) -> void:
 func _position_players() -> void:
 	return
 
-func start_game(snapshots : Dictionary) -> void:
-	var ball_scene : Node3D = get_node(snapshots["ball_scene"])
-	var spawns_blue : Node3D = get_node(snapshots["spawns_blue"])
-	var spawns_red : Node3D = get_node(snapshots["spawns_red"])
-	_position_players2(ball_scene, spawns_blue, spawns_red)
+func start_game() -> void:
+	#var ball_scene : Node3D = get_node(snapshots["ball_scene"])
+	#var spawns_blue : Node3D = get_node(snapshots["spawns_blue"])
+	#var spawns_red : Node3D = get_node(snapshots["spawns_red"])
+	print("starting game")
+	_position_players2()
 
 func _toggle_player_process(toggle : bool) -> void:
 	var switch := false
@@ -239,7 +247,7 @@ func _toggle_player_process(toggle : bool) -> void:
 		
 		p.freeze(switch)
 
-func _position_players2(ball_scene : Node3D, spawns_blue : Node3D, spawns_red : Node3D) -> void:
+func _position_players2() -> void:
 	var blue_placed := 1
 	var red_placed  := 1
 

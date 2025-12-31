@@ -70,6 +70,7 @@ func setup(s_cfg: Dictionary, blue: Node3D, red: Node3D, ball_sp: Node3D, scene:
 	ball_spawn   = ball_sp
 	ball_scene  = scene
 
+
 func set_scoreboard(scoreboard : Control) -> void:
 	_client.set_scoreboard(scoreboard)
 	#var stats_array = get_stats_in_array()
@@ -178,8 +179,8 @@ func _set_game() -> void:
 	"spawns_red": spawns_red.get_path()
 	
 	}
-	_client.start_game(snapshots)
-	_network_endpoint.rpc("receive_network_input_dictionary", NetCodes.Msg.GAME_BEGIN,snapshots)
+	_client.start_game()
+	_network_endpoint.rpc("receive_network_input_dictionary", NetCodes.Msg.GAME_BEGIN,{})
 
 
 func init(game : Node, network_endpoint : Node, is_also_player : bool, roster : Dictionary) -> void:
@@ -240,7 +241,7 @@ func _initialize_game_updater(roster : Dictionary) -> void:
 	_client  = GameClient.new()
 	_client.name = "GameClient"
 	_network_endpoint.add_child(_client)
-	_client.initialize(roster, _network_endpoint, state.get_path())
+	_client.initialize(roster, _network_endpoint, state.get_path(), ball_scene.get_path(), spawns_blue.get_path(), spawns_red.get_path())
 
 
 func _on_time_up_server() -> void:

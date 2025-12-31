@@ -32,7 +32,10 @@ func start_init(players: Dictionary,
 	_network_endpoint.set_game(_game_server)
 	if _is_also_player:
 		_peers_ready += 1
-	var data := {"roster" : roster, "state_path": ingame.get_path()}
+		
+	#_debug_data(roster, ingame, ball_scene, blue_spawns, red_spawns)
+	var data := {"roster" : roster, "state_path": ingame.get_path(), "ball_path" : ball_scene.get_path(),
+	"blue_path" : blue_spawns.get_path(), "red_path" : red_spawns.get_path()}
 	_network_endpoint.rpc("receive_network_input_dictionary", NetCodes.Msg.INIT_BEGIN, data)
 	
 
@@ -170,3 +173,26 @@ func _build_player_paths() -> Dictionary:
 		var p: Node = _players[peer_id]
 		paths[peer_id] = p.get_path()  # NodePath
 	return paths
+
+func _debug_data(roster: Dictionary, ingame: Node, ball_scene: Node, blue_spawns: Node, red_spawns: Node) -> void:
+	print("--- BUILD DATA DEBUG ---")
+
+	print("roster size =", roster.size(), " empty? ", roster.is_empty())
+
+	print("ingame =", ingame, " valid? ", is_instance_valid(ingame))
+	if is_instance_valid(ingame):
+		print("state_path =", ingame.get_path(), " empty? ", ingame.get_path().is_empty())
+
+	print("ball_scene =", ball_scene, " valid? ", is_instance_valid(ball_scene))
+	if is_instance_valid(ball_scene):
+		print("ball_path =", ball_scene.get_path(), " empty? ", ball_scene.get_path().is_empty())
+
+	print("blue_spawns =", blue_spawns, " valid? ", is_instance_valid(blue_spawns))
+	if is_instance_valid(blue_spawns):
+		print("blue_path =", blue_spawns.get_path(), " empty? ", blue_spawns.get_path().is_empty())
+
+	print("red_spawns =", red_spawns, " valid? ", is_instance_valid(red_spawns))
+	if is_instance_valid(red_spawns):
+		print("red_path =", red_spawns.get_path(), " empty? ", red_spawns.get_path().is_empty())
+
+	print("--- END BUILD DATA DEBUG ---")
