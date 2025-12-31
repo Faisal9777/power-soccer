@@ -121,6 +121,10 @@ func set_game(game : Node) -> void:
 	add_child(_game)
 
 func start_game() -> void:
+	var start_data = {"ball_scene" : BALL_PATH,
+	"spawns_blue": TEAM_BLUE_PATH,
+	"spawns_red": TEAM_RED_PATH
+	}
 	_game.start_game()
 
 
