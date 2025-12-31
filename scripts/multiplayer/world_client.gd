@@ -47,6 +47,7 @@ func process_input_dictionary(msg : int, value : Dictionary) -> void:
 		_network_endpoint.set_game(game)
 		game.initialize(roster, _network_endpoint, value.get("state_path"), 
 		ball_path, blue_path, red_path)
+		_resolve_players_from_roster()
 		_network_endpoint.rpc("receive_network_input_dictionary", NetCodes.Msg.INIT_DONE, {})
 	if msg == NetCodes.Msg.GAME_BEGIN:
 		_network_endpoint.start_game()
@@ -79,36 +80,61 @@ func _ready() -> void:
 func _physics_process(delta: float) -> void:
 	_my_id = multiplayer.get_unique_id()
 
+	# ---- DEBUG CHECKS (safe) ----
+	print("\n--- CLIENT _physics_process DEBUG ---")
+	print("_my_id =", _my_id)
+	print("_players has my_id? ", _players.has(_my_id), "  _players size=", _players.size())
+	print("_latest_local_snapshot empty? ", _latest_local_snapshot.is_empty(), "  keys=", _latest_local_snapshot.keys())
+	print("_next_input_seq =", _next_input_seq)
+	print("_pending_inputs size =", _pending_inputs.size())
+	print("_network_endpoint =", _network_endpoint, "  valid? ", is_instance_valid(_network_endpoint))
+	print("server_peer_id =", server_peer_id, "  input_rpc_name =", input_rpc_name)
+	print("is_server? ", multiplayer.is_server())
+	print("--- END DEBUG (pre) ---")
+	# -----------------------------
+
 	if not _players.has(_my_id):
 		return
 
-	var me := _players[_my_id]
+	var me = _players.get(_my_id, null)
+	print("me =", me, "  valid? ", is_instance_valid(me))
+	if not is_instance_valid(me):
+		return
 
-	# 1) If we have a newer server snapshot for the local player, reconcile ONCE at the physics boundary.
+	# 1) Reconcile (if snapshot exists)
 	if not _latest_local_snapshot.is_empty():
 		var snap := _latest_local_snapshot
-		_latest_local_snapshot = {}  # keep only newest; drop older automatically
+		_latest_local_snapshot = {}
+		print("Reconciling with snap.last_server_seq =", int(snap.get("last_server_seq", -999)))
 		_reconcile_local(me, snap)
 
-	# 2) Local prediction + send input to server
-	var cmd := me.get_input_data() as Dictionary
+	# 2) Local prediction + send input
+	var cmd: Dictionary = {}
+	if me.has_method("get_input_data"):
+		cmd = me.get_input_data() as Dictionary
+	else:
+		print("ERROR: me has no get_input_data()")
+		return
+
 	cmd["seq"] = _next_input_seq
 	_next_input_seq += 1
 
-	# store a deep copy so we don't accidentally mutate the buffered command later
 	var stored := cmd.duplicate(true)
-
 	_pending_inputs.append(stored)
 
-	# predict locally immediately for responsiveness
-	me.update_player_states(stored, delta)
+	if me.has_method("update_player_states"):
+		me.update_player_states(stored, delta)
+	else:
+		print("ERROR: me has no update_player_states(input, delta)")
+		return
 
-	# send to server (only if we are actually a client)
 	if not multiplayer.is_server():
-		# The RPC is expected to exist on your network endpoint on the server.
-		_network_endpoint.rpc_id(server_peer_id, input_rpc_name, stored, _my_id)
+		if is_instance_valid(_network_endpoint):
+			print("Sending input seq=", int(stored.get("seq", -1)), " to server_peer_id=", server_peer_id)
+			_network_endpoint.rpc_id(server_peer_id, input_rpc_name, stored, _my_id)
+		else:
+			print("ERROR: _network_endpoint is null/invalid, cannot rpc_id")
 
-	# Optional: keep pending buffer bounded even if something goes wrong
 	if _pending_inputs.size() > 256:
 		_pending_inputs = _pending_inputs.slice(_pending_inputs.size() - 256, _pending_inputs.size())
 
@@ -240,3 +266,19 @@ func _snap_to_xform(snap: Dictionary, fallback_node: Node) -> Transform3D:
 		return fallback_node.global_transform
 
 	return Transform3D.IDENTITY
+
+func _resolve_players_from_roster() -> void:
+	# Build unresolved list first
+	for k in GameState.roster.keys():
+		var peer_id := int(k)
+		var entry := GameState.roster[k] as Dictionary
+		var ppath: NodePath = entry.get("player_path", NodePath(""))
+
+		if ppath.is_empty():
+			print("Roster peer ", peer_id, " has EMPTY player_path")
+			continue
+
+		var node := get_node_or_null(ppath)
+
+		if node != null:
+			_players[k] = node
