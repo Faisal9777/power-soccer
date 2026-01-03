@@ -1039,11 +1039,10 @@ func _enable_local_view_now(p: Node) -> void:
 @rpc("any_peer", "unreliable_ordered")
 func receive_network_input(cmd: Dictionary, peer_id : int) -> void:
 	net.process_input(cmd, peer_id)
+	
 
 @rpc("any_peer", "reliable")
 func receive_network_input_dictionary(msg: int, value : Dictionary) -> void:
-	print("receive_network_input_dictionary, mid: ", multiplayer.get_unique_id())
-	print("receive_network_input_dictionary, with msg: ", msg)
 	net.process_input_dictionary(msg, value)
 
 @rpc("any_peer", "reliable")

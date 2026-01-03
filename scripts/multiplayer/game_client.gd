@@ -207,6 +207,7 @@ func initialize(roster : Dictionary, network_endpoint : Node, state_path : NodeP
 	ball_scene = get_node_or_null(ball_path)
 	spawns_blue = get_node_or_null(blue_path)
 	spawns_red = get_node_or_null(red_path)
+	_color_all_players(roster)
 
 func _ready() -> void:
 	
@@ -232,7 +233,6 @@ func start_game() -> void:
 	#var ball_scene : Node3D = get_node(snapshots["ball_scene"])
 	#var spawns_blue : Node3D = get_node(snapshots["spawns_blue"])
 	#var spawns_red : Node3D = get_node(snapshots["spawns_red"])
-	print("starting game")
 	_position_players2()
 
 func _toggle_player_process(toggle : bool) -> void:
