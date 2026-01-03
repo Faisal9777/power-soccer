@@ -18,7 +18,7 @@ var _players: Dictionary[int, Node] = {}  # peer_id -> Player node
 
 # --- local prediction/reconciliation ---
 var _pending_inputs: Array[Dictionary] = []   # only for LOCAL player
-var _next_input_seq: int = 0
+var _next_input_seq: int = -1
 
 var _latest_local_snapshot: Dictionary = {}   # newest snapshot waiting to reconcile
 var _latest_local_snapshot_id: int = -1       # ordering guard (server_tick or last_server_seq)
@@ -33,7 +33,8 @@ var _fixed_dt: float = 1.0 / 60.0
 @onready var _network_endpoint: Node = get_parent()
 
 func process_input(cmd: Dictionary, peer_id : int) -> void:
-	pass
+	print("snapshots: ", cmd)
+	_store_snapshots(cmd)
 
 func process_input_dictionary(msg : int, value : Dictionary) -> void:
 	if msg == NetCodes.Msg.INIT_BEGIN:
@@ -64,6 +65,7 @@ func register_player(peer_id: int, player: Node) -> void:
 # Your network endpoint can forward server snapshots into either of these.
 # I’m providing BOTH names so you can wire it easily.
 func process_snapshots(snapshots: Dictionary, server_id: int) -> void:
+	
 	_store_snapshots(snapshots)
 
 func receive_network_input(snapshots: Dictionary, server_id: int) -> void:
@@ -81,32 +83,32 @@ func _physics_process(delta: float) -> void:
 	_my_id = multiplayer.get_unique_id()
 
 	# ---- DEBUG CHECKS (safe) ----
-	print("\n--- CLIENT _physics_process DEBUG ---")
-	print("_my_id =", _my_id)
-	print("_players has my_id? ", _players.has(_my_id), "  _players size=", _players.size())
-	print("_latest_local_snapshot empty? ", _latest_local_snapshot.is_empty(), "  keys=", _latest_local_snapshot.keys())
-	print("_next_input_seq =", _next_input_seq)
-	print("_pending_inputs size =", _pending_inputs.size())
-	print("_network_endpoint =", _network_endpoint, "  valid? ", is_instance_valid(_network_endpoint))
-	print("server_peer_id =", server_peer_id, "  input_rpc_name =", input_rpc_name)
-	print("is_server? ", multiplayer.is_server())
-	print("--- END DEBUG (pre) ---")
+	#print("\n--- CLIENT _physics_process DEBUG ---")
+	#print("_my_id =", _my_id)
+	#print("_players has my_id? ", _players.has(_my_id), "  _players size=", _players.size())
+	#print("_latest_local_snapshot empty? ", _latest_local_snapshot.is_empty(), "  keys=", _latest_local_snapshot.keys())
+	#print("_next_input_seq =", _next_input_seq)
+	#print("_pending_inputs size =", _pending_inputs.size())
+	#print("_network_endpoint =", _network_endpoint, "  valid? ", is_instance_valid(_network_endpoint))
+	#print("server_peer_id =", server_peer_id, "  input_rpc_name =", input_rpc_name)
+	#print("is_server? ", multiplayer.is_server())
+	#print("--- END DEBUG (pre) ---")
 	# -----------------------------
 
 	if not _players.has(_my_id):
 		return
 
 	var me = _players.get(_my_id, null)
-	print("me =", me, "  valid? ", is_instance_valid(me))
+	#print("me =", me, "  valid? ", is_instance_valid(me))
 	if not is_instance_valid(me):
 		return
 
 	# 1) Reconcile (if snapshot exists)
-	if not _latest_local_snapshot.is_empty():
-		var snap := _latest_local_snapshot
-		_latest_local_snapshot = {}
-		print("Reconciling with snap.last_server_seq =", int(snap.get("last_server_seq", -999)))
-		_reconcile_local(me, snap)
+	#if not _latest_local_snapshot.is_empty():
+		#var snap := _latest_local_snapshot
+		#_latest_local_snapshot = {}
+		#print("Reconciling with snap.last_server_seq =", int(snap.get("last_server_seq", -999)))
+		#_reconcile_local(me, snap)
 
 	# 2) Local prediction + send input
 	var cmd: Dictionary = {}
@@ -130,7 +132,7 @@ func _physics_process(delta: float) -> void:
 
 	if not multiplayer.is_server():
 		if is_instance_valid(_network_endpoint):
-			print("Sending input seq=", int(stored.get("seq", -1)), " to server_peer_id=", server_peer_id)
+			#print("Sending input seq=", int(stored.get("seq", -1)), " to server_peer_id=", server_peer_id)
 			_network_endpoint.rpc_id(server_peer_id, input_rpc_name, stored, _my_id)
 		else:
 			print("ERROR: _network_endpoint is null/invalid, cannot rpc_id")
@@ -141,19 +143,20 @@ func _physics_process(delta: float) -> void:
 
 func _process(_delta: float) -> void:
 	# Remote interpolation runs every render frame for smoothness
+	print("in process")
 	var now := Time.get_ticks_msec()
 	var render_time := now - remote_interp_delay_ms
-
 	for peer_id in _remote_buf.keys():
+		
 		if peer_id == _my_id:
 			continue
 		if not _players.has(peer_id):
+			
 			continue
 
 		var buf: Array = _remote_buf[peer_id]
 		if buf.is_empty():
 			continue
-
 		# Drop snapshots that are definitely older than our render_time
 		while buf.size() >= 2 and int(buf[1]["t"]) <= render_time:
 			buf.pop_front()
@@ -176,14 +179,15 @@ func _process(_delta: float) -> void:
 
 		var xa := a["xform"] as Transform3D
 		var xb := b["xform"] as Transform3D
+		#dbg_print_if_moved_xz(p)
+		var inter := xa.interpolate_with(xb, alpha)
 		p.global_transform = xa.interpolate_with(xb, alpha)
-
+	print("process end")
 
 # ---------- Snapshot storage ----------
 func _store_snapshots(snapshots: Dictionary) -> void:
 	var now := Time.get_ticks_msec()
 	_my_id = multiplayer.get_unique_id()
-
 	for k in snapshots.keys():
 		var peer_id := int(k)
 		if not _players.has(peer_id):
@@ -221,7 +225,6 @@ func _store_snapshots(snapshots: Dictionary) -> void:
 			while _remote_buf[peer_id].size() > remote_buffer_max:
 				_remote_buf[peer_id].pop_front()
 
-
 # ---------- Local reconcile ----------
 func _reconcile_local(p: Node, snap: Dictionary) -> void:
 	# 1) Apply authoritative server state
@@ -250,22 +253,30 @@ func _reconcile_local(p: Node, snap: Dictionary) -> void:
 
 
 # ---------- Helpers ----------
-func _snap_to_xform(snap: Dictionary, fallback_node: Node) -> Transform3D:
-	# Best-case: snapshot already contains a Transform3D
-	if snap.has("global_transform"):
-		return snap["global_transform"] as Transform3D
-	if snap.has("xform"):
-		return snap["xform"] as Transform3D
+#func _snap_to_xform(snap: Dictionary, fallback_node: Node) -> Transform3D:
+	## Best-case: snapshot already contains a Transform3D
+	#if snap.has("global_transform"):
+		#return snap["global_transform"] as Transform3D
+	#if snap.has("xform"):
+		#return snap["xform"] as Transform3D
+#
+	## Common pattern: pos + basis
+	#if snap.has("pos") and snap.has("basis"):
+		#return Transform3D(snap["basis"] as Basis, snap["pos"] as Vector3)
+#
+	## Fallback: keep whatever the node currently has (prevents crashing)
+	#if fallback_node != null:
+		#return fallback_node.global_transform
+#
+	#return Transform3D.IDENTITY
 
-	# Common pattern: pos + basis
-	if snap.has("pos") and snap.has("basis"):
-		return Transform3D(snap["basis"] as Basis, snap["pos"] as Vector3)
+func _snap_to_xform(snap: Dictionary, fallback_node: Node3D) -> Transform3D:
+	var pos := snap.get("pos", fallback_node.global_position) as Vector3
 
-	# Fallback: keep whatever the node currently has (prevents crashing)
-	if fallback_node != null:
-		return fallback_node.global_transform
+	# keep current basis (rotation) so interpolation doesn't touch rotation
+	var basis := fallback_node.global_transform.basis
 
-	return Transform3D.IDENTITY
+	return Transform3D(basis, pos)
 
 func _resolve_players_from_roster() -> void:
 	# Build unresolved list first

@@ -82,6 +82,8 @@ var _aim_el := 0.0      # pitch around the ball (up/down)
 var _captured := true
 var _yaw_delta_accum: float = 0.0  # collected since last send
 var _pitch_delta_accum := 0.0
+var _yaw_abs: float = 0.0
+var _pitch_abs: float = 0.0
 var _is_frozen := true
 const SELF_LAYER_UI := 19                     # the checkbox number in the inspector
 const SELF_LAYER_MASK := 1 << (SELF_LAYER_UI - 1)  # convert 1..20 -> bit 0..19
@@ -202,6 +204,8 @@ func get_yaw() -> Dictionary:
 
 func get_snapshot() -> Dictionary:
 	var snapshot := {
+			"pos" : global_position,
+			"vel": velocity,
 			"yaw": rotation.y,
 			"pitch": (aim_pivot.rotation.x if is_instance_valid(aim_pivot) else 0.0)
 		}
@@ -211,6 +215,27 @@ func apply_snapshot(snap: Dictionary) -> void:
 	var pitch := snap["pitch"] as float
 	_apply_facing_absolute(yaw, pitch)
 
+
+#func get_input_data() -> Dictionary:
+	#var mvx : float = 0.0
+	#var mvz : float = 0.0
+	#if is_mobile and is_instance_valid(joystick):
+		#var v2: Vector2 = joystick.vector
+		#if v2.length() > 0.01:
+			#mvx = v2.x
+			#mvz = v2.y	
+	#else: 
+		#mvx = Input.get_action_strength("move_right") - Input.get_action_strength("move_left")
+		#mvz = Input.get_action_strength("move_forward") - Input.get_action_strength("move_back")
+	#
+	#var input := {
+			#"mvx": mvx,
+			#"mvz": mvz,
+			#"yaw_delta": _yaw_delta_accum,
+			#"pitch_delta": _pitch_delta_accum,
+			#"sprint" : Input.is_action_pressed("sprint")
+		#}
+	#return input
 
 func get_input_data() -> Dictionary:
 	var mvx : float = 0.0
@@ -227,8 +252,8 @@ func get_input_data() -> Dictionary:
 	var input := {
 			"mvx": mvx,
 			"mvz": mvz,
-			"yaw_delta": _yaw_delta_accum,
-			"pitch_delta": _pitch_delta_accum,
+			"yaw": _yaw_abs,
+			"pitch": _pitch_abs,
 			"sprint" : Input.is_action_pressed("sprint")
 		}
 	return input
@@ -239,8 +264,8 @@ func update_player_states(input: Dictionary, delta) -> void:
 	
 	_update_player_facing(input)
 	_handle_movement(input, delta)
-	_yaw_delta_accum = 0.0
-	_pitch_delta_accum = 0.0
+	#_yaw_delta_accum = 0.0
+	#_pitch_delta_accum = 0.0
 
 
 
@@ -296,6 +321,8 @@ func _btn_just_released(name: String) -> bool:
 
 func _ready() -> void:
 		#add a script called ClientPlayer
+	_yaw_abs = rotation.y
+	_pitch_abs = 0.0  # or whatever you use
 	if tackle_field:
 		tackle_field.body_entered.connect(_on_tackle_field_body_entered)
 	if $KickArea:
@@ -458,6 +485,47 @@ func _is_valid_action(action: String) -> bool:
 	return ["sprint", "tackle", "shoot", "dribble", "jump", "stop"].has(action)
 
 
+#func _unhandled_input(event: InputEvent) -> void:
+	#if !_is_local_owner():
+		#return
+	## Optional aim toggle you already had...
+	#if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT:
+		#if event.pressed:
+			#_captured = false
+			#Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+			## initialize arrow orbit from current facing: point to frontmost spot
+			#if not current_ball:
+				#_resolve_ball()
+			#if current_ball and is_instance_valid(current_ball):
+				#var C := current_ball.global_transform.origin
+				#var pivot := get_node_or_null("AimPivot") as Node3D
+				#var P := (pivot.global_transform.origin if is_instance_valid(pivot) else global_transform.origin)
+				## front = from center toward player; start az=0, el=0 -> frontmost point
+				#_aim_az = 0.0
+				#_aim_el = 0.0
+		#else:
+			#_captured = true
+			#Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+#
+		#return
+#
+	## Mouse move → just accumulate yaw delta; no local rotation
+	#if event is InputEventMouseMotion:
+		#var mm := event as InputEventMouseMotion
+		#
+		#if _is_aiming():
+			## Arrow-only orbit control (do NOT rotate character)
+			#_aim_az +=  mm.relative.x * aim_sens_x
+			#_aim_el += mm.relative.y * aim_sens_y   # invert for typical feel
+			## keep angles reasonable
+			#_aim_az = wrapf(_aim_az, -PI, PI)
+			#_aim_el = clamp(_aim_el, aim_pitch_min, aim_pitch_max)
+		#else:
+			## Normal mode: accumulate facing deltas (character will rotate on server)
+			#_yaw_delta_accum   += -mm.relative.x * mouse_sens
+			#_pitch_delta_accum += -mm.relative.y * mouse_sens
+		## (If you track local camera pitch, you can still update that here; it’s local-only)
+
 func _unhandled_input(event: InputEvent) -> void:
 	if !_is_local_owner():
 		return
@@ -487,17 +555,16 @@ func _unhandled_input(event: InputEvent) -> void:
 		var mm := event as InputEventMouseMotion
 		
 		if _is_aiming():
-			# Arrow-only orbit control (do NOT rotate character)
 			_aim_az +=  mm.relative.x * aim_sens_x
-			_aim_el += mm.relative.y * aim_sens_y   # invert for typical feel
-			# keep angles reasonable
+			_aim_el +=  mm.relative.y * aim_sens_y
 			_aim_az = wrapf(_aim_az, -PI, PI)
 			_aim_el = clamp(_aim_el, aim_pitch_min, aim_pitch_max)
 		else:
-			# Normal mode: accumulate facing deltas (character will rotate on server)
-			_yaw_delta_accum   += -mm.relative.x * mouse_sens
-			_pitch_delta_accum += -mm.relative.y * mouse_sens
-		# (If you track local camera pitch, you can still update that here; it’s local-only)
+			# ✅ change: update absolute angles directly (still using relative mouse)
+			_yaw_abs   = wrapf(_yaw_abs + (-mm.relative.x * mouse_sens), -PI, PI)
+			_pitch_abs = clamp(_pitch_abs + (-mm.relative.y * mouse_sens), aim_pitch_min, aim_pitch_max)
+
+
 func _update_stamina_ui_from_replication() -> void:
 	# _stamina is replicated from server → owner via MultiplayerSynchronizer
 	var pct := 100.0 * (_stamina / maxf(1e-6, stamina_max))
@@ -941,28 +1008,49 @@ func _update_player_facing_server(delta: float) -> void:
 		var pr := aim_pivot.rotation
 		pr.x = clamp(pr.x + clamp(dp, -0.35, 0.35), min_pitch, max_pitch)
 		aim_pivot.rotation = pr
+#func _update_player_facing(cmd: Dictionary) -> void:
+	#var aiming := bool(_net.get("rmb", false))
+	#if aiming:
+		#_face_ball_server()
+		#return
+#
+	#var dy := float(cmd.get("yaw_delta", 0.0))
+	#var dp := float(cmd.get("pitch_delta", 0.0))
+#
+	## Compute new absolute yaw/pitch from deltas
+	#var new_yaw := rotation.y
+	#if absf(dy) > 1e-6:
+		#new_yaw = wrapf(new_yaw + clamp(dy, -0.35, 0.35), -PI, PI)
+#
+	#var new_pitch := 0.0
+	#if is_instance_valid(aim_pivot):
+		#new_pitch = aim_pivot.rotation.x
+		#if absf(dp) > 1e-6:
+			#new_pitch = clamp(new_pitch + clamp(dp, -0.35, 0.35), min_pitch, max_pitch)
+#
+	## Apply (no smoothing here; this is “input apply”)
+	#_apply_facing_absolute(new_yaw, new_pitch, 1.0)
+
 func _update_player_facing(cmd: Dictionary) -> void:
 	var aiming := bool(_net.get("rmb", false))
 	if aiming:
 		_face_ball_server()
 		return
 
-	var dy := float(cmd.get("yaw_delta", 0.0))
-	var dp := float(cmd.get("pitch_delta", 0.0))
-
-	# Compute new absolute yaw/pitch from deltas
-	var new_yaw := rotation.y
-	if absf(dy) > 1e-6:
-		new_yaw = wrapf(new_yaw + clamp(dy, -0.35, 0.35), -PI, PI)
-
-	var new_pitch := 0.0
+	# ✅ Read absolute angles from the command (robust for unreliable + latest-wins)
+	var yaw := float(cmd.get("yaw", rotation.y))
+	var pitch_default := 0.0
 	if is_instance_valid(aim_pivot):
-		new_pitch = aim_pivot.rotation.x
-		if absf(dp) > 1e-6:
-			new_pitch = clamp(new_pitch + clamp(dp, -0.35, 0.35), min_pitch, max_pitch)
+		pitch_default = aim_pivot.rotation.x
 
-	# Apply (no smoothing here; this is “input apply”)
-	_apply_facing_absolute(new_yaw, new_pitch, 1.0)
+	var pitch := float(cmd.get("pitch", pitch_default))
+
+	# Keep them in safe ranges (server-side sanity)
+	yaw = wrapf(yaw, -PI, PI)
+	pitch = clamp(pitch, min_pitch, max_pitch)
+
+	# Apply (no smoothing; this is authoritative input apply)
+	_apply_facing_absolute(yaw, pitch, 1.0)
 
 func _apply_facing_absolute(yaw: float, pitch: float, alpha: float = 1.0) -> void:
 	# alpha=1.0 means snap, alpha<1 means smooth/lerp
