@@ -19,7 +19,7 @@ var _next_bot_id: int = 100000  # fake peer ids for bots
 # (Optional: if you kept a bottom TeamButton, you can remove it or ignore it.)
 
 var _ui_ids: Array[int] = []  # peer_id order as shown (not needed for Tree, kept for reference)
-const WORLD_SCENE := "res://world.tscn"
+const WORLD_SCENE := "res://scenes/world.tscn"
 const Team = GameState.Team
 const TEAM_COLOR := {
 	GameState.Team.BLUE: Color(0.2, 0.6, 1.0),
@@ -370,7 +370,7 @@ func _on_leave() -> void:
 		rpc("_rpc_host_is_leaving")
 	GameState.reset_lobby()
 	Network.close_connection()
-	get_tree().change_scene_to_file("res://title_screen.tscn")
+	get_tree().change_scene_to_file("res://scenes/title_screen.tscn")
 
 func _on_host_gone() -> void:
 	print("[lobby] host disconnected or left")
@@ -378,7 +378,7 @@ func _on_host_gone() -> void:
 	# Clear local state and return to title
 	GameState.reset_lobby()
 	Network.close_connection()
-	get_tree().change_scene_to_file("res://title_screen.tscn")
+	get_tree().change_scene_to_file("res://scenes/title_screen.tscn")
 
 # -------------------- Helpers --------------------
 
@@ -660,7 +660,7 @@ func _on_start_pressed() -> void:
 
 func _on_leave_pressed() -> void:
 	GameState.reset_lobby()
-	get_tree().change_scene_to_file("res://title_screen.tscn")  # or wherever
+	get_tree().change_scene_to_file("res://scenes/title_screen.tscn")  # or wherever
 func _update_status() -> void:
 	if multiplayer.is_server():
 		status_label.text = "HOST (dedicated)" if GameState.is_dedicated_server() else "HOST"

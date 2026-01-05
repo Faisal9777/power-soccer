@@ -1,5 +1,5 @@
 extends CharacterBody3D
-
+class_name Player
 # --- Tunables (unchanged) ---
 @export var walk_speed: float = 6.0
 @export var sprint_speed: float = 9.5
@@ -7,6 +7,7 @@ extends CharacterBody3D
 @export var gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
 @export var air_control: float = 0.4
 
+@export var tackle_cooldown_dur: float = 20.0  # 20 seconds cooldown
 @export var kick_force: float = 16.0
 @export var kick_up: float = 3.0
 @export var shoot_cooldown: float = 0.25
@@ -54,6 +55,12 @@ extends CharacterBody3D
 @export var tackle_speed_curve: float = 1.2
 @export var tackle_cost_mul: float = 0.5
 @export var tackle_require_floor: bool = true
+# --- Tackle phasing (pass through other players while tackling) ---
+@export var tackle_phase_through_players: bool = true
+
+var _saved_body_layer: int = 0
+var _saved_body_mask: int = 0
+var _tackle_phasing: bool = false
 @export var owner_peer_id: int = 1
 @export var characters_layer_bit: int = 2
 @export var ball_layer_bit: int = 3
@@ -79,6 +86,11 @@ extends CharacterBody3D
 @export var aim_sens_y := 0.010
 @export var aim_pitch_min := deg_to_rad(-80)
 @export var aim_pitch_max := deg_to_rad( 80)
+# --- Abilities ---
+@export var grapple_max_dist: float = 60.0
+@export var grapple_hit_mask: int = 1  # set this to your “world/walls” layers
+@export var grapple_shot_scene: PackedScene = preload("res://scenes/GrappleShot.tscn")
+
 
 var _aim_az := 0.0      # yaw around the ball (left/right)
 var _aim_el := 0.0      # pitch around the ball (up/down)
@@ -105,6 +117,8 @@ var current_ball_path: NodePath = NodePath("")
 var current_ball: RigidBody3D = null
 
 var aim_active: bool = false
+var grapple_mode_active: bool = false
+
 var aim_dir: Vector3 = Vector3.ZERO
 var aim_contact: Vector3 = Vector3.ZERO
 #var arrow_position: Vector3 = Vector3.ZERO
@@ -122,14 +136,51 @@ var _pre_move_vel: Vector3
 var tackle_active: bool = false
 var tackle_time_left: float = 0.0
 var tackle_velocity: Vector3 = Vector3.ZERO
+# replicated to owner (UI only)
+var tackle_cd_ui: float = 0.0
+
+@export var tackle_steal_window: float = 0.20  # seconds (tune: 0.15–0.30)
+
+var _tackle_steal_left: float = 0.0
+var _tackle_has_stolen: bool = false
+
 
 # Latch helpers (no reparenting in netcode—see notes below)
+@export var latch_stuck_layer: int = 8
+@export var latch_unstuck_player_move_dist: float = 0.15  # meters; tweak
+
+var _latch_stuck: bool = false
+var _latch_stuck_player_pos: Vector3 = Vector3.ZERO
+
+func _layer_bit(layer_num: int) -> int:
+	return 1 << (layer_num - 1)
+
 var ball_latched: bool = false
 var _latched_offset_local: Vector3 = Vector3.ZERO
 var _saved_ball_layer: int = 0
 var _saved_ball_mask: int = 0
 var _latched_ball: RigidBody3D = null
 var latch_mode_active: bool = false   # toggle state
+# Layer numbers: 1 -> (1<<0), 3 -> (1<<2), 8 -> (1<<7)
+@export var latch_block_mask: int = (1 << 0) | (1 << 2) | (1 << 7)
+# set to walls + players layers (example below)
+@export var latch_cast_margin: float = 0.02
+const LATCH_EPS := 0.001
+@export var latch_max_dist: float = 4.0  # meters (make smaller = harder to latch)
+
+var _latch_shape := SphereShape3D.new()
+var _latch_q := PhysicsShapeQueryParameters3D.new()
+
+@export var assist_pass_cooldown_dur: float = 20.0
+@export var assist_pass_max_dist: float = 100.0     # how far teammate can be
+@export var assist_pass_force: float = 5.0        # base impulse strength
+@export var assist_pass_lift: float = 0.6          # little arc
+@export var assist_pass_cone_dot: float = -0.2     # -1..1 (higher = more forward-only)
+
+const PASS_TRAP_META_KEY := "pass_trap_info"
+
+var assist_pass_cd_ui: float = 0.0   # replicated to owner for UI
+
 
 var cam: Camera3D = null  # local-only reference
 var _ui_charge := 0.0  # client-only visual charge
@@ -140,7 +191,8 @@ var _ui_charge := 0.0  # client-only visual charge
 @onready var ball_latch_anchor: Node3D = Node3D.new()
 @onready var is_mobile: bool = OS.has_feature("mobile")
 @onready var joystick: Node = null
-var _cooldowns := {"shoot": 0.0, "move": 0.0, "jump": 0.0}
+# Add "tackle": 0.0 to the dictionary
+var _cooldowns := {"shoot": 0.0, "move": 0.0, "jump": 0.0, "tackle": 0.0, "assist_pass": 0.0}
 
 # --- Net input state (fed by world.gd on the server) ---
 var _net := {
@@ -157,12 +209,18 @@ var _net := {
 	"facing": {"yaw_delta" : _yaw_delta_accum, "pitch_delta" : _pitch_delta_accum},
 	"aim_position": null,
 	"latch_toggle": false,
+	"grapple_toggle": false,
+	"assist_pass_pressed": false,
 	"cam_yaw": 0.0        # ⬅️ ADD THIS
 }
 
 
 func apply_net_input(d: Dictionary) -> void:
 	# SERVER ONLY: called by world.gd before simulate_server()
+	if d.get("assist_pass_pressed", false):
+		var who := "SERVER" if multiplayer.is_server() else "CLIENT"
+		print("PLAYER GOT assist_pass_pressed! who=", who)
+
 	for k in _net.keys():
 		if d.has(k):
 			_net[k] = d[k]
@@ -173,20 +231,13 @@ func apply_net_input(d: Dictionary) -> void:
 			#else:
 				#_net[k] = d[k]
 
-func attach_camera(c: Camera3D, j : Node) -> void:
-
+func attach_camera(c: Camera3D, j: Node) -> void:
 	joystick = j
 	cam = c
 	if cam and _is_local_owner():
-		#print("hiding mesh for player: ", owner_peer_id)
-		#_log_pid("done in: ")
-	# Tag ONLY this player's visuals with the extra bit (additive!)
-		#_mark_self_layer_recursive(self)
-		##_disable_self_shadows_recursive(self)
-		## Cull only this extra bit on this camera
-		#cam.cull_mask &= ~SELF_LAYER_MASK
+		_mark_self_layer_recursive(self)  # ✅ move my visuals to SELF layer only
 		cam.current = true
-		cam.near = max(cam.near, 0.12) # small near-plane helps
+		cam.near = max(cam.near, 0.12)
 
 # Aim the camera at a world position.
 # yaw_only=true keeps the camera level (no pitch); set false to let it tilt up/down.
@@ -247,8 +298,10 @@ func _btn_just_pressed(name: String) -> bool:
 	match name:
 		"jump": return bool(_net["jump_pressed"])
 		"tackle": return bool(_net["tackle_pressed"])
+		"assist_pass": return bool(_net["assist_pass_pressed"])
 		"shoot": return false
 		_: return false
+
 
 func _btn_just_released(name: String) -> bool:
 	match name:
@@ -258,6 +311,7 @@ func _btn_just_released(name: String) -> bool:
 # --- Engine callbacks ---
 
 func _ready() -> void:
+	add_to_group("players")
 	if tackle_field:
 		tackle_field.body_entered.connect(_on_tackle_field_body_entered)
 	if $KickArea:
@@ -397,14 +451,19 @@ func _update_arrow_position(delta: float) -> void:
 	aim_arrow.scale = Vector3(1.0, 1.0, maxf(vec.length(), aim_min_len))
 
 func _resolve_ball() -> RigidBody3D:
+	# ✅ If latched, this is always the truth
+	if ball_latched and _latched_ball != null and is_instance_valid(_latched_ball):
+		current_ball = _latched_ball
+		current_ball_path = _latched_ball.get_path()
+		return current_ball
+
 	if String(current_ball_path) == "":
 		current_ball = null
 		return null
-	# If cached and still valid, reuse
-	if current_ball != null and is_instance_valid(current_ball):
-		if current_ball.get_path() == current_ball_path:
-			return current_ball
-	# Resolve fresh
+
+	if current_ball != null and is_instance_valid(current_ball) and current_ball.get_path() == current_ball_path:
+		return current_ball
+
 	current_ball = get_node_or_null(current_ball_path) as RigidBody3D
 	return current_ball
 
@@ -416,6 +475,8 @@ func _local_process(delta: float) -> void:
 		_update_charge_ui_from_replication()
 	if _stam_bar:
 		_update_stamina_ui_from_replication()
+	if !is_mobile and grapple_mode_active and Input.is_action_just_pressed("grapple_fire"):
+		_fire_grapple_visual_center()
 
 func _update_charge_ui_from_replication() -> void:
 	# _charge here is replicated from the server via MultiplayerSynchronizer
@@ -431,8 +492,10 @@ func simulate_server(delta: float) -> void:
 
 	_update_cooldowns(delta)
 	_update_charge_server(delta)
-	_update_latched_ball_server(delta)
 	_handle_latch_mode_server(delta)
+
+	_handle_grapple_mode_server()  # ✅ ADD THIS
+	_handle_assist_pass_server()  # ✅ ADD THIS
 
 	apply_gravity(delta)
 	_update_player_facing_server(delta)
@@ -452,6 +515,7 @@ func simulate_server(delta: float) -> void:
 	_handle_tackle_input_server(delta)
 	_handle_action_server(input_dir, delta)
 	_update_stamina_server(delta)
+	_update_latched_ball_server(delta)
 
 func _can_perform(action: String, stamina_required: float, spend: bool = true) -> bool:
 	# Special case: "stamina_regen" is just a condition check (no cost)
@@ -533,6 +597,13 @@ func _update_stamina_server(delta: float) -> void:
 			_stamina = minf(stamina_max, _stamina + stamina_regen_rate * delta)
 
 func _update_charge_server(delta: float) -> void:
+	if grapple_mode_active:
+		_charge = 0.0
+		if is_instance_valid(_charge_bar):
+			_charge_bar.value = 0.0
+			_charge_bar.visible = false
+		return
+
 	var down := _btn_down("shoot")
 	if down and charge_time_to_max > 0.0:
 		_charge = minf(1.0, _charge + charge_rate_mul * (delta / charge_time_to_max))
@@ -547,8 +618,16 @@ func _update_charge_server(delta: float) -> void:
 		#print("charge bar does not exist for the player with id: ", owner_peer_id)
 
 func _update_cooldowns(delta: float) -> void:
+	var prev_t = _cooldowns["tackle"]
+	var prev_p = _cooldowns["assist_pass"]
 	for k in _cooldowns.keys():
 		_cooldowns[k] = max(_cooldowns[k] - delta, 0.0)
+
+	if prev_p > 0.0 and _cooldowns["assist_pass"] == 0.0:
+		assist_pass_cd_ui = 0.0
+	# when tackle cooldown hits zero, notify UI once
+	if prev_t > 0.0 and _cooldowns["tackle"] == 0.0:
+		tackle_cd_ui = 0.0
 
 func apply_gravity(delta: float) -> void:
 	if !is_on_floor():
@@ -676,9 +755,10 @@ func perform_dribble_server(direction: int) -> void:
 	current_ball.apply_impulse(J, local_contact)
 
 func _handle_shoot_server() -> void:
-	# Use edge up for the release shot
+	if grapple_mode_active:
+		return
+
 	if aim_active and current_ball != null and _btn_just_released("shoot"):
-		#print("shoot all conditions have been met")
 		_kick_at_contact_server()
 
 func _kick_at_contact_server() -> void:
@@ -782,27 +862,22 @@ func _debug_red_dot(ball: Node3D,p: Vector3, seconds: float = 1.5, size: float =
 	t.timeout.connect(func(): if is_instance_valid(mi): mi.queue_free())
 
 func _handle_tackle_input_server(delta: float) -> void:
-	
-	#if _net["tackle_pressed"] == 0: return
-	#_net["tackle_pressed"] = _net["tackle_pressed"] - 1
 	var can_perform : bool = _net["tackle_pressed"]
-	#if _net["tackle_pressed"]>0:
-		#print("the tackle pressed counter: ", _net["tackle_pressed"])
-		#_net["tackle_pressed"] = _net["tackle_pressed"] - 1
-		#can_perform = true  
+	
 	if tackle_active: 
 		_update_tackle_server(delta)
 		return
-	#if !_btn_just_pressed("tackle"): return
-	#if not Input.is_action_just_pressed("tackle"): return
-	if tackle_require_floor and !is_on_floor(): return
-	if can_perform : _start_tackle_server()
-	#_net["tackle_pressed"] = false
 
+	if tackle_require_floor and !is_on_floor(): 
+		return
+
+	# CHECK COOLDOWN HERE
+	if can_perform and _cooldowns["tackle"] <= 0.0: 
+		_start_tackle_server()
+		
 func _start_tackle_server() -> void:
 	var fwd := Vector3.ZERO
 
-	# 1) If we’re aiming and have a ball, tackle TOWARD the ball
 	_resolve_ball()
 	if aim_active and current_ball != null and is_instance_valid(current_ball):
 		var to_ball := current_ball.global_transform.origin - global_transform.origin
@@ -810,7 +885,6 @@ func _start_tackle_server() -> void:
 		if to_ball.length() > 0.001:
 			fwd = to_ball.normalized()
 
-	# 2) Fallback: old behavior (use character's forward)
 	if fwd == Vector3.ZERO:
 		fwd = -global_transform.basis.z
 		fwd.y = 0.0
@@ -834,14 +908,21 @@ func _start_tackle_server() -> void:
 	if not _can_perform("tackle", stamina_tackle_cost + tackle_cost_mul * slide_speed):
 		return
 
+	# ✅ APPLY COOLDOWN HERE
+	#_cooldowns["tackle"] = tackle_cooldown_dur
+	tackle_cd_ui = tackle_cooldown_dur
 	tackle_time_left = lerpf(tackle_dur_min, tackle_dur_max, w_dur)
 	tackle_active = true
+	_enter_tackle_phasing()
+	_tackle_steal_left = tackle_steal_window
+	_tackle_has_stolen = false
 
 func _update_tackle_server(delta: float) -> void:
 	# keep the ball glued while latched (server-side tick snap)
 	
 	#_update_latched_ball_server(delta)
 	# slide & gravity
+	_tackle_steal_left = maxf(0.0, _tackle_steal_left - delta)
 	var v_xz := Vector3(tackle_velocity.x, 0.0, tackle_velocity.z)
 	var dec := tackle_decel * delta
 	var new_len := maxf(v_xz.length() - dec, 0.0)
@@ -864,25 +945,45 @@ func _update_tackle_server(delta: float) -> void:
 func _latch_ball_server(ball: RigidBody3D) -> void:
 	if ball == null:
 		return
-
+	current_ball = ball
+	current_ball_path = ball.get_path()
+	aim_active = true
 	_latched_ball = ball
+	_latch_stuck = false
+	_latch_stuck_player_pos = global_position
 
 	# Save collisions to restore later
 	_saved_ball_layer = ball.collision_layer
 	_saved_ball_mask  = ball.collision_mask
 
-	# Compute offset: anchor^-1 * ball (so ball = anchor * offset each frame)
 	_ball_offset = ball_latch_anchor.global_transform.affine_inverse() * ball.global_transform
 
-	# Make physics tame while carried (no reparent)
 	ball.freeze = true
 	ball.linear_velocity  = Vector3.ZERO
 	ball.angular_velocity = Vector3.ZERO
-	# Optional: avoid blocking while carried (do replicate these to clients via tiny RPC if you need)
 	ball.collision_layer = 0
 	ball.collision_mask  = 0
 
+	_latch_shape.radius = _get_ball_radius_world(ball) + latch_cast_margin
+
+	_latch_q.shape = _latch_shape
+	_latch_q.margin = 0.0
+	_latch_q.collision_mask = latch_block_mask
+	_latch_q.exclude = [self.get_rid()]
+
 	ball_latched = true
+
+	# ✅ If the ball is ALREADY touching layer 8 when latch starts, stick immediately.
+	if _is_latch_touching_layer(latch_stuck_layer, ball.global_position):
+		_latch_stuck = true
+		_latch_stuck_player_pos = global_position
+
+func _ball_within_latch_range(ball: Node3D) -> bool:
+	if ball == null or !is_instance_valid(ball):
+		return false
+	var p := global_transform.origin
+	var b := ball.global_transform.origin
+	return p.distance_to(b) <= latch_max_dist
 
 # Call when tackle ends
 func _unlatch_ball_server() -> void:
@@ -891,70 +992,135 @@ func _unlatch_ball_server() -> void:
 
 	var ball := _latched_ball
 	_latched_ball = null
-	#ball_latch_anchor = null
 	ball_latched = false
+
+	# ✅ clear stuck state no matter what
+	_latch_stuck = false
 
 	# Restore physics/collisions
 	ball.freeze = false
 	ball.collision_layer = _saved_ball_layer
 	ball.collision_mask  = _saved_ball_mask
 
-	# Optional: give it a finishing shove
-	# ball.apply_impulse(impulse_vector, Vector3.ZERO)
-
 func _handle_latch_mode_server(delta: float) -> void:
-	# One-shot latch toggle from network input
+	# Edge-triggered latch toggle from network input
 	var toggle := bool(_net.get("latch_toggle", false))
-
 	if toggle:
 		# consume the edge so it won't re-trigger
 		_net["latch_toggle"] = false
 
+		# If currently holding, toggle OFF
 		if latch_mode_active:
-			# TURN OFF
 			latch_mode_active = false
 			if ball_latched:
 				_unlatch_ball_server()
-		else:
-			# TURN ON (only if enough stamina)
-			if _stamina >= latch_min_to_start:
-				latch_mode_active = true
+			return
 
-				# ⬇️ IMPORTANT: if we already have a ball in range, latch it now
-				var ball := _resolve_ball()
-				if ball != null and is_instance_valid(ball):
-					_latch_ball_server(ball)
-				# otherwise: the next time a ball enters KickArea / TackleField,
-				# _on_kick_area_body_entered or _on_tackle_field_body_entered
-				# will latch it because latch_mode_active == true
+		# Otherwise trying to toggle ON:
+		# 1) Need stamina
+		if _stamina < latch_min_to_start:
+			return
 
-	# While active, drain stamina and auto-unlatch when empty
-	if latch_mode_active:
-		if ball_latched or current_ball != null:
-			_stamina = maxf(0.0, _stamina - latch_stamina_drain * delta)
-			if _stamina <= 0.0:
-				latch_mode_active = false
-				if ball_latched:
-					_unlatch_ball_server()
+		# 2) Need a ball AND it must be close enough RIGHT NOW
+		var ball := _resolve_ball()
+		if ball == null or !is_instance_valid(ball):
+			return
+		if !_ball_within_latch_range(ball):
+			return
 
+		# ✅ Only now do we enable latch mode and latch immediately
+		latch_mode_active = true
+		_latch_ball_server(ball)
+
+	# Drain stamina ONLY while actually latched
+	if latch_mode_active and ball_latched and is_instance_valid(_latched_ball):
+		_stamina = maxf(0.0, _stamina - latch_stamina_drain * delta)
+
+		# Auto-unlatch when empty
+		if _stamina <= 0.0:
+			latch_mode_active = false
+			_unlatch_ball_server()
 
 func _update_latched_ball_server(delta: float) -> void:
-	if ball_latched and _latched_ball != null and ball_latch_anchor != null:
-		var target_xf: Transform3D = ball_latch_anchor.global_transform * _ball_offset
-		_latched_ball.global_transform = target_xf
-		# keep velocities calm while carried
-		_latched_ball.linear_velocity  = Vector3.ZERO
+	if !ball_latched or _latched_ball == null or ball_latch_anchor == null:
+		return
+
+	# ✅ If we are stuck, do not move ball at all until player moves enough.
+	if _latch_stuck:
+		_latched_ball.linear_velocity = Vector3.ZERO
 		_latched_ball.angular_velocity = Vector3.ZERO
-		
+
+		if global_position.distance_to(_latch_stuck_player_pos) <= latch_unstuck_player_move_dist:
+			return
+		# Player moved (back/forward/sideways) → unstick
+		_latch_stuck = false
+
+	# ✅ If we are not stuck yet, but we are currently touching layer 8, stick now.
+	if not _latch_stuck and _is_latch_touching_layer(latch_stuck_layer, _latched_ball.global_position):
+		_latch_stuck = true
+		_latch_stuck_player_pos = global_position
+		return
+
+	var target_xf: Transform3D = ball_latch_anchor.global_transform * _ball_offset
+
+	var from_pos := _latched_ball.global_position
+	var to_pos   := target_xf.origin
+	var motion   := to_pos - from_pos
+
+	if motion.length_squared() < 1e-10:
+		_latched_ball.global_transform = target_xf
+		_latched_ball.linear_velocity = Vector3.ZERO
+		_latched_ball.angular_velocity = Vector3.ZERO
+		return
+
+	var space := get_world_3d().direct_space_state
+
+	_latch_q.transform = Transform3D(Basis(), from_pos)
+	_latch_q.motion = motion
+
+	var fractions: PackedFloat32Array = space.cast_motion(_latch_q)
+	var safe := 1.0
+	if fractions.size() >= 1:
+		safe = float(fractions[0])
+
+	safe = clampf(safe - LATCH_EPS, 0.0, 1.0)
+	var new_pos := from_pos + motion * safe
+
+	# ✅ If blocked, check WHAT blocked us; if it's on layer 8 => hard-freeze latch movement
+	if safe < 0.999:
+		var rest := space.get_rest_info(_latch_q) # uses same motion sweep
+		var col = rest.get("collider")
+		if col is CollisionObject3D:
+			var stuck_mask := _layer_bit(latch_stuck_layer)
+			if (col.collision_layer & stuck_mask) != 0:
+				# Place ball at safe position and freeze latch motion entirely
+				var xf := target_xf
+				xf.origin = new_pos
+				_latched_ball.global_transform = xf
+				_latched_ball.linear_velocity = Vector3.ZERO
+				_latched_ball.angular_velocity = Vector3.ZERO
+
+				_latch_stuck = true
+				_latch_stuck_player_pos = global_position
+				return
+
+	# Normal latch movement (not stuck)
+	var xf2 := target_xf
+	xf2.origin = new_pos
+	_latched_ball.global_transform = xf2
+	_latched_ball.linear_velocity = Vector3.ZERO
+	_latched_ball.angular_velocity = Vector3.ZERO
+
 func _end_tackle_server() -> void:
 	tackle_active = false
-	if characters_layer_bit > 0:
-		collision_mask = collision_mask # (restore if you modify it elsewhere)
+	_exit_tackle_phasing()
+	_tackle_steal_left = 0.0
+	_tackle_has_stolen = false
 
-	# ⬇️ ONLY unlatch if we are *not* in latch mode
+	_cooldowns["tackle"] = tackle_cooldown_dur  # ✅ cooldown starts after finishing
+	tackle_cd_ui = tackle_cooldown_dur
 	if ball_latched and !latch_mode_active:
 		_unlatch_ball_server()
-
 
 
 # --- Misc / UI / aim ---
@@ -1144,26 +1310,293 @@ func _on_kick_area_body_entered(body: Node) -> void:
 		aim_active = true
 
 		# ⬇️ optional: if latch mode is already on, auto-latch immediately
-		if latch_mode_active:
+		if latch_mode_active and _ball_within_latch_range(ball):
 			_latch_ball_server(ball)
 
 func _on_kick_area_body_exited(body: Node) -> void:
 	if not multiplayer.is_server(): return
+
+	# ✅ If it's our latched ball, keep refs
+	if ball_latched and _latched_ball == body:
+		return
+
 	if body == current_ball:
 		current_ball = null
 		current_ball_path = NodePath("")
 		aim_active = false
 		_show_arrow(false)
 
+
 func _on_tackle_field_body_entered(body: Node) -> void:
 	if !multiplayer.is_server():
 		return
+
+	# ✅ STEAL ONLY INSIDE THE HIT WINDOW
+	if tackle_active and _tackle_steal_left > 0.0 and !_tackle_has_stolen:
+		var victim := body as Player
+		if victim == null or victim == self:
+			return
+
+		# Victim must be holding a latched ball
+		if victim.ball_latched and victim._latched_ball != null and is_instance_valid(victim._latched_ball):
+			var ball := victim._latched_ball
+
+			# Victim drops it
+			victim.latch_mode_active = false
+			victim._unlatch_ball_server()
+			victim.current_ball = null
+			victim.current_ball_path = NodePath("")
+			victim.aim_active = false
+
+			# If we were holding, drop first
+			if ball_latched:
+				_unlatch_ball_server()
+
+			# Take it
+			current_ball_path = ball.get_path()
+			current_ball = ball
+			aim_active = true
+			_latch_ball_server(ball)
+
+			_tackle_has_stolen = true
+			_tackle_steal_left = 0.0
+			return
+
+	# Existing: latch a BALL if it enters tackle field
 	var rb := body as RigidBody3D
-	if rb == null:
-		return
-	if !rb.is_in_group("ball"):
+	if rb == null or !rb.is_in_group("ball"):
 		return
 
-	# start follow-with-offset latch (no reparent)
-	if tackle_active or latch_mode_active:
+	if (tackle_active or latch_mode_active) and _ball_within_latch_range(rb):
 		_latch_ball_server(rb)
+
+func _player_layer_mask() -> int:
+	# characters_layer_bit is a layer number (1..32). You said player layer is 2.
+	return 1 << (characters_layer_bit - 1)
+
+func _enter_tackle_phasing() -> void:
+	if !tackle_phase_through_players or _tackle_phasing:
+		return
+	_tackle_phasing = true
+	_saved_body_layer = collision_layer
+	_saved_body_mask  = collision_mask
+
+	var p_mask := _player_layer_mask()
+	# Remove player layer from BOTH so neither side collides with the other
+	collision_layer = collision_layer & ~p_mask
+	collision_mask  = collision_mask  & ~p_mask
+
+func _exit_tackle_phasing() -> void:
+	if !_tackle_phasing:
+		return
+	_tackle_phasing = false
+	collision_layer = _saved_body_layer
+	collision_mask  = _saved_body_mask
+func _get_ball_radius_world(ball: RigidBody3D) -> float:
+	var r := _get_ball_radius(ball)
+	var s := ball.global_transform.basis.get_scale()
+	return r * maxf(s.x, maxf(s.y, s.z))
+func _is_latch_touching_layer(layer_num: int, at_pos: Vector3) -> bool:
+	var space := get_world_3d().direct_space_state
+
+	# Save and temporarily narrow the query to ONLY the stuck layer.
+	var old_mask := _latch_q.collision_mask
+	_latch_q.collision_mask = _layer_bit(layer_num)
+
+	_latch_q.transform = Transform3D(Basis(), at_pos)
+	_latch_q.motion = Vector3.ZERO
+	_latch_q.collide_with_bodies = true
+	_latch_q.collide_with_areas = true  # important if your layer8 thing is Area3D
+
+	var hits := space.intersect_shape(_latch_q, 8)
+
+	_latch_q.collision_mask = old_mask
+	return hits.size() > 0
+func _handle_assist_pass_server() -> void:
+	if !multiplayer.is_server():
+		return
+
+	var pressed := bool(_net.get("assist_pass_pressed", false))
+	if !pressed:
+		return
+
+	# ✅ consume the edge
+	_net["assist_pass_pressed"] = false
+
+	print("ASSIST: pressed on server")
+
+	if _cooldowns["assist_pass"] > 0.0:
+		print("ASSIST: blocked by cooldown ", _cooldowns["assist_pass"])
+		return
+
+	_resolve_ball()
+
+	# Optional: if latched, use the latched ball as the source of truth
+	if (current_ball == null or !is_instance_valid(current_ball)) and ball_latched and is_instance_valid(_latched_ball):
+		current_ball = _latched_ball
+		current_ball_path = current_ball.get_path()
+
+	if current_ball == null or !is_instance_valid(current_ball):
+		print("ASSIST: no current_ball (path=", current_ball_path, " latched=", ball_latched, ")")
+		return
+
+	var target := _pick_best_teammate_for_pass()
+	if target == null:
+		print("ASSIST: no teammate found")
+		return
+
+	print("ASSIST: passing to ", target.owner_peer_id, " ", target.name)
+
+	if ball_latched:
+		latch_mode_active = false
+		_unlatch_ball_server()
+	# before applying impulse / apply_hit
+	_mark_pass_trap_for_receiver(current_ball, target)
+
+	_do_pass_to(target)
+
+	_cooldowns["assist_pass"] = assist_pass_cooldown_dur
+	assist_pass_cd_ui = assist_pass_cooldown_dur
+	print("ASSIST: done. cooldown=", _cooldowns["assist_pass"])
+
+
+func _pick_best_teammate_for_pass() -> Player:
+	var my_team := GameState.get_team(owner_peer_id)
+	if my_team == GameState.TEAM_NONE:
+		return null
+
+	# forward direction based on cam yaw (same as your movement)
+	var yaw := float(_net.get("cam_yaw", rotation.y))
+	var fwd := Vector3.FORWARD.rotated(Vector3.UP, yaw)
+	fwd.y = 0.0
+	fwd = fwd.normalized()
+
+	var best: Player = null
+	var best_score := INF
+
+	for n in get_tree().get_nodes_in_group("players"):
+		var p := n as Player
+		if p == null or p == self:
+			continue
+		if GameState.get_team(p.owner_peer_id) != my_team:
+			continue
+
+		var to_p := p.global_position - global_position
+		to_p.y = 0.0
+		var d := to_p.length()
+		if d <= 0.01 or d > assist_pass_max_dist:
+			continue
+
+		# Prefer teammates generally in front (cone). If you want “any direction”, remove this.
+		var dir := to_p / d
+		if fwd.dot(dir) < assist_pass_cone_dot:
+			continue
+
+		# score: nearest wins (you can add extra weighting later)
+		if d < best_score:
+			best_score = d
+			best = p
+
+	# Fallback: if none in cone, allow nearest teammate in any direction
+	if best == null:
+		for n in get_tree().get_nodes_in_group("players"):
+			var p := n as Player
+			if p == null or p == self:
+				continue
+			if GameState.get_team(p.owner_peer_id) != my_team:
+				continue
+			var d2 := global_position.distance_to(p.global_position)
+			if d2 < best_score and d2 <= assist_pass_max_dist:
+				best_score = d2
+				best = p
+
+	return best
+
+
+func _do_pass_to(target: Player) -> void:
+	if current_ball == null or !is_instance_valid(current_ball):
+		return
+
+	# aim a bit above ground (feels nicer)
+	var aim_pos := target.global_position + Vector3.UP * 0.6
+
+	var from := current_ball.global_position
+	var dir := (aim_pos - from)
+	dir.y = 0.0
+	if dir.length() < 0.05:
+		return
+	dir = dir.normalized()
+
+	# clear old movement
+	current_ball.freeze = false
+	current_ball.linear_velocity = Vector3.ZERO
+	current_ball.angular_velocity = Vector3.ZERO
+	current_ball.sleeping = false
+
+	var J := dir * assist_pass_force + Vector3.UP * assist_pass_lift
+
+	# If your ball is class_name Ball and you want tracking, use apply_hit:
+	var b := current_ball as Ball
+	if b != null:
+		b.apply_hit(J, Vector3.ZERO, owner_peer_id)
+	else:
+		current_ball.apply_impulse(J, Vector3.ZERO)
+func _mark_pass_trap_for_receiver(ball: RigidBody3D, receiver: Node) -> void:
+	if ball == null or !is_instance_valid(ball) or receiver == null:
+		return
+
+	var info := {
+		"team": GameState.get_team(owner_peer_id),
+		"from_role": GameState.get_role(owner_peer_id), # must exist in GameState
+		"timestamp": Time.get_ticks_msec() / 1000.0,
+		"used": false,
+		"receiver_path": receiver.get_path(),
+		"from_path": get_path(),  # so bots can exclude passer if needed
+	}
+	ball.set_meta(PASS_TRAP_META_KEY, info)
+
+func _handle_grapple_mode_server() -> void:
+	if !multiplayer.is_server():
+		return
+
+	if bool(_net.get("grapple_toggle", false)):
+		_net["grapple_toggle"] = false  # ✅ consume edge
+
+		grapple_mode_active = !grapple_mode_active
+
+		var who := "SERVER" if multiplayer.is_server() else "CLIENT"
+		print("GRAPPLE MODE =", grapple_mode_active, " owner_peer_id=", owner_peer_id, " who=", who)
+
+func _fire_grapple_visual_center() -> void:
+	if cam == null or grapple_shot_scene == null:
+		return
+
+	# Ray from screen center
+	var r = cam.get_center_ray()
+	var ro: Vector3 = r["origin"]
+	var rd: Vector3 = r["dir"]
+
+	var to := ro + rd * grapple_max_dist
+
+	var q := PhysicsRayQueryParameters3D.create(ro, to)
+	q.collision_mask = grapple_hit_mask
+	q.exclude = [self]  # don't hit yourself
+
+	var hit := get_world_3d().direct_space_state.intersect_ray(q)
+	var end_pos = hit.position if !hit.is_empty() else to
+
+	# Start point (choose camera origin for now — later you can use a weapon/muzzle socket)
+	var start_pos := get_muzzle_from_camera(cam)
+
+	var shot := grapple_shot_scene.instantiate()
+	get_tree().current_scene.add_child(shot)
+	shot.start(start_pos, end_pos)
+func get_muzzle_from_camera(cam: Camera3D) -> Vector3:
+	var right := cam.global_transform.basis.x
+	var up := cam.global_transform.basis.y
+	var forward := -cam.global_transform.basis.z  # camera forward is -Z
+
+	return cam.global_position \
+		+ right * 0.25 \
+		+ up * -0.18 \
+		+ forward * 0.60

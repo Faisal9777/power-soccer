@@ -46,10 +46,24 @@ var _my_player: Node = null
 var _input_accum: float = 0.0
 var ball_scene : Node3D = null
 var  tackle_edge_latched := false
+var grapple_edge_latched := false
 var  stop_ball_edge_latched := false
 var  jump_edge_latched := false
 var  shoot_edge_latched := false
 var latch_edge_latched := false 
+@onready var tackle_btn: TouchScreenButton = $CanvasLayer/UI/ActionPad/Tackle
+var _tackle_cd_label: Label
+var _tackle_cd_local: float = 0.0
+var _tackle_cd_last_from_player: float = -999.0
+
+var assist_pass_edge_latched := false
+
+@onready var pass_btn: TouchScreenButton = $CanvasLayer/UI/ActionPad/Pass
+var _pass_cd_label: Label
+var _pass_cd_local: float = 0.0
+var _pass_cd_last_from_player: float = -999.0
+
+
 func _ready() -> void:
 	if multiplayer.is_server():
 		out_bounds.body_entered.connect(_on_ball_out_of_bounds)
@@ -89,6 +103,8 @@ func _ready() -> void:
 	_setup_scoreboard_popup()
 	_game.set_scoreboard(_scoreboard_instance)
 	_server_setup()
+	_tackle_cd_label = _ensure_cd_label(tackle_btn)
+	_pass_cd_label = _ensure_cd_label(pass_btn)
 
 	# 1) Connect to the Network autoload signals (do it here so it works even if not wired in editor)
 
@@ -297,6 +313,10 @@ func _setup_pause_dialog() -> void:
 	v.add_child(btn_exit)
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel"):
+		# ✅ If graphics menu is open, close it first (don’t unpause)
+		if _gfx_ui and _gfx_ui.visible:
+			_gfx_ui.hide()
+			return
 		_toggle_pause_menu()
 
 	# SHOW while holding
@@ -331,7 +351,7 @@ func _on_pause_exit() -> void:
 		Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 	# Quit or go to title:
 	# get_tree().quit()
-	get_tree().change_scene_to_file("res://title_screen.tscn")
+	get_tree().change_scene_to_file("res://scenes/title_screen.tscn")
 
 func _open_graphics_settings() -> void:
 	if _gfx_ui and _gfx_ui.visible:
@@ -355,7 +375,7 @@ func _create_graphics_settings_ui() -> Control:
 
 	# background dim
 	var dim := ColorRect.new()
-	dim.color = Color(0,0,0,0.5)
+	dim.color = Color(0, 0, 0, 0.5)
 	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
 	root.add_child(dim)
 
@@ -365,20 +385,62 @@ func _create_graphics_settings_ui() -> Control:
 	root.add_child(center)
 
 	var panel := Panel.new()
-	panel.custom_minimum_size = Vector2i(480, 340)
+
+	# ✅ Fit panel to screen (so it never goes off-screen)
+	var vp := get_viewport().get_visible_rect().size
+	var w := int(min(520.0, vp.x - 40.0))
+	var h := int(min(520.0, vp.y - 40.0))
+	panel.custom_minimum_size = Vector2i(max(360, w), max(300, h))
 	center.add_child(panel)
 
-	var v := VBoxContainer.new()
-	v.alignment = BoxContainer.ALIGNMENT_CENTER
-	v.add_theme_constant_override("separation", 14)
-	panel.add_child(v)
+	# padding
+	var pad := MarginContainer.new()
+	pad.set_anchors_preset(Control.PRESET_FULL_RECT)
+	pad.add_theme_constant_override("margin_left", 16)
+	pad.add_theme_constant_override("margin_right", 16)
+	pad.add_theme_constant_override("margin_top", 16)
+	pad.add_theme_constant_override("margin_bottom", 16)
+	panel.add_child(pad)
 
-	# Title
+	# main layout: header + scroll + bottom buttons
+	var main_v := VBoxContainer.new()
+	main_v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	main_v.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	main_v.add_theme_constant_override("separation", 12)
+	pad.add_child(main_v)
+
+	# --------------------
+	# Header row (Title + X)
+	# --------------------
+	var header := HBoxContainer.new()
+	header.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	main_v.add_child(header)
+
 	var title := Label.new()
 	title.text = "Graphics Settings"
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	title.add_theme_font_size_override("font_size", 24)
-	v.add_child(title)
+	header.add_child(title)
+
+	var close_btn := Button.new()
+	close_btn.text = "✕"
+	close_btn.flat = true
+	close_btn.custom_minimum_size = Vector2i(44, 44)
+	header.add_child(close_btn)
+
+	# --------------------
+	# Scrollable content
+	# --------------------
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	main_v.add_child(scroll)
+
+	var v := VBoxContainer.new()
+	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	v.add_theme_constant_override("separation", 14)
+	scroll.add_child(v)
 
 	# --- Fullscreen toggle ---
 	var fullscreen := CheckBox.new()
@@ -398,14 +460,17 @@ func _create_graphics_settings_ui() -> Control:
 	v.add_child(quality_label)
 
 	var quality := OptionButton.new()
+	quality.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	quality.add_item("Low (No AA)", 0)
 	quality.add_item("Medium (2x AA)", 1)
 	quality.add_item("High (4x AA)", 2)
-	# pick based on current MSAA
+
 	match get_viewport().msaa_3d:
 		Viewport.MSAA_DISABLED: quality.select(0)
 		Viewport.MSAA_2X:       quality.select(1)
 		Viewport.MSAA_4X:       quality.select(2)
+		_:                      quality.select(clamp(Settings.quality, 0, 2))
+
 	v.add_child(quality)
 
 	# --- Texture quality dropdown ---
@@ -414,38 +479,83 @@ func _create_graphics_settings_ui() -> Control:
 	v.add_child(tex_label)
 
 	var tex_quality := OptionButton.new()
+	tex_quality.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	tex_quality.add_item("Low", 0)
 	tex_quality.add_item("Medium", 1)
 	tex_quality.add_item("High", 2)
 	tex_quality.select(clamp(Settings.tex_quality, 0, 2))
 	v.add_child(tex_quality)
 
-	# --- Apply and Back buttons ---
-	var h := HBoxContainer.new()
-	h.alignment = BoxContainer.ALIGNMENT_CENTER
-	h.add_theme_constant_override("separation", 16)
-	v.add_child(h)
+	# --- 3D Render Scale ---
+	var scale_label := Label.new()
+	scale_label.text = "3D Render Scale"
+	v.add_child(scale_label)
+
+	var scale_row := HBoxContainer.new()
+	scale_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scale_row.add_theme_constant_override("separation", 12)
+	v.add_child(scale_row)
+
+	var scale_slider := HSlider.new()
+	scale_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scale_slider.min_value = 0.25
+	scale_slider.max_value = 2.0
+	scale_slider.step = 0.05
+	scale_slider.value = clampf(Settings.scale_3d, float(scale_slider.min_value), float(scale_slider.max_value))
+	scale_row.add_child(scale_slider)
+
+	var scale_value := Label.new()
+	scale_value.custom_minimum_size = Vector2i(70, 0)
+	scale_row.add_child(scale_value)
+
+	var _update_scale_text := func():
+		scale_value.text = "%d%%" % int(round(scale_slider.value * 100.0))
+	_update_scale_text.call()
+
+	scale_slider.value_changed.connect(func(_v):
+		_update_scale_text.call()
+	)
+
+	# --------------------
+	# Bottom buttons (always visible)
+	# --------------------
+	var hrow := HBoxContainer.new()
+	hrow.alignment = BoxContainer.ALIGNMENT_CENTER
+	hrow.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hrow.add_theme_constant_override("separation", 16)
+	main_v.add_child(hrow)
 
 	var apply := Button.new()
 	apply.text = "Apply"
-	h.add_child(apply)
+	apply.custom_minimum_size = Vector2i(160, 48)
+	hrow.add_child(apply)
 
 	var back := Button.new()
 	back.text = "Back"
-	h.add_child(back)
+	back.custom_minimum_size = Vector2i(160, 48)
+	hrow.add_child(back)
 
-	# --- Signal handlers ---
-	apply.pressed.connect(func ():
-		_apply_graphics_settings(fullscreen.button_pressed, vsync.button_pressed, quality.selected,tex_quality.selected)
-	)
-
-	back.pressed.connect(func ():
+	# handlers
+	var _close := func():
 		root.hide()
+
+	close_btn.pressed.connect(_close)
+	back.pressed.connect(_close)
+
+	apply.pressed.connect(func():
+		_apply_graphics_settings(
+			fullscreen.button_pressed,
+			vsync.button_pressed,
+			quality.selected,
+			tex_quality.selected,
+			float(scale_slider.value)
+		)
 	)
 
 	return root
-func _apply_graphics_settings(fullscreen: bool, vsync: bool, quality: int, tex_quality: int) -> void:
-	Settings.set_and_save(fullscreen, vsync, quality, tex_quality)
+
+func _apply_graphics_settings(fullscreen: bool, vsync: bool, quality: int, tex_quality: int, scale_3d: float) -> void:
+	Settings.set_and_save(fullscreen, vsync, quality, tex_quality, scale_3d)
 
 func _server_setup() -> void:
 	if !multiplayer.is_server():
@@ -549,18 +659,30 @@ func _physics_process(delta: float) -> void:
 func _shoot_action() -> String:
 	return "shoot_touch" if is_mobile else "shoot"
 func _update_inputs() -> void:
+	var gm := false
+	if _my_player and is_instance_valid(_my_player):
+		gm = bool(_my_player.get("grapple_mode_active"))
 	if Input.is_action_just_pressed("jump") and not jump_edge_latched:
 		jump_edge_latched = true
 	if Input.is_action_just_pressed("tackle") and not tackle_edge_latched:
-		tackle_edge_latched = true			
+		if _tackle_cd_local <= 0.0:
+			tackle_edge_latched = true
 	if Input.is_action_just_pressed("stop_ball") and not stop_ball_edge_latched:
 		stop_ball_edge_latched = true		
-	if Input.is_action_just_released(_shoot_action()) and not shoot_edge_latched:
+	# Only allow shoot edge when NOT grappling
+	if !gm and Input.is_action_just_released(_shoot_action()) and not shoot_edge_latched:
 		shoot_edge_latched = true
 	# ⬇️ NEW: toggle input (press once = "edge" event)
 	if Input.is_action_just_pressed("ball_latch") and not latch_edge_latched:
 		 
 		latch_edge_latched = true
+	if Input.is_action_just_pressed("assist_pass") and not assist_pass_edge_latched:
+		
+		if _pass_cd_local <= 0.0:
+			print("CAPPPPPPPPPPP!!!!!!+")
+			assist_pass_edge_latched = true
+	if Input.is_action_just_pressed("grapple") and not grapple_edge_latched:
+		grapple_edge_latched = true
 
 func _reset_inputs() -> void:
 	jump_edge_latched = false
@@ -568,7 +690,8 @@ func _reset_inputs() -> void:
 	stop_ball_edge_latched = false
 	shoot_edge_latched = false
 	latch_edge_latched = false     # ⬅️ NEW
-
+	assist_pass_edge_latched = false
+	grapple_edge_latched = false
 
 func _process(delta: float) -> void:
 	if Input.is_action_just_pressed("host_key"):
@@ -591,6 +714,9 @@ func _process(delta: float) -> void:
 
 	if Input.is_action_just_pressed("debug_first") and is_instance_valid(_game):
 		_game._rpc_set_camera_first_person()       # direct local call
+	_update_tackle_cooldown_ui(delta)
+	_update_pass_cooldown_ui(delta)
+
 func _is_really_hosting() -> bool:
 	return multiplayer.multiplayer_peer is ENetMultiplayerPeer and multiplayer.is_server()
 
@@ -796,6 +922,16 @@ func _gather_input() -> Dictionary:
 			facing = Dictionary()
 	else:
 		facing = (_my_player.get_yaw() if _my_player else Dictionary())
+	var gm := false
+	if _my_player and is_instance_valid(_my_player):
+		gm = bool(_my_player.get("grapple_mode_active"))
+
+	var shoot_down := Input.is_action_pressed(_shoot_action())
+	var shoot_up := shoot_edge_latched
+
+	if gm:
+		shoot_down = false
+		shoot_up = false
 	return {
 	"mvx": mvx,
 	"mvz": mvz,
@@ -804,39 +940,36 @@ func _gather_input() -> Dictionary:
 	"tackle_pressed": tackle_edge_latched,
 	"dribble": Input.is_action_pressed("dribble"),
 	"stop_ball": stop_ball_edge_latched,
-	"shoot_down": Input.is_action_pressed(_shoot_action()),
-	"shoot_up": shoot_edge_latched,
+	"shoot_down": shoot_down,
+	"shoot_up": shoot_up,
 	"rmb": Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT),
 	"facing": facing,
 	"aim_position": _my_player.get_aim_arrow_position() if _my_player and shoot_edge_latched else null,
 	"cam_yaw": yaw,
-	"latch_toggle": latch_edge_latched   # ⬅️ NEW
+	"assist_pass_pressed": assist_pass_edge_latched,
+	"latch_toggle": latch_edge_latched,
+	"grapple_toggle": grapple_edge_latched   # ⬅️ NEW
 }
 
 func _send_local_input() -> void:
-	# 0) If there is no network peer yet (single-player / not joined / not hosting), do nothing
 	if multiplayer.multiplayer_peer == null:
-		print("no player has joined yet")
 		return
+
 	var d := _gather_input()
-	if _players.has(1):
-		#print("_players.has(1)")
-		var p: CharacterBody3D = _players[1]
-		if p and p.has_method("apply_net_input"):
-			#print("_players.has(1)2")
-			p.apply_net_input(d)
+	
+	if multiplayer.is_server():
+	
+		if _players.has(1):
+			var p: CharacterBody3D = _players[1]
+			if p and p.has_method("apply_net_input"):
+				p.apply_net_input(d)
 	else:
-		# Client: only send if we’re actually connected to the server (peer 1)
-		if multiplayer.get_peers().has(1):
-			rpc_id(1, "_rpc_client_input", multiplayer.get_unique_id(), d)
-		else:
-			#print("Client not connected yet; dropping input")
-			pass
+		rpc_id(1, "_rpc_client_input", multiplayer.get_unique_id(), d)
 
 @rpc("any_peer")
 func _rpc_client_input(from_id: int, d: Dictionary) -> void:
-	#print("the input is coming from the player: ", from_id)
-	#print("_rpc_client_input")
+	if d.get("grapple_toggle", false):
+		print("World got grapple toggle from ", from_id)
 	if _players.has(from_id):
 		#print("_rpc_client_input2")
 		var p: CharacterBody3D = _players[from_id]
@@ -951,3 +1084,88 @@ func _respawn_ball(ball: RigidBody3D) -> void:
 	ball.call_deferred("_wake_ball")
 
 # helper method on the ball (or inline with deferred lambda)
+func _ensure_cd_label(btn: TouchScreenButton) -> Label:
+	var lbl := btn.get_node_or_null("CooldownLabel") as Label
+	if lbl:
+		return lbl
+
+	lbl = Label.new()
+	lbl.name = "CooldownLabel"
+	lbl.visible = false
+	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	lbl.z_index = 1000
+	lbl.z_as_relative = true
+
+	# Match the texture rect (TouchScreenButton texture starts at local (0,0))
+	var tex := btn.texture_normal
+	var size := Vector2(120, 120)
+	if tex:
+		size = tex.get_size()
+
+	lbl.size = size
+	lbl.position = Vector2.ZERO  # ✅ key change: align to textured rect
+
+	# Make countdown text black
+	lbl.add_theme_color_override("font_color", Color(0, 0, 0, 1))
+	lbl.add_theme_font_size_override("font_size", 48)
+
+	btn.add_child(lbl)
+	return lbl
+
+func _update_tackle_cooldown_ui(delta: float) -> void:
+	if not OS.has_feature("mobile"):
+		return
+	if _tackle_cd_label == null:
+		return
+
+	# Pull last replicated cooldown start value from player (server → owner)
+	var from_player := 0.0
+	if _my_player and is_instance_valid(_my_player):
+		# tackle_cd_ui is replicated to the owning client
+		from_player = float(_my_player.get("tackle_cd_ui"))
+
+	# If server pushed a new cooldown (or reset), sync local timer
+	if absf(from_player - _tackle_cd_last_from_player) > 0.001:
+		_tackle_cd_last_from_player = from_player
+		_tackle_cd_local = from_player
+
+	# Count down locally for smooth UI
+	if _tackle_cd_local > 0.0:
+		_tackle_cd_local = maxf(0.0, _tackle_cd_local - delta)
+
+	if _tackle_cd_local > 0.0:
+		_tackle_cd_label.visible = true
+		_tackle_cd_label.text = str(int(ceil(_tackle_cd_local)))
+
+		# Optional: visually “disable” button
+		# tackle_btn.modulate.a = 0.55
+	else:
+		_tackle_cd_label.visible = false
+		_tackle_cd_label.text = ""
+		# tackle_btn.modulate.a = 1.0
+
+func _update_pass_cooldown_ui(delta: float) -> void:
+	if not OS.has_feature("mobile"):
+		return
+	if _pass_cd_label == null:
+		return
+
+	var from_player := 0.0
+	if _my_player and is_instance_valid(_my_player):
+		from_player = float(_my_player.get("assist_pass_cd_ui"))
+
+	if absf(from_player - _pass_cd_last_from_player) > 0.001:
+		_pass_cd_last_from_player = from_player
+		_pass_cd_local = from_player
+
+	if _pass_cd_local > 0.0:
+		_pass_cd_local = maxf(0.0, _pass_cd_local - delta)
+
+	if _pass_cd_local > 0.0:
+		_pass_cd_label.visible = true
+		_pass_cd_label.text = str(int(ceil(_pass_cd_local)))
+	else:
+		_pass_cd_label.visible = false
+		_pass_cd_label.text = ""

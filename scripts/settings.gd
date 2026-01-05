@@ -10,15 +10,20 @@ var vsync := true
 var quality := 1          # 0=Low, 1=Med, 2=High (MSAA)
 var tex_quality := 2      # 0=Low, 1=Med, 2=High (Textures)
 
+# NEW: 3D render scale (Project Settings -> Rendering -> Scaling 3D -> Scale)
+var scale_3d: float = 1.0
+
 func _enter_tree() -> void:
 	_load()
 	_apply()
 
-func set_and_save(new_fullscreen: bool, new_vsync: bool, new_quality: int, new_tex_quality: int) -> void:
+# UPDATED: add new_scale_3d
+func set_and_save(new_fullscreen: bool, new_vsync: bool, new_quality: int, new_tex_quality: int, new_scale_3d: float) -> void:
 	fullscreen = new_fullscreen
 	vsync = new_vsync
 	quality = new_quality
 	tex_quality = new_tex_quality
+	scale_3d = new_scale_3d
 	_apply()
 	_save()
 
@@ -37,18 +42,23 @@ func _apply() -> void:
 		2: get_viewport().msaa_3d = Viewport.MSAA_4X
 
 	# Texture "quality"
-	# - Uses mipmap bias globally (2D & 3D)
-	# - Also adjusts default 2D filter (Controls/Node2D); 3D filtering is per-material
 	match tex_quality:
 		0:
-			get_viewport().texture_mipmap_bias = 2.0           # more blurry / cheaper
+			get_viewport().texture_mipmap_bias = 2.0
 			get_viewport().canvas_item_default_texture_filter = Viewport.DEFAULT_CANVAS_ITEM_TEXTURE_FILTER_NEAREST
 		1:
 			get_viewport().texture_mipmap_bias = 1.0
 			get_viewport().canvas_item_default_texture_filter = Viewport.DEFAULT_CANVAS_ITEM_TEXTURE_FILTER_LINEAR
 		2:
-			get_viewport().texture_mipmap_bias = 0.0           # crispest
+			get_viewport().texture_mipmap_bias = 0.0
 			get_viewport().canvas_item_default_texture_filter = Viewport.DEFAULT_CANVAS_ITEM_TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+
+	# NEW: 3D scaling (apply to the root viewport so it matches Project Settings behavior)
+	var vp := get_tree().root
+	vp.scaling_3d_scale = clampf(scale_3d, 0.25, 2.0)
+
+	# Optional: also keep ProjectSettings in sync (not strictly required for runtime)
+	ProjectSettings.set_setting("rendering/scaling_3d/scale", vp.scaling_3d_scale)
 
 func _load() -> void:
 	var cfg := ConfigFile.new()
@@ -58,30 +68,34 @@ func _load() -> void:
 		quality     = cfg.get_value("video", "quality", quality)
 		tex_quality = cfg.get_value("video", "texture_quality", tex_quality)
 
-		# NEW: profile
+		# NEW:
+		scale_3d    = float(cfg.get_value("video", "scale_3d", scale_3d))
+
+		# profile
 		player_name = cfg.get_value("profile", "name", player_name)
 
 func _save() -> void:
 	var cfg := ConfigFile.new()
-	# write BOTH sections so we don’t lose one when saving the other
+
 	cfg.set_value("video", "fullscreen", fullscreen)
 	cfg.set_value("video", "vsync", vsync)
 	cfg.set_value("video", "quality", quality)
 	cfg.set_value("video", "texture_quality", tex_quality)
 
-	# NEW: profile
+	# NEW:
+	cfg.set_value("video", "scale_3d", scale_3d)
+
 	cfg.set_value("profile", "name", player_name)
 
 	cfg.save(CFG_PATH)
+
 func ensure_player_name() -> void:
-	# called on startup (e.g., TitleScreen._ready())
 	if player_name.strip_edges() == "":
 		player_name = "Player_%d" % randi()
 		_save()
 
 func set_player_name_and_save(name: String) -> void:
 	player_name = name.strip_edges()
-	print(player_name)
 	if player_name == "":
 		player_name = "Player_%d" % randi()
 	_save()
