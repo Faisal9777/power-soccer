@@ -1,0 +1,15 @@
+[gd_scene load_steps=3 format=3 uid="uid://d4mdf4duq868k"]
+
+[ext_resource type="Script" uid="uid://b5v6aw1fud27w" path="res://scripts/grapple_shot.gd" id="1_cfvmp"]
+[ext_resource type="Script" uid="uid://pgvdf7lrj277" path="res://scripts/hook.gd" id="2_1p83u"]
+
+[node name="GrappleShot" type="Node3D"]
+script = ExtResource("1_cfvmp")
+linger_time = 100.0
+
+[node name="Rope" type="MeshInstance3D" parent="."]
+
+[node name="Hook" type="Node3D" parent="."]
+script = ExtResource("2_1p83u")
+claw_curve_radius = 0.12
+claw_radius = 0.022

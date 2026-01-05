@@ -26,7 +26,8 @@ var _look_touch_id: int = -1
 
 var _dy_accum: float = 0.0    # yaw delta since last read
 var _dp_accum: float = 0.0    # pitch delta since last read
-
+@export var self_layer_ui: int = 19
+var _self_layer_mask: int
 var _aim_mode: bool = false
 var _target: Node3D
 var _target_ball: Node3D
@@ -43,9 +44,12 @@ var _has_pending_face: bool = false
 @export var front_is_plus_z: bool = true
 
 func _ready() -> void:
+	_self_layer_mask = 1 << (self_layer_ui - 1)
 	_target = get_node_or_null(target_path)
 	_target_ball = get_node_or_null("Ball")
 	activate()
+	_apply_fp_tp_self_visibility()  # ✅ ensure correct on start
+
 
 func set_joystick(n: Control) -> void:
 	joystick = n
@@ -130,8 +134,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		var mb := event as InputEventMouseButton
 		if mb.button_index == MOUSE_BUTTON_WHEEL_UP:
 			distance = max(min_distance, distance - _wheel_step)
+			_apply_fp_tp_self_visibility()
 		elif mb.button_index == MOUSE_BUTTON_WHEEL_DOWN:
 			distance = min(max_distance, distance + _wheel_step)
+			_apply_fp_tp_self_visibility()
 
 # ----------------------------
 # Mobile input (touch look)
@@ -245,6 +251,20 @@ func _physics_process(delta: float) -> void:
 func set_goal_third_person_view() -> void:
 	_aim_mode = false
 	distance = clamp(goal_third_person_distance, min_distance, max_distance)
+	_apply_fp_tp_self_visibility()
 
 func set_first_person_view() -> void:
 	distance = min_distance
+	_apply_fp_tp_self_visibility()
+
+func _apply_fp_tp_self_visibility() -> void:
+	if distance <= 0.05:
+		cull_mask &= ~_self_layer_mask   # ✅ FP: hide self
+	else:
+		cull_mask |= _self_layer_mask    # ✅ TP: show self
+func get_center_ray() -> Dictionary:
+	var vp := get_viewport()
+	var center := vp.get_visible_rect().size * 0.5
+	var ro := project_ray_origin(center)
+	var rd := project_ray_normal(center).normalized()
+	return {"origin": ro, "dir": rd}

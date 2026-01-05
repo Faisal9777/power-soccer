@@ -1,0 +1,91 @@
+[gd_scene load_steps=8 format=3 uid="uid://dv5l1qjf5gwfn"]
+
+[ext_resource type="Script" uid="uid://cpn8a4o2wga3b" path="res://scripts/player.gd" id="1_xhfnw"]
+[ext_resource type="ArrayMesh" uid="uid://dfkb3j37cjp2g" path="res://3DModels/android_phone.obj" id="2_kpjcp"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_ld6s0"]
+radius = 1.0
+height = 4.0
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_f3sb7"]
+radius = 19.017
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_fj7yv"]
+radius = 1.467
+
+[sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_kpjcp"]
+properties/0/path = NodePath(".:owner_peer_id")
+properties/0/spawn = true
+properties/0/replication_mode = 1
+properties/1/path = NodePath(".:transform")
+properties/1/spawn = true
+properties/1/replication_mode = 1
+properties/2/path = NodePath(".:aim_active")
+properties/2/spawn = true
+properties/2/replication_mode = 1
+properties/3/path = NodePath(".:_charge")
+properties/3/spawn = true
+properties/3/replication_mode = 1
+properties/4/path = NodePath(".:_stamina")
+properties/4/spawn = true
+properties/4/replication_mode = 1
+properties/5/path = NodePath(".:current_ball_path")
+properties/5/spawn = true
+properties/5/replication_mode = 1
+properties/6/path = NodePath(".:tackle_cd_ui")
+properties/6/spawn = true
+properties/6/replication_mode = 2
+properties/7/path = NodePath(".:grapple_mode_active")
+properties/7/spawn = true
+properties/7/replication_mode = 2
+
+[sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_xhfnw"]
+properties/0/path = NodePath(".:rotation")
+properties/0/spawn = true
+properties/0/replication_mode = 1
+
+[node name="Player" type="CharacterBody3D"]
+collision_layer = 2
+collision_mask = 5
+script = ExtResource("1_xhfnw")
+walk_speed = 9.0
+sprint_speed = 12.0
+stamina_regen_rate = 10.0
+stamina_sprint_drain = 20.0
+latch_stamina_drain = 65.0
+latch_min_to_start = 100.0
+
+[node name="Mesh" type="MeshInstance3D" parent="."]
+transform = Transform3D(3.821371e-17, 8.7422775e-10, 0.02, 0.02, -8.7422775e-10, 0, 8.7422775e-10, 0.02, -8.7422775e-10, 0.8497119, -1.4332567, 0.239928)
+mesh = ExtResource("2_kpjcp")
+
+[node name="PlayerCollision" type="CollisionShape3D" parent="."]
+shape = SubResource("CapsuleShape3D_ld6s0")
+
+[node name="KickArea" type="Area3D" parent="."]
+collision_layer = 8
+collision_mask = 4
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="KickArea"]
+transform = Transform3D(0.99997, 0.00703362, 0.0031066, -0.00703358, 0.999975, -2.18512e-05, -0.00310668, 0, 0.999995, 0, -0.9, -0.6)
+shape = SubResource("SphereShape3D_f3sb7")
+
+[node name="TackleField" type="Area3D" parent="."]
+collision_layer = 16
+collision_mask = 6
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="TackleField"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.0160648, -1.35571, 4.76837e-07)
+shape = SubResource("SphereShape3D_fj7yv")
+
+[node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="."]
+replication_config = SubResource("SceneReplicationConfig_kpjcp")
+
+[node name="AimPivot" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.19209e-07, 1.18405, 0.071167)
+
+[node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="AimPivot"]
+replication_config = SubResource("SceneReplicationConfig_xhfnw")
+
+[node name="NameTag" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5, 0)

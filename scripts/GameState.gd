@@ -87,3 +87,6 @@ func set_player_name_for(id: int, name: String) -> void:
 func _rpc_set_lobby_leader(id: int) -> void:
 	lobby_leader_id = id
 	lobby_leader_changed.emit(id)
+func is_same_team(a: int, b: int) -> bool:
+	var ta := get_team(a)
+	return ta != TEAM_NONE and ta == get_team(b)
