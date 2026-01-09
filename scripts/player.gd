@@ -214,6 +214,7 @@ func apply_snapshot(snap: Dictionary) -> void:
 	var yaw := snap["yaw"] as float
 	var pitch := snap["pitch"] as float
 	_apply_facing_absolute(yaw, pitch)
+	global_position = snap["pos"]
 
 
 #func get_input_data() -> Dictionary:

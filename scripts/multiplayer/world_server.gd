@@ -145,6 +145,10 @@ func _broadcast_snapshots() -> void:
 		var snapshot := _players[peer_id].get_snapshot() as Dictionary
 		snapshot["last_server_seq"] = int(last_server_seq.get(peer_id, -1))
 		snapshots[peer_id] = snapshot
+		if peer_id != 1:
+			print("before sending player snapshot to the client")
+			print("for the seq: ", snapshot["last_server_seq"])
+			print("the client's position: ", snapshot["pos"])
 
 	_network_endpoint.rpc("receive_network_input", snapshots, multiplayer.get_unique_id())
 
