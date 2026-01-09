@@ -33,7 +33,6 @@ var _fixed_dt: float = 1.0 / 60.0
 @onready var _network_endpoint: Node = get_parent()
 
 func process_input(cmd: Dictionary, peer_id : int) -> void:
-	print("snapshots: ", cmd)
 	_store_snapshots(cmd)
 
 func process_input_dictionary(msg : int, value : Dictionary) -> void:
@@ -104,11 +103,12 @@ func _physics_process(delta: float) -> void:
 		return
 
 	# 1) Reconcile (if snapshot exists)
-	#if not _latest_local_snapshot.is_empty():
-		#var snap := _latest_local_snapshot
-		#_latest_local_snapshot = {}
-		#print("Reconciling with snap.last_server_seq =", int(snap.get("last_server_seq", -999)))
-		#_reconcile_local(me, snap)
+	if not _latest_local_snapshot.is_empty():
+		var snap := _latest_local_snapshot
+		_latest_local_snapshot = {}
+		print("Reconciling with snap.last_server_seq =", int(snap.get("last_server_seq", -999)))
+		print("the client's position: ", snap["pos"])
+		_reconcile_local(me, snap, delta)
 
 	# 2) Local prediction + send input
 	var cmd: Dictionary = {}
@@ -143,7 +143,6 @@ func _physics_process(delta: float) -> void:
 
 func _process(_delta: float) -> void:
 	# Remote interpolation runs every render frame for smoothness
-	print("in process")
 	var now := Time.get_ticks_msec()
 	var render_time := now - remote_interp_delay_ms
 	for peer_id in _remote_buf.keys():
@@ -180,9 +179,7 @@ func _process(_delta: float) -> void:
 		var xa := a["xform"] as Transform3D
 		var xb := b["xform"] as Transform3D
 		#dbg_print_if_moved_xz(p)
-		var inter := xa.interpolate_with(xb, alpha)
 		p.global_transform = xa.interpolate_with(xb, alpha)
-	print("process end")
 
 # ---------- Snapshot storage ----------
 func _store_snapshots(snapshots: Dictionary) -> void:
@@ -226,7 +223,7 @@ func _store_snapshots(snapshots: Dictionary) -> void:
 				_remote_buf[peer_id].pop_front()
 
 # ---------- Local reconcile ----------
-func _reconcile_local(p: Node, snap: Dictionary) -> void:
+func _reconcile_local(p: Node, snap: Dictionary, delta : float) -> void:
 	# 1) Apply authoritative server state
 	if p.has_method("apply_snapshot"):
 		p.apply_snapshot(snap)
@@ -249,7 +246,7 @@ func _reconcile_local(p: Node, snap: Dictionary) -> void:
 
 	# 3) Replay remaining predicted-but-unconfirmed inputs using FIXED dt
 	for cmd in _pending_inputs:
-		p.update_player_states(cmd, _fixed_dt)
+		p.update_player_states(cmd, delta)
 
 
 # ---------- Helpers ----------
