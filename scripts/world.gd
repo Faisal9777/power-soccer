@@ -4,9 +4,9 @@ extends Node
 # --- Assign in the inspector or hardcode a PackedScene for clients that join ---
 @export var pause_btn: Button
 @export var score_btn: Button
-@export var win_scene_path: String = "res://WinScene.tscn"
-@export var defeat_scene_path: String = "res://DefeatScene.tscn"
-@export var scoreboard_scene_path: String = "res://ScoreboardScene.tscn"
+@export var win_scene_path: String = "res://scenes/WinScene.tscn"
+@export var defeat_scene_path: String = "res://scenes/DefeatScene.tscn"
+@export var scoreboard_scene_path: String = "res://scenes/ScoreboardScene.tscn"
 @export var player_scene: PackedScene
 @export var bot_player_scene: PackedScene
 @onready var grapple_btn: TouchScreenButton = $CanvasLayer/UI/ActionPad/Grapple
