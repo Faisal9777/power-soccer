@@ -13,3 +13,4 @@ linger_time = 100.0
 script = ExtResource("2_1p83u")
 claw_curve_radius = 0.12
 claw_radius = 0.022
+open_amount = 1.0

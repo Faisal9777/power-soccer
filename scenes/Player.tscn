@@ -48,12 +48,6 @@ properties/0/replication_mode = 1
 collision_layer = 2
 collision_mask = 5
 script = ExtResource("1_xhfnw")
-walk_speed = 9.0
-sprint_speed = 12.0
-stamina_regen_rate = 10.0
-stamina_sprint_drain = 20.0
-latch_stamina_drain = 65.0
-latch_min_to_start = 100.0
 
 [node name="Mesh" type="MeshInstance3D" parent="."]
 transform = Transform3D(3.821371e-17, 8.7422775e-10, 0.02, 0.02, -8.7422775e-10, 0, 8.7422775e-10, 0.02, -8.7422775e-10, 0.8497119, -1.4332567, 0.239928)
