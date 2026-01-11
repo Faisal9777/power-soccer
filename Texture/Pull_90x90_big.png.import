@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://d0c8ua7ecabi2"
-valid=false
+uid="uid://cg2brpywalpp3"
+path="res://.godot/imported/Pull_90x90_big.png-ecd5e5d1edbccec6ea433bd078cfbec1.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
-source_file="res://Texture/ChatGPT Image Jan 4, 2026, 06_44_21 PM.png"
+source_file="res://Texture/Pull_90x90_big.png"
+dest_files=["res://.godot/imported/Pull_90x90_big.png-ecd5e5d1edbccec6ea433bd078cfbec1.ctex"]
 
 [params]
 

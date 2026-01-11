@@ -13,9 +13,9 @@ const TEAM_NAME := { Team.BLUE: "BLUE", Team.RED: "RED" }
 var _fake_stats := [
 	{"id": 1, "name": "Ayaan",  "team": Team.BLUE, "goals": 3, "assists": 1, "saves": 0},
 	{"id": 2, "name": "Fardin", "team": Team.BLUE, "goals": 1, "assists": 2, "saves": 1},
-	{"id": 3, "name": "Nabila", "team": Team.BLUE, "goals": 0, "assists": 1, "saves": 3},
+	{"id": 3, "name": "Nabil", "team": Team.BLUE, "goals": 0, "assists": 1, "saves": 3},
 	{"id": 4, "name": "Rafi",   "team": Team.RED,  "goals": 2, "assists": 0, "saves": 1},
-	{"id": 5, "name": "Zara",   "team": Team.RED,  "goals": 1, "assists": 3, "saves": 0},
+	{"id": 5, "name": "Ahsan",   "team": Team.RED,  "goals": 1, "assists": 3, "saves": 0},
 	{"id": 6, "name": "Hamza",  "team": Team.RED,  "goals": 0, "assists": 1, "saves": 2},
 ]
 

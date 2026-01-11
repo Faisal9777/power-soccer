@@ -2,22 +2,20 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dhwigcxrh05st"
-path.s3tc="res://.godot/imported/hook_cutout.png-8348cc25e79ffd089a9bfd3d9b732f7d.s3tc.ctex"
-path.etc2="res://.godot/imported/hook_cutout.png-8348cc25e79ffd089a9bfd3d9b732f7d.etc2.ctex"
+uid="uid://dn7lmpy8jrhos"
+path="res://.godot/imported/Grapple_90x90_big.png-88719d185c955e0f9f18a42f9451fdb3.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc", "etc2_astc"],
-"vram_texture": true
+"vram_texture": false
 }
 
 [deps]
 
-source_file="res://Texture/hook_cutout.png"
-dest_files=["res://.godot/imported/hook_cutout.png-8348cc25e79ffd089a9bfd3d9b732f7d.s3tc.ctex", "res://.godot/imported/hook_cutout.png-8348cc25e79ffd089a9bfd3d9b732f7d.etc2.ctex"]
+source_file="res://Texture/Grapple_90x90_big.png"
+dest_files=["res://.godot/imported/Grapple_90x90_big.png-88719d185c955e0f9f18a42f9451fdb3.ctex"]
 
 [params]
 
-compress/mode=2
+compress/mode=0
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -25,7 +23,7 @@ compress/rdo_quality_loss=0.0
 compress/hdr_compression=1
 compress/normal_map=0
 compress/channel_pack=0
-mipmaps/generate=true
+mipmaps/generate=false
 mipmaps/limit=-1
 roughness/mode=0
 roughness/src_normal=""
@@ -39,4 +37,4 @@ process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
-detect_3d/compress_to=0
+detect_3d/compress_to=1

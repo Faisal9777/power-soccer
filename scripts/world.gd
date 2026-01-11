@@ -9,6 +9,19 @@ extends Node
 @export var scoreboard_scene_path: String = "res://ScoreboardScene.tscn"
 @export var player_scene: PackedScene
 @export var bot_player_scene: PackedScene
+@onready var grapple_btn: TouchScreenButton = $CanvasLayer/UI/ActionPad/Grapple
+@onready var pull_btn:    TouchScreenButton = $CanvasLayer/UI/ActionPad/Pull
+@onready var fire_btn:    TouchScreenButton = $CanvasLayer/UI/ActionPad/Fire
+@onready var release_btn: TouchScreenButton = $CanvasLayer/UI/ActionPad/Release
+
+var _last_grapple_mode := false
+
+@export var fire_tex_flying: Texture2D        # normal fire icon
+@export var fire_tex_latched: Texture2D       # icon when grapple is latched (often “Release” icon)
+@export var fire_btn_path:NodePath
+
+var _fire_last_latched := false
+
 
 @export var ball_packed: PackedScene
 @onready var spawn_points := $SpawnPoints   # optional, if you have markers named SpawnPoint0/1/2...
@@ -81,6 +94,7 @@ func _ready() -> void:
 		score_btn.button_down.connect(_on_mobile_score_down)
 	if not score_btn.button_up.is_connected(_on_mobile_score_up):
 		score_btn.button_up.connect(_on_mobile_score_up)
+	_set_grapple_buttons_visible(false)
 	_setup_team_position()
 	# If you didn't set the spawner in the editor, do it here:
 	var spawner := players_root.get_node_or_null("MultiplayerSpawner")
@@ -554,8 +568,19 @@ func _create_graphics_settings_ui() -> Control:
 
 	return root
 
+
 func _apply_graphics_settings(fullscreen: bool, vsync: bool, quality: int, tex_quality: int, scale_3d: float) -> void:
 	Settings.set_and_save(fullscreen, vsync, quality, tex_quality, scale_3d)
+
+func _set_grapple_buttons_visible(on: bool) -> void:
+	if pull_btn:    pull_btn.visible = on
+	if fire_btn:    fire_btn.visible = on
+	if release_btn: release_btn.visible = on
+
+	# "Toggle look" for Grapple button (TouchScreenButton can’t stay pressed)
+	if grapple_btn:
+		grapple_btn.modulate.a = 1.0 if on else 0.55
+
 
 func _server_setup() -> void:
 	if !multiplayer.is_server():
@@ -716,7 +741,13 @@ func _process(delta: float) -> void:
 		_game._rpc_set_camera_first_person()       # direct local call
 	_update_tackle_cooldown_ui(delta)
 	_update_pass_cooldown_ui(delta)
+	var gm := false
+	if _my_player and is_instance_valid(_my_player):
+		gm = bool(_my_player.get("grapple_mode_active"))
 
+	if gm != _last_grapple_mode:
+		_last_grapple_mode = gm
+		_set_grapple_buttons_visible(gm)
 func _is_really_hosting() -> bool:
 	return multiplayer.multiplayer_peer is ENetMultiplayerPeer and multiplayer.is_server()
 
@@ -1026,6 +1057,11 @@ func _rpc_attach_cam(player_path: NodePath, _unused_joystick_path: NodePath, bal
 	# Hand joystick to player (as you already do)
 	if p.has_method("attach_camera"):
 		p.call_deferred("attach_camera", cam, joystick)
+		# ✅ Bind grapple UI for local player
+	var pl := p as Player
+	if pl != null and pl._is_local_owner(): # or (multiplayer.get_unique_id() == pl.owner_peer_id)
+		_bind_player_ui(pl)
+
 func _focus_camera_on_player(p: Node, peer_id: int) -> void:
 	# Find your camera (adjust the path/group/name to your project)
 	var my_id := multiplayer.get_unique_id()
@@ -1108,7 +1144,7 @@ func _ensure_cd_label(btn: TouchScreenButton) -> Label:
 	lbl.position = Vector2.ZERO  # ✅ key change: align to textured rect
 
 	# Make countdown text black
-	lbl.add_theme_color_override("font_color", Color(0, 0, 0, 1))
+	lbl.add_theme_color_override("font_color", Color(1, 1, 1, 1))
 	lbl.add_theme_font_size_override("font_size", 48)
 
 	btn.add_child(lbl)
@@ -1169,3 +1205,33 @@ func _update_pass_cooldown_ui(delta: float) -> void:
 	else:
 		_pass_cd_label.visible = false
 		_pass_cd_label.text = ""
+
+func _set_fire_texture(latched: bool) -> void:
+	if fire_btn == null:
+		fire_btn = get_node_or_null(fire_btn_path) as TouchScreenButton
+		if fire_btn == null:
+			return
+
+	var tex: Texture2D = fire_tex_latched if latched else fire_tex_flying
+	if tex == null:
+		return
+
+	fire_btn.texture_normal = tex
+	fire_btn.texture_pressed = tex
+
+
+func _bind_player_ui(p: Player) -> void:
+	if p == null:
+		return
+	# avoid double connect
+	if not p.grapple_latch_ui_changed.is_connected(_on_grapple_latch_ui_changed):
+		p.grapple_latch_ui_changed.connect(_on_grapple_latch_ui_changed)
+	# set initial state
+	_on_grapple_latch_ui_changed(p.is_grapple_latched())
+
+func _on_grapple_latch_ui_changed(latched: bool) -> void:
+	_set_fire_texture(latched)
+
+
+func ui_release_grapple() -> void:
+	pass # Replace with function body.

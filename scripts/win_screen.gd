@@ -6,7 +6,7 @@ signal exit_pressed
 @export var _next: Button                    # assign NextButton
 @export var _countdown_label: Label          # assign the label beside Next
 @export var auto_advance_seconds: int = 10
-@export var next_scene_path: String = "res://ScoreboardScene.tscn"     # optional: path for next scene
+@export var next_scene_path: String = "res://scenes/ScoreboardScene.tscn"     # optional: path for next scene
 
 var _remaining: float = 0.0
 var _last_shown_secs: int = -1
