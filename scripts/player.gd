@@ -778,22 +778,34 @@ func simulate_server(delta: float) -> void:
 	# normal sim continues here
 	_update_player_facing_server(delta)
 
-	# Reel overrides movement
-	if _handle_grapple_reel_server(delta):
-		return
+	# Reel overrides movement (but MUST NOT skip latch + stamina)
+	var reel_handled := _handle_grapple_reel_server(delta)
 
-	_handle_grapple_pull_target_server(delta)
+	# Still allow pulling target even if not reeling (optional)
+	if !reel_handled:
+		_handle_grapple_pull_target_server(delta)
 
 	if current_ball_path:
 		_resolve_ball()
 
 	_update_cooldowns(delta)
 	_update_charge_server(delta)
+
+	# ✅ latch toggle + stamina drain must still happen while reeling
 	_handle_latch_mode_server(delta)
 
 	_handle_grapple_mode_server()
 	_handle_assist_pass_server()
 
+	# ✅ if grapple reel already moved us this tick, don't do normal movement,
+	# but DO keep stamina logic stable and keep ball glued.
+	if reel_handled:
+		_using_sprint = false
+		_update_stamina_server(delta)
+		_update_latched_ball_server(delta)
+		return
+
+	# normal sim continues here
 	apply_gravity(delta)
 
 	var input_dir := _get_input_dir_server()
@@ -812,6 +824,7 @@ func simulate_server(delta: float) -> void:
 	_handle_action_server(input_dir, delta)
 	_update_stamina_server(delta)
 	_update_latched_ball_server(delta)
+
 
 func _can_perform(action: String, stamina_required: float, spend: bool = true) -> bool:
 	# Special case: "stamina_regen" is just a condition check (no cost)
@@ -1892,9 +1905,18 @@ func _fire_grapple_visual_center() -> void:
 
 	var q := PhysicsRayQueryParameters3D.create(ro, to)
 	q.collision_mask = grapple_hit_mask
-	q.exclude = [self]  # don't hit yourself
+
+	# ✅ exclude should be RID, not Node
+	q.exclude = [get_rid()]
+
+	# ✅ make it robust
+	q.collide_with_bodies = true
+	q.collide_with_areas = true
+	q.hit_from_inside = true
+	q.hit_back_faces = true
 
 	var hit := get_world_3d().direct_space_state.intersect_ray(q)
+
 	var end_pos = hit.position if !hit.is_empty() else to
 
 	# Start point (choose camera origin for now — later you can use a weapon/muzzle socket)
