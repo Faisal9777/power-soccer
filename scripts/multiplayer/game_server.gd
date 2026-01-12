@@ -159,28 +159,35 @@ func _start_countdown_server() -> void:
 
 func _start_game() -> void:
 	state.is_paused = false
+	_toggle_player_process(true)
 	#_toggle_player_process(false)
 
 func _toggle_player_process(toggle : bool) -> void:
+	var switch := false
+	if toggle != true:
+		switch = true
+		
 	for k in GameState.roster.keys():
 		var p := get_node(GameState.roster[k]["player_path"]) as Node3D
 		#print("the player's id is: ", pid)
 		if p == null:
 			continue
-		p.freeze(toggle)
+		p.freeze(switch)
 
 func _set_game() -> void:
 	_spawn_ball_at(ball_spawn.global_transform.origin)
 	#_spawn_players_from_roster()
 	
 	#var snapshots = _build_position_snapshots()
-	var snapshots = {"ball_scene" : ball_scene.get_path(),
-	"spawns_blue": spawns_blue.get_path(),
-	"spawns_red": spawns_red.get_path()
-	
-	}
-	_client.start_game()
-	_network_endpoint.rpc("receive_network_input_dictionary", NetCodes.Msg.GAME_BEGIN,{})
+	#var snapshots = {"ball_scene" : ball_scene.get_path(),
+	#"spawns_blue": spawns_blue.get_path(),
+	#"spawns_red": spawns_red.get_path()
+	#
+	#}
+	_position_players2()
+	#_client.start_game()
+	_start_countdown_server()
+	#_network_endpoint.rpc("receive_network_input_dictionary", NetCodes.Msg.GAME_BEGIN,{})
 
 
 func init(game : Node, network_endpoint : Node, is_also_player : bool, roster : Dictionary) -> void:
@@ -212,7 +219,6 @@ func _start_match_authoritative() -> void:
 	if is_instance_valid(_red_zone):
 		_red_zone.body_entered.connect(_on_score_zone_body_entered.bind("red_goal"))
 	_set_game()
-	_start_countdown_server()
 	state.toggle_process(true)
 	
 
@@ -221,6 +227,8 @@ func _physics_process(delta: float) -> void:
 		if multiplayer.is_server():
 				_physics_process_server(delta)
 
+		
+		
 func _physics_process_server(delta: float) -> void:
 	if state.time_left_ms == 0:
 		_process_game_end()
@@ -256,6 +264,38 @@ func _end_match_authoritative(reason: String) -> void:
 	print("time up")
 	
 
+func _position_players2() -> void:
+	var blue_placed := 1
+	var red_placed  := 1
+
+	# Find a target to face: live Ball if it exists, else the BallSpawn
+	var ball := ball_scene
+	#var target_pos := ball.global_transform.origin if ball != null else ball_spawn.global_transform.origin
+	#var target_pos := ball_spawn.global_position
+	for k in GameState.roster.keys():
+		var pid := int(k)
+		var name := String(GameState.roster.get(pid, {}).get("name", ""))
+		var team := int(GameState.roster.get(pid, {}).get("team", 0))
+		#print("about to calll _cl_init_entry: ", multiplayer.get_unique_id())
+		# initialize only if missing
+		var p := get_node(GameState.roster[k]["player_path"]) as Node3D
+		#print("the player's id is: ", pid)
+		if p == null:
+			continue
+
+		if GameState.is_blue(pid):
+			var sp := spawns_blue.get_node_or_null("Spawn%d" % blue_placed) as Node3D
+			if sp:
+				p.global_transform = sp.global_transform
+				blue_placed += 1
+		else:
+			var sp := spawns_red.get_node_or_null("Spawn%d" % red_placed) as Node3D
+			if sp:
+				p.global_transform = sp.global_transform
+				red_placed += 1
+		# tell that specific client to aim their camera
+		p.focus_at(ball)
+		p.freeze(true)
 
 func _spawn_players_from_roster() -> void:
 	# player_scene should be known (from GameState or exported on World)
@@ -277,6 +317,8 @@ func _spawn_players_from_roster() -> void:
 
 		if team == GameState.Team.BLUE: blue_i += 1
 		else:                           red_i  += 1
+
+
 
 @rpc("any_peer", "reliable", "call_local")
 func _rpc_aim_camera(target_pos: Vector3, path: NodePath) -> void:
@@ -403,6 +445,21 @@ func _on_score_zone_body_entered(body: Node3D, which_goal: String) -> void:     
 	if not body.is_in_group("ball"): return       # tag your ball with group "ball"
 	_goal_lock = true
 	_handle_goal(which_goal, body)
+#func _handle_goal(which_goal: String, ball : Node3D) -> void:
+	## Example: ball in *red* goal means BLUE scores
+	#var scoring_team := "red"
+	#if which_goal == "blue_goal":
+		#scoring_team = "blue"
+	#_add_point(scoring_team, ball)
+	## Wait 3 seconds, then reset
+	## Show "Goal!" on every client (server does NOT run it)
+	#var secs := 3
+	#rpc("_cl_handle_goal_outcome", "Goal!", secs)
+	## server waits locally; this does not block clients
+	#await get_tree().create_timer(secs).timeout
+	#_set_game()
+	#_goal_lock = false	
+
 func _handle_goal(which_goal: String, ball : Node3D) -> void:
 	# Example: ball in *red* goal means BLUE scores
 	var scoring_team := "red"
@@ -411,13 +468,14 @@ func _handle_goal(which_goal: String, ball : Node3D) -> void:
 	_add_point(scoring_team, ball)
 	# Wait 3 seconds, then reset
 	# Show "Goal!" on every client (server does NOT run it)
+	state.is_paused = false
 	var secs := 3
-	rpc("_cl_handle_goal_outcome", "Goal!", secs)
-	# server waits locally; this does not block clients
+	state.goal_scored = true
 	await get_tree().create_timer(secs).timeout
+	state.goal_scored = false
+	
 	_set_game()
 	_goal_lock = false
-	
 
 func _add_point(scoring_team: String, ball : Node3D) -> void:
 	var goal_player = ball.get_player(0)
@@ -434,22 +492,37 @@ func _add_point(scoring_team: String, ball : Node3D) -> void:
 		#red_score += 1
 	#var stats_array = get_stats_in_array()
 	#_scoreboard_instance.set_stats(stats_array)
-	rpc("_cl_apply_goal_update", scoring_team, goal_player, assist_player, GameState.is_in_the_same_team(goal_player, scoring_team))
+	_apply_goal_update(scoring_team, goal_player, assist_player, GameState.is_in_the_same_team(goal_player, scoring_team))
+	#rpc("_cl_apply_goal_update", scoring_team, goal_player, assist_player, GameState.is_in_the_same_team(goal_player, scoring_team))
 
 @rpc("authority", "reliable", "call_local")
 func _cl_apply_goal_update(scoring_team : String, goal_player : int, assist_player : int, is_in_the_same_team : bool) -> void:
 	if goal_player != -1 and not is_in_the_same_team:
-		game[goal_player]["goals"] += 1
+		state.add_goal(goal_player)
 	else:
-		game[goal_player]["goals"] -= 1
+		state.sub_goal(goal_player)
 	if assist_player != -1 and not is_in_the_same_team:
-		game[goal_player]["assists"] += 1
+		state.add_assist(assist_player)
 	if scoring_team == "red":
 		state.blue_score += 1
 	else:
 		state.red_score += 1
-	var stats_array = get_stats_in_array()
-	_scoreboard_instance.set_stats(stats_array)
+	#var stats_data = state.get_game_data()
+	#_scoreboard_instance.set_stats(stats_data)
+
+func _apply_goal_update(scoring_team : String, goal_player : int, assist_player : int, is_in_the_same_team : bool) -> void:
+	if goal_player != -1 and not is_in_the_same_team:
+		state.add_goal(goal_player)
+	else:
+		state.sub_goal(goal_player)
+	if assist_player != -1 and not is_in_the_same_team:
+		state.add_assist(assist_player)
+	if scoring_team == "red":
+		state.blue_score += 1
+	else:
+		state.red_score += 1
+	#var stats_data = state.get_game_data()
+	#
 
 @rpc("authority", "reliable", "call_local") 
 func _cl_handle_goal_outcome(text: String, seconds: float) -> void:
