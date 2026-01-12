@@ -31,6 +31,20 @@ var ROLE_NAME := {
 	GameState.Role.MIDFIELDER: "Midfielder",
 	GameState.Role.FORWARD: "Forward",
 }
+# ⬇ NEW: Ability IDs + names
+const ABILITY_IDS: Array[String] = ["grapple"]  # add later: ["grapple","dash","blink",...]
+var ABILITY_NAME := {
+	"grapple": "Grapple",
+}
+
+func _get_ability_id(e: Dictionary) -> String:
+	return String(e.get("ability", "grapple"))
+
+func _cycle_ability(cur: String) -> String:
+	var i := ABILITY_IDS.find(cur)
+	if i == -1: i = 0
+	return ABILITY_IDS[(i + 1) % ABILITY_IDS.size()]
+
 
 func _ready() -> void:
 	# --- Build the Tree columns + per-row buttons ---
@@ -68,14 +82,23 @@ func _ready() -> void:
 	if GameState.is_host and not GameState.is_dedicated_server():
 		var host_id := multiplayer.get_unique_id() # usually 1
 		var host: Dictionary = GameState.roster.get(host_id, {})
+
 		if host.is_empty():
 			GameState.roster[host_id] = {
 				"name": GameState.player_name,
 				"ready": false,
-				"team": GameState.pick_balanced_team()
+				"team": GameState.pick_balanced_team(),
+				"ability": "grapple", # ✅ ADD HERE
 			}
-		elif !host.has("team"):
-			GameState.roster[host_id]["team"] = GameState.pick_balanced_team()
+		else:
+			# Ensure required fields exist even if entry was created earlier
+			if !host.has("team"):
+				host["team"] = GameState.pick_balanced_team()
+			if !host.has("ability"):
+				host["ability"] = "grapple" # ✅ BACKFILL HERE
+
+			GameState.roster[host_id] = host
+
 	elif not GameState.is_host:
 		# Client announces name to host after Multiplayer is ready
 		call_deferred("_submit_name_to_host")
@@ -181,7 +204,7 @@ func _setup_player_tree() -> void:
 	player_list.set_column_title(0, "Player")
 	player_list.set_column_title(1, "Team")
 	player_list.set_column_title(2, "Swap")
-	player_list.set_column_title(3, "Role")   # ⬅ NEW
+	player_list.set_column_title(3, "Role / Ability") # ⬅ NEW
 
 	player_list.set_column_expand(0, true)   # name expands
 	player_list.set_column_expand(1, false)
@@ -210,6 +233,7 @@ func _refresh_ui() -> void:
 		var team_val  := int(e.get("team", -1))
 		var role_val  := int(e.get("role", GameState.Role.MIDFIELDER))  # ⬅ NEW
 		var is_bot    := bool(e.get("is_bot", false))                   # ⬅ NEW
+		var ability_id := _get_ability_id(e)
 		var host_tag  := " (Host)" if pid == 1 else ""
 		var ready_tag := " ✓" if is_ready else ""
 
@@ -236,17 +260,27 @@ func _refresh_ui() -> void:
 		else:
 			item.set_text(2, "")
 
-		# Column 3: Role text + button (host only, bots only)
+		# Column 3: Role text + button (bots) OR Ability text + button (humans)
 		if is_bot:
 			item.set_text(3, ROLE_NAME.get(role_val, "Midfielder"))
-		else:
-			item.set_text(3, "")  # you can leave empty for human players
 
-		if _i_am_leader() and is_bot:
-			var role_icon: Texture2D = player_list.get_theme_icon("Edit", "EditorIcons")
-			if role_icon == null:
-				role_icon = player_list.get_theme_icon("RightArrow", "Tree")
-			item.add_button(3, role_icon, 0, false, "Change role")
+			if _i_am_leader():
+				var role_icon: Texture2D = player_list.get_theme_icon("Edit", "EditorIcons")
+				if role_icon == null:
+					role_icon = player_list.get_theme_icon("RightArrow", "Tree")
+				item.add_button(3, role_icon, 0, false, "Change role")
+
+		else:
+			item.set_text(3, ABILITY_NAME.get(ability_id, ability_id))
+
+			# ✅ allow: player can change their OWN ability
+			# (Optional: also allow leader to change others)
+			var can_change := (pid == multiplayer.get_unique_id()) or _i_am_leader()
+			if can_change:
+				var ab_icon: Texture2D = player_list.get_theme_icon("Edit", "EditorIcons")
+				if ab_icon == null:
+					ab_icon = player_list.get_theme_icon("RightArrow", "Tree")
+				item.add_button(3, ab_icon, 0, false, "Change ability")
 
 	status_label.text = "Connected: %d" % int(GameState.roster.size())
 	_update_start_enabled()
@@ -272,19 +306,31 @@ func _on_tree_button_clicked(item: TreeItem, column: int, id: int, mouse_button_
 			_update_start_enabled()
 		elif column == 3:
 			var rec: Dictionary = GameState.roster[pid]
-			if !bool(rec.get("is_bot", false)):
-				return
-			var cur_role := int(rec.get("role", GameState.Role.MIDFIELDER))
-			rec["role"] = (cur_role + 1) % 3
-			GameState.roster[pid] = rec
-			_broadcast_roster()
-			_update_start_enabled()
+
+			if bool(rec.get("is_bot", false)):
+				# bot => cycle role (your existing behavior)
+				var cur_role := int(rec.get("role", GameState.Role.MIDFIELDER))
+				rec["role"] = (cur_role + 1) % 3
+				GameState.roster[pid] = rec
+				_broadcast_roster()
+				_update_start_enabled()
+			else:
+				# human => cycle ability
+				rec["ability"] = _cycle_ability(String(rec.get("ability", "grapple")))
+				GameState.roster[pid] = rec
+				_broadcast_roster()
+				_update_start_enabled()
+
 	else:
 		# Client leader -> request
 		if column == 2:
 			rpc_id(1, "_rpc_request_swap_team", pid)
 		elif column == 3:
-			rpc_id(1, "_rpc_request_cycle_role", pid)
+			var rec: Dictionary = GameState.roster[pid]
+			if bool(rec.get("is_bot", false)):
+				rpc_id(1, "_rpc_request_cycle_role", pid)
+			else:
+				rpc_id(1, "_rpc_request_cycle_ability", pid)
 
 # -------------------- Start button enable/disable --------------------
 func _all_ready() -> bool:
@@ -441,7 +487,7 @@ func _rpc_submit_name(name: String) -> void:
 
 	var from := multiplayer.get_remote_sender_id()
 	var team := GameState.pick_balanced_team()
-	GameState.roster[from] = {"name": name, "ready": false, "team": team}
+	GameState.roster[from] = {"name": name, "ready": false, "team": team, "ability": "grapple"}
 
 	_ensure_leader_exists()   # ✅ IMPORTANT
 	_broadcast_roster()
@@ -474,6 +520,7 @@ func _broadcast_roster() -> void:
 			"team": e.get("team", Team.BLUE),
 			"is_bot": e.get("is_bot", false),  # <--- keep bot flag
 			"role": e.get("role", GameState.Role.MIDFIELDER),  # ⬅ NEW
+			"ability": e.get("ability", "grapple"),  # ✅ NEW
 		})
 
 
@@ -490,6 +537,7 @@ func _rpc_set_roster(snapshot: Array) -> void:
 			"team": int(e.get("team", Team.BLUE)),
 			"is_bot": bool(e.get("is_bot", false)),
 			"role": int(e.get("role", GameState.Role.MIDFIELDER)),  # ⬅ NEW
+			"ability": String(e.get("ability", "grapple")), # ✅ NEW
 		}
 
 	print("ROSTERRRRRR")
@@ -814,6 +862,7 @@ func _update_bots_for_team_size() -> void:
 				"team": team,
 				"is_bot": true,
 				"role": GameState.Role.MIDFIELDER,  # default; host can change
+				"ability": "grapple",
 			}
 
 			counts[team] += 1
@@ -844,3 +893,27 @@ func _rpc_set_lobby_leader(id: int) -> void:
 	_refresh_ui()
 	_apply_admin_ui_state()
 	_update_start_enabled()
+@rpc("any_peer", "reliable")
+func _rpc_request_cycle_ability(pid: int) -> void:
+	if !multiplayer.is_server():
+		return
+
+	var sender := multiplayer.get_remote_sender_id()
+
+	# ✅ allow the player to change their OWN ability
+	# (Optional) also allow leader to change others
+	if sender != pid and sender != GameState.lobby_leader_id:
+		return
+
+	if !GameState.roster.has(pid):
+		return
+
+	var rec: Dictionary = GameState.roster[pid]
+	if bool(rec.get("is_bot", false)):
+		return # bots use role cycling, not this
+
+	var cur := String(rec.get("ability", "grapple"))
+	rec["ability"] = _cycle_ability(cur)
+	GameState.roster[pid] = rec
+
+	_broadcast_roster()
