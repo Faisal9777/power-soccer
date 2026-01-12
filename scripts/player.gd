@@ -207,12 +207,14 @@ func get_snapshot() -> Dictionary:
 			"pos" : global_position,
 			"vel": velocity,
 			"yaw": rotation.y,
-			"pitch": (aim_pivot.rotation.x if is_instance_valid(aim_pivot) else 0.0)
+			"pitch": (aim_pivot.rotation.x if is_instance_valid(aim_pivot) else 0.0),
+			"is_frozen" : _is_frozen
 		}
 	return snapshot
 func apply_snapshot(snap: Dictionary) -> void:
 	var yaw := snap["yaw"] as float
 	var pitch := snap["pitch"] as float
+	_is_frozen = snap["is_frozen"]
 	_apply_facing_absolute(yaw, pitch)
 	global_position = snap["pos"]
 
@@ -255,7 +257,7 @@ func get_input_data() -> Dictionary:
 			"mvz": mvz,
 			"yaw": _yaw_abs,
 			"pitch": _pitch_abs,
-			"sprint" : Input.is_action_pressed("sprint")
+			"sprint" : Input.is_action_pressed("sprint"),
 		}
 	return input
 

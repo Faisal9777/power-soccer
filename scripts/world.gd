@@ -90,11 +90,12 @@ func _ready() -> void:
 		players_root.add_child(spawner)
 	_create_ball_spawner()
 	_setup_pause_dialog()
-	_setup_scoreboard_popup()
 	#_initialize_game_setup()
 	var game : Node = Ingame.new()
 	game.name = "ingame_state"
+	
 	add_child(game)
+	_setup_scoreboard_popup(game)
 	if multiplayer.is_server():
 		_server_setup3()
 		
@@ -180,7 +181,7 @@ func _make_centered_overlay(name: String, panel_min_size: Vector2i) -> Array:
 
 	return [overlay, panel]
 
-func _setup_scoreboard_popup() -> void:
+func _setup_scoreboard_popup(game_data_holder : Node) -> void:
 	var parts := _make_centered_overlay("ScoreboardOverlay", Vector2i(560, 360))
 	_scoreboard_popup = parts[0]
 	var panel: Panel = parts[1]
@@ -241,6 +242,7 @@ func _setup_scoreboard_popup() -> void:
 
 		inner_center.add_child(root_ctrl)
 		_scoreboard_instance = root_ctrl
+		_scoreboard_instance.set_game_data_holder(game_data_holder, _scoreboard_popup)
 	else:
 		push_error("Could not load scoreboard scene at: %s" % scoreboard_scene_path)
 
@@ -249,12 +251,12 @@ func _open_scoreboard() -> void:
 	if SCOREBOARD_PAUSES:
 		get_tree().paused = true
 		# keep mouse as-is (you’re only holding a key)
-	_scoreboard_popup.visible = true
+	_scoreboard_instance.show_score(true)
 
 func _close_scoreboard() -> void:
 	_scoreboard_popup.visible = false
 	if SCOREBOARD_PAUSES and get_tree().paused:
-		get_tree().paused = false
+		_scoreboard_instance.show_score(false)
 
 func _setup_pause_dialog() -> void:
 	# Root overlay that still works while paused

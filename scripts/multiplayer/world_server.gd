@@ -30,6 +30,7 @@ func start_init(players: Dictionary,
 		}, blue_spawns, red_spawns, ball_spawn, ball_scene)
 	_game_server.init(ingame, _network_endpoint, _is_also_player, roster)
 	_network_endpoint.set_game(_game_server)
+	ingame.set_roster(GameState.roster)
 	if _is_also_player:
 		_peers_ready += 1
 		
@@ -145,10 +146,6 @@ func _broadcast_snapshots() -> void:
 		var snapshot := _players[peer_id].get_snapshot() as Dictionary
 		snapshot["last_server_seq"] = int(last_server_seq.get(peer_id, -1))
 		snapshots[peer_id] = snapshot
-		if peer_id != 1:
-			print("before sending player snapshot to the client")
-			print("for the seq: ", snapshot["last_server_seq"])
-			print("the client's position: ", snapshot["pos"])
 
 	_network_endpoint.rpc("receive_network_input", snapshots, multiplayer.get_unique_id())
 

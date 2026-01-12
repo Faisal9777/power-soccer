@@ -14,7 +14,7 @@ var _score_red_lbl: Label
 var _countdown_label: Label
 var _is_player_frozen:= true
 var _network_endpoint : Node
-
+var _all_player_frozen := true
 var ball_scene : Node
 var spawns_blue : Node
 var spawns_red : Node
@@ -215,19 +215,24 @@ func _ready() -> void:
 	set_multiplayer_authority(1)
 
 func _physics_process(delta: float) -> void:
-	if _is_player_frozen and not state.is_paused:
-		_toggle_player_process(true)
-		_is_player_frozen = false
+	#if _is_player_frozen and not state.is_paused:
+		#_toggle_player_process(true)
+		#_is_player_frozen = false
+
 	if state and state.can_process:
 		if not state.is_paused:
 			# Everyone (server + clients) renders from replicated time_left_ms
 			_update_label(state.time_left_ms)
-		
-		_update_countdown_ui(state.countdown_ms)
-		_update_score_label(state.blue_score, state.red_score)
+		if state.goal_scored:
+			_countdown_label.text = "Goal!"     # "3", "2", "1"
+			_countdown_label.show()
+		else:
+			_update_countdown_ui(state.countdown_ms)
+			_update_score_label(state.blue_score, state.red_score)
 
 func _position_players() -> void:
 	return
+
 
 func start_game() -> void:
 	#var ball_scene : Node3D = get_node(snapshots["ball_scene"])
@@ -246,6 +251,7 @@ func _toggle_player_process(toggle : bool) -> void:
 			continue
 		
 		p.freeze(switch)
+	_all_player_frozen = switch
 
 func _position_players2() -> void:
 	var blue_placed := 1
