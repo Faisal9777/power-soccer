@@ -9,18 +9,13 @@ extends Node
 @export var scoreboard_scene_path: String = "res://scenes/ScoreboardScene.tscn"
 @export var player_scene: PackedScene
 @export var bot_player_scene: PackedScene
-@onready var grapple_btn: TouchScreenButton = $CanvasLayer/UI/ActionPad/Grapple
-@onready var pull_btn:    TouchScreenButton = $CanvasLayer/UI/ActionPad/Pull
-@onready var fire_btn:    TouchScreenButton = $CanvasLayer/UI/ActionPad/Fire
-@onready var release_btn: TouchScreenButton = $CanvasLayer/UI/ActionPad/Release
 
-var _last_grapple_mode := false
 
-@export var fire_tex_flying: Texture2D        # normal fire icon
-@export var fire_tex_latched: Texture2D       # icon when grapple is latched (often “Release” icon)
-@export var fire_btn_path:NodePath
+var _grapple_crosshair_layer: CanvasLayer
+var _grapple_crosshair_root: Control
+var _grapple_crosshair: GrappleCrosshair
 
-var _fire_last_latched := false
+
 
 
 @export var ball_packed: PackedScene
@@ -59,11 +54,15 @@ var _my_player: Node = null
 var _input_accum: float = 0.0
 var ball_scene : Node3D = null
 var  tackle_edge_latched := false
-var grapple_edge_latched := false
 var  stop_ball_edge_latched := false
 var  jump_edge_latched := false
 var  shoot_edge_latched := false
 var latch_edge_latched := false 
+var ability_toggle_edge_latched := false
+var ability_a1_edge_latched := false
+var ability_a2_edge_latched := false
+var ability_a3_edge_latched := false
+
 @onready var tackle_btn: TouchScreenButton = $CanvasLayer/UI/ActionPad/Tackle
 var _tackle_cd_label: Label
 var _tackle_cd_local: float = 0.0
@@ -94,7 +93,7 @@ func _ready() -> void:
 		score_btn.button_down.connect(_on_mobile_score_down)
 	if not score_btn.button_up.is_connected(_on_mobile_score_up):
 		score_btn.button_up.connect(_on_mobile_score_up)
-	_set_grapple_buttons_visible(false)
+	
 	_setup_team_position()
 	# If you didn't set the spawner in the editor, do it here:
 	var spawner := players_root.get_node_or_null("MultiplayerSpawner")
@@ -119,7 +118,8 @@ func _ready() -> void:
 	_server_setup()
 	_tackle_cd_label = _ensure_cd_label(tackle_btn)
 	_pass_cd_label = _ensure_cd_label(pass_btn)
-
+	_ensure_grapple_crosshair()
+	
 	# 1) Connect to the Network autoload signals (do it here so it works even if not wired in editor)
 
 	#Network.server_started.connect(_on_server_started)
@@ -572,14 +572,6 @@ func _create_graphics_settings_ui() -> Control:
 func _apply_graphics_settings(fullscreen: bool, vsync: bool, quality: int, tex_quality: int, scale_3d: float) -> void:
 	Settings.set_and_save(fullscreen, vsync, quality, tex_quality, scale_3d)
 
-func _set_grapple_buttons_visible(on: bool) -> void:
-	if pull_btn:    pull_btn.visible = on
-	if fire_btn:    fire_btn.visible = on
-	if release_btn: release_btn.visible = on
-
-	# "Toggle look" for Grapple button (TouchScreenButton can’t stay pressed)
-	if grapple_btn:
-		grapple_btn.modulate.a = 1.0 if on else 0.55
 
 
 func _server_setup() -> void:
@@ -685,8 +677,6 @@ func _shoot_action() -> String:
 	return "shoot_touch" if is_mobile else "shoot"
 func _update_inputs() -> void:
 	var gm := false
-	if _my_player and is_instance_valid(_my_player):
-		gm = bool(_my_player.get("grapple_mode_active"))
 	if Input.is_action_just_pressed("jump") and not jump_edge_latched:
 		jump_edge_latched = true
 	if Input.is_action_just_pressed("tackle") and not tackle_edge_latched:
@@ -706,8 +696,17 @@ func _update_inputs() -> void:
 		if _pass_cd_local <= 0.0:
 			print("CAPPPPPPPPPPP!!!!!!+")
 			assist_pass_edge_latched = true
-	if Input.is_action_just_pressed("grapple") and not grapple_edge_latched:
-		grapple_edge_latched = true
+
+		# --- Ability inputs (edge-latched like everything else) ---
+	if Input.is_action_just_pressed("ability_toggle") and not ability_toggle_edge_latched:
+		ability_toggle_edge_latched = true
+
+	if Input.is_action_just_pressed("ability_action1") and not ability_a1_edge_latched:
+		ability_a1_edge_latched = true	
+		print("WORLD: ability_action1 pressed")
+
+	if Input.is_action_just_pressed("ability_action3") and not ability_a3_edge_latched:
+		ability_a3_edge_latched = true
 
 func _reset_inputs() -> void:
 	jump_edge_latched = false
@@ -716,7 +715,10 @@ func _reset_inputs() -> void:
 	shoot_edge_latched = false
 	latch_edge_latched = false     # ⬅️ NEW
 	assist_pass_edge_latched = false
-	grapple_edge_latched = false
+	ability_toggle_edge_latched = false
+	ability_a1_edge_latched = false
+	ability_a3_edge_latched = false
+
 
 func _process(delta: float) -> void:
 	if Input.is_action_just_pressed("host_key"):
@@ -741,13 +743,9 @@ func _process(delta: float) -> void:
 		_game._rpc_set_camera_first_person()       # direct local call
 	_update_tackle_cooldown_ui(delta)
 	_update_pass_cooldown_ui(delta)
-	var gm := false
-	if _my_player and is_instance_valid(_my_player):
-		gm = bool(_my_player.get("grapple_mode_active"))
 
-	if gm != _last_grapple_mode:
-		_last_grapple_mode = gm
-		_set_grapple_buttons_visible(gm)
+
+	
 func _is_really_hosting() -> bool:
 	return multiplayer.multiplayer_peer is ENetMultiplayerPeer and multiplayer.is_server()
 
@@ -840,19 +838,14 @@ func _spawn_player_for2(id: int) -> void:
 	if !multiplayer.is_server():
 		return
 
-	# Avoid duplicates
 	if _players.has(id) and is_instance_valid(_players[id]):
 		return
 
-	# ----------------------------
-	# Choose bot scene or player scene
-	# ----------------------------
 	var scene_to_use: PackedScene = player_scene
+	var rec: Dictionary = GameState.roster.get(id, {})
 
-	if GameState.roster.has(id):
-		var rec: Dictionary = GameState.roster[id]
-		if rec.get("is_bot", false) and bot_player_scene:
-			scene_to_use = bot_player_scene
+	if bool(rec.get("is_bot", false)) and bot_player_scene:
+		scene_to_use = bot_player_scene
 
 	if scene_to_use == null:
 		push_error("No player scene assigned (player_scene / bot_player_scene)")
@@ -860,23 +853,29 @@ func _spawn_player_for2(id: int) -> void:
 
 	var p: Node = scene_to_use.instantiate()
 
-	# Use the name from roster if present (so bots show “Bot1”, etc.)
-	var display_name := GameState.player_name
-	if GameState.roster.has(id):
-		display_name = String(GameState.roster[id].get("name", display_name))
+	var display_name := String(rec.get("name", GameState.player_name))
 	p.name = display_name
 
-	p.set_multiplayer_authority(1)        # SERVER owns/simulates in server-auth
-	p.owner_peer_id = id                  # who should see/control this player locally
+	p.set_multiplayer_authority(1)
+	p.owner_peer_id = id
+
 	_players[id] = p
 	players_root.add_child(p, true)
-	GameState.roster[id]["player_path"] = p.get_path()
+
+	# ✅ APPLY LOBBY-CHOSEN ABILITY HERE
+	var ability_id := String(rec.get("ability", "grapple"))  # default
+	if p is Player:
+		(p as Player).ability_id = ability_id
+		(p as Player).call_deferred("set_ability_local", StringName(ability_id))
+
+	# store player_path back into roster (server-side)
+	if GameState.roster.has(id):
+		GameState.roster[id]["player_path"] = p.get_path()
 
 	print("Spawned/registered player for peer ", id,
-		" (bot=", GameState.roster.get(id, {}).get("is_bot", false),
+		" (bot=", rec.get("is_bot", false),
 		") authority=", p.get_multiplayer_authority())
 
-	# Tell only that client to attach their camera to this player
 	_notify_client_to_attach_camera(p, id)
 
 func _spawn_players() -> void:
@@ -954,8 +953,6 @@ func _gather_input() -> Dictionary:
 	else:
 		facing = (_my_player.get_yaw() if _my_player else Dictionary())
 	var gm := false
-	if _my_player and is_instance_valid(_my_player):
-		gm = bool(_my_player.get("grapple_mode_active"))
 
 	var shoot_down := Input.is_action_pressed(_shoot_action())
 	var shoot_up := shoot_edge_latched
@@ -979,7 +976,11 @@ func _gather_input() -> Dictionary:
 	"cam_yaw": yaw,
 	"assist_pass_pressed": assist_pass_edge_latched,
 	"latch_toggle": latch_edge_latched,
-	"grapple_toggle": grapple_edge_latched   # ⬅️ NEW
+	"ability_toggle": ability_toggle_edge_latched,
+	"ability_action1": ability_a1_edge_latched,
+	"ability_action2": Input.is_action_pressed("ability_action2"),
+	"ability_action3": ability_a3_edge_latched,  
+
 }
 
 func _send_local_input() -> void:
@@ -987,13 +988,20 @@ func _send_local_input() -> void:
 		return
 
 	var d := _gather_input()
-	
+
+	# ✅ IMPORTANT: also feed local player immediately on this machine
+	# so client-side code (_ability.client_tick, UI, etc.) can react instantly.
+	if is_instance_valid(_my_player) and _my_player.has_method("apply_net_input"):
+		_my_player.apply_net_input(d)
+
 	if multiplayer.is_server():
-	
 		if _players.has(1):
 			var p: CharacterBody3D = _players[1]
 			if p and p.has_method("apply_net_input"):
 				p.apply_net_input(d)
+				if d.get("ability_action1", false):
+					print("PLAYER: got ability_action1 (server=", multiplayer.is_server(), ")")
+
 	else:
 		rpc_id(1, "_rpc_client_input", multiplayer.get_unique_id(), d)
 
@@ -1028,6 +1036,11 @@ func _rpc_attach_cam(player_path: NodePath, _unused_joystick_path: NodePath, bal
 	if p == null:
 		return
 
+	# Connect ONCE (avoid double connect on respawn)
+	if not _my_player.ability_ui_changed.is_connected(_on_ability_ui_changed):
+		_my_player.ability_ui_changed.connect(_on_ability_ui_changed)
+
+
 	# Resolve joystick on THIS client
 	#var joystick: Control = null
 	#if OS.has_feature("mobile"):
@@ -1057,10 +1070,7 @@ func _rpc_attach_cam(player_path: NodePath, _unused_joystick_path: NodePath, bal
 	# Hand joystick to player (as you already do)
 	if p.has_method("attach_camera"):
 		p.call_deferred("attach_camera", cam, joystick)
-		# ✅ Bind grapple UI for local player
-	var pl := p as Player
-	if pl != null and pl._is_local_owner(): # or (multiplayer.get_unique_id() == pl.owner_peer_id)
-		_bind_player_ui(pl)
+
 
 func _focus_camera_on_player(p: Node, peer_id: int) -> void:
 	# Find your camera (adjust the path/group/name to your project)
@@ -1206,32 +1216,92 @@ func _update_pass_cooldown_ui(delta: float) -> void:
 		_pass_cd_label.visible = false
 		_pass_cd_label.text = ""
 
-func _set_fire_texture(latched: bool) -> void:
-	if fire_btn == null:
-		fire_btn = get_node_or_null(fire_btn_path) as TouchScreenButton
-		if fire_btn == null:
-			return
 
-	var tex: Texture2D = fire_tex_latched if latched else fire_tex_flying
-	if tex == null:
+
+
+func _ensure_grapple_crosshair() -> void:
+	if _grapple_crosshair_layer != null:
 		return
 
-	fire_btn.texture_normal = tex
-	fire_btn.texture_pressed = tex
+	_grapple_crosshair_layer = CanvasLayer.new()
+	_grapple_crosshair_layer.name = "GrappleCrosshairLayer"
+	_grapple_crosshair_layer.layer = 200  # draw above most UI
+	add_child(_grapple_crosshair_layer)
+
+	# full-screen root
+	_grapple_crosshair_root = Control.new()
+	_grapple_crosshair_root.name = "GrappleCrosshairRoot"
+	_grapple_crosshair_root.anchor_left = 0.0
+	_grapple_crosshair_root.anchor_top = 0.0
+	_grapple_crosshair_root.anchor_right = 1.0
+	_grapple_crosshair_root.anchor_bottom = 1.0
+	_grapple_crosshair_root.offset_left = 0
+	_grapple_crosshair_root.offset_top = 0
+	_grapple_crosshair_root.offset_right = 0
+	_grapple_crosshair_root.offset_bottom = 0
+	_grapple_crosshair_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_grapple_crosshair_layer.add_child(_grapple_crosshair_root)
+
+	# center container
+	var center := CenterContainer.new()
+	center.anchor_left = 0.0
+	center.anchor_top = 0.0
+	center.anchor_right = 1.0
+	center.anchor_bottom = 1.0
+	center.offset_left = 0
+	center.offset_top = 0
+	center.offset_right = 0
+	center.offset_bottom = 0
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_grapple_crosshair_root.add_child(center)
+
+	_grapple_crosshair = GrappleCrosshair.new()
+	_grapple_crosshair.visible = false
+	center.add_child(_grapple_crosshair)
 
 
-func _bind_player_ui(p: Player) -> void:
-	if p == null:
+func _update_grapple_crosshair() -> void:
+	if _grapple_crosshair == null:
 		return
-	# avoid double connect
-	if not p.grapple_latch_ui_changed.is_connected(_on_grapple_latch_ui_changed):
-		p.grapple_latch_ui_changed.connect(_on_grapple_latch_ui_changed)
-	# set initial state
-	_on_grapple_latch_ui_changed(p.is_grapple_latched())
 
-func _on_grapple_latch_ui_changed(latched: bool) -> void:
-	_set_fire_texture(latched)
+	var show := false
+	if is_instance_valid(_my_player):
+		# show only when grapple mode is enabled
+		show = _my_player.grapple_mode_active
+
+	_grapple_crosshair.visible = show
+
+
 
 
 func ui_release_grapple() -> void:
 	pass # Replace with function body.
+func _on_ability_ui_changed(labels: PackedStringArray, visible: bool, wants_crosshair: bool) -> void:
+	var pad := $CanvasLayer/UI/ActionPad
+
+	var a1 := pad.get_node("AbilityAction1")
+	var a2 := pad.get_node("AbilityAction2")
+	var a3 := pad.get_node("AbilityAction3")
+
+	a1.visible = visible
+	a2.visible = visible
+	a3.visible = visible
+	
+	#_set_btn_label(a1, labels.size() > 0 ? labels[0] : "")
+	#_set_btn_label(a2, labels.size() > 1 ? labels[1] : "")
+	#_set_btn_label(a3, labels.size() > 2 ? labels[2] : "")
+
+	
+	# Crosshair (use your existing node reference or path)
+	if is_instance_valid(_grapple_crosshair):
+		_grapple_crosshair.visible = visible and wants_crosshair
+func _set_btn_label(btn: Node, t: String) -> void:
+	if btn == null: return
+	var lbl := btn.get_node_or_null("Label") as Label
+	if lbl:
+		lbl.text = t
+		return
+	for c in btn.get_children():
+		if c is Label:
+			(c as Label).text = t
+			return

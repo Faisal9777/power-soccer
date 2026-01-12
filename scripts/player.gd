@@ -87,38 +87,29 @@ var _tackle_phasing: bool = false
 @export var aim_sens_y := 0.010
 @export var aim_pitch_min := deg_to_rad(-80)
 @export var aim_pitch_max := deg_to_rad( 80)
+# --- Generic: keep air momentum (used by abilities like Grapple) ---
+var _air_momentum_keep_left := 0.0
+
+func start_air_momentum_keep(seconds: float) -> void:
+	_air_momentum_keep_left = maxf(_air_momentum_keep_left, seconds)
+
+# --- Generic: external pull (used by abilities) ---
+var _external_pull_active := false
+var _external_pull_to := Vector3.ZERO
+var _external_pull_speed := 0.0
+var _external_pull_stop_dist := 1.2
+
 # --- Abilities ---
-@export var grapple_max_dist: float = 60.0
-@export var grapple_hit_mask: int = (1 << 0) | (1 << 1) | (1 << 2) # set this to your “world/walls” layers
-@export var grapple_shot_scene: PackedScene = preload("res://scenes/GrappleShot.tscn")
+const ABILITY_REGISTRY := {
+	"grapple": "res://scripts/Abilities/GrappleAbility.gd",
+}
+signal ability_ui_changed(labels: PackedStringArray, visible: bool, wants_crosshair: bool)
 
-@export var grapple_pull_speed: float = 18.0
-@export var grapple_stop_dist: float = 1.2
-@export var grapple_pull_stamina_drain: float = 0.0  # set >0 if you want stamina cost
+var ability_mode_active: bool = false
+var _ability: AbilityBase = null
+var _ability_id: StringName = &"grapple"
+@export var ability_id: String = "grapple"
 
-var _last_pulled_victim_path: NodePath = NodePath("")
-
-@export var grapple_release_keep_time: float = 5.0  # seconds
-var _grapple_release_keep_left: float = 0.0
-signal grapple_latch_ui_changed(latched: bool)
-var _grapple_target_path_local: NodePath = NodePath("")
-var _grapple_target_path_server: NodePath = NodePath("")
-var _grapple_target_kind_server: int = 0  # 0=wall/none, 1=ball, 2=player
-
-var _grapple_shot: GrappleShot = null        # client-only visual
-var _grapple_latched_local: bool = false     # client-only
-
-var _grapple_point_server: Vector3 = Vector3.ZERO
-var _grapple_latched_server: bool = false
-var _grapple_reeling_server: bool = false
-
-var _grapple_reel: bool = false
-var _grapple_pulling_server: bool = false
-@export var grapple_pull_target_speed: float = 14.0
-
-var _pulled_active_server := false
-var _pulled_to_server: Vector3 = Vector3.ZERO
-var _pulled_speed_server: float = 0.0
 
 var _aim_az := 0.0      # yaw around the ball (left/right)
 var _aim_el := 0.0      # pitch around the ball (up/down)
@@ -145,7 +136,6 @@ var current_ball_path: NodePath = NodePath("")
 var current_ball: RigidBody3D = null
 
 var aim_active: bool = false
-var grapple_mode_active: bool = false
 
 var aim_dir: Vector3 = Vector3.ZERO
 var aim_contact: Vector3 = Vector3.ZERO
@@ -237,9 +227,14 @@ var _net := {
 	"facing": {"yaw_delta" : _yaw_delta_accum, "pitch_delta" : _pitch_delta_accum},
 	"aim_position": null,
 	"latch_toggle": false,
-	"grapple_toggle": false,
 	"assist_pass_pressed": false,
-	"cam_yaw": 0.0        # ⬅️ ADD THIS
+	"cam_yaw": 0.0,
+
+	# ✅ ADD THESE:
+	"ability_toggle": false,
+	"ability_action1": false,
+	"ability_action2": false,
+	"ability_action3": false,
 }
 
 
@@ -272,216 +267,6 @@ func attach_camera(c: Camera3D, j: Node) -> void:
 @rpc("any_peer", "reliable", "call_local")
 func rpc_aim_camera_at(target_world: Vector3, from : Vector3) -> void:
 	cam.face_towards(target_world, from)
-
-# Client tells server: "the hook is now latched here"
-@rpc("any_peer", "reliable", "call_local")
-func _rpc_grapple_latched(point: Vector3, target_path: NodePath) -> void:
-	if !multiplayer.is_server():
-		return
-
-	var sender := multiplayer.get_remote_sender_id()
-	if sender != 0 and sender != owner_peer_id:
-		return
-
-	_grapple_point_server = point
-	_grapple_latched_server = true
-	_grapple_reeling_server = false
-
-	# Reset target info
-	_grapple_target_path_server = NodePath("")
-	_grapple_target_kind_server = 0
-
-	# Validate target_path (only allow ball/player)
-	if String(target_path) != "":
-		var n := get_node_or_null(target_path)
-		if n is RigidBody3D and n.is_in_group("ball"):
-			# layer 3 check (optional but nice)
-			if (n.collision_layer & _layer_bit(ball_layer_bit)) != 0:
-				_grapple_target_path_server = target_path
-				_grapple_target_kind_server = 1
-		elif n is Player:
-			if (n.collision_layer & _layer_bit(characters_layer_bit)) != 0:
-				_grapple_target_path_server = target_path
-				_grapple_target_kind_server = 2
-
-@rpc("any_peer", "reliable")
-func _rpc_request_cancel_grapple() -> void:
-	if !multiplayer.is_server():
-		return
-	if multiplayer.get_remote_sender_id() != owner_peer_id:
-		return
-	_sv_cancel_grapple(true)
-
-
-# Client -> Server: "release/cancel grapple"
-@rpc("any_peer", "reliable")
-func _rpc_request_grapple_release() -> void:
-	if !multiplayer.is_server():
-		return
-	# only allow the owner to release their grapple
-	if multiplayer.get_remote_sender_id() != owner_peer_id:
-		return
-	_sv_grapple_release()
-
-func _sv_grapple_release() -> void:
-	# clear server grapple state
-	_grapple_reeling_server = false
-	_grapple_latched_server = false
-	_grapple_reel = false
-	_grapple_point_server = Vector3.ZERO
-	_grapple_pulling_server = false
-	_grapple_target_kind_server = 0
-	_grapple_target_path_server = NodePath("")
-	
-	if String(_last_pulled_victim_path) != "":
-		var oldv := get_node_or_null(_last_pulled_victim_path) as Player
-		if oldv and is_instance_valid(oldv):
-			oldv._sv_clear_pulled()
-	_last_pulled_victim_path = NodePath("")
-	 #optional: keep everyone’s reel flag consistent
-	rpc("_rpc_set_reel_state", false)
-
-	# tell only the owning client to remove the rope visual
-	rpc_id(owner_peer_id, "_rpc_grapple_finish_visual")
-
-func _request_grapple_release() -> void:
-	if multiplayer.is_server():
-		_sv_grapple_release()          # host: no rpc-to-self
-	else:
-		rpc_id(1, "_rpc_request_grapple_release")
-
-
-@rpc("any_peer", "reliable")
-func _rpc_request_reel(on: bool) -> void:
-	if !multiplayer.is_server():
-		return
-
-	# optional: only allow the owner to request reel
-	if multiplayer.get_remote_sender_id() != owner_peer_id:
-		return
-
-	_sv_set_reel(on)
-
-func _sv_set_reel(on: bool) -> void:
-	_grapple_reel = on
-	rpc("_rpc_set_reel_state", on)  # broadcast to all peers
-	
-
-@rpc("authority", "reliable", "call_local")
-func _rpc_set_reel_state(on: bool) -> void:
-	_grapple_reel = on
-
-
-# Client tells server: "start/stop reeling"
-@rpc("any_peer", "reliable", "call_local")
-func _rpc_grapple_set_reel(enable: bool) -> void:
-	if !multiplayer.is_server():
-		return
-	if multiplayer.get_remote_sender_id() != owner_peer_id:
-		return
-	if enable and _grapple_latched_server:
-		var d := global_position.distance_to(_grapple_point_server)
-		if d <= grapple_stop_dist:
-			_grapple_reeling_server = false
-			return
-		_grapple_reeling_server = true
-	else:
-		_grapple_reeling_server = false
-
-@rpc("any_peer", "reliable")
-func _rpc_request_pull(on: bool) -> void:
-	if !multiplayer.is_server():
-		return
-	if multiplayer.get_remote_sender_id() != owner_peer_id:
-		return
-	_grapple_pulling_server = on
-
-func _request_pull(on: bool) -> void:
-	if multiplayer.is_server():
-		_grapple_pulling_server = on
-	else:
-		rpc_id(1, "_rpc_request_pull", on)
-
-func _sv_set_pulled(to_pos: Vector3, speed: float) -> void:
-	_pulled_active_server = true
-	_pulled_to_server = to_pos
-	_pulled_speed_server = speed
-
-func _sv_clear_pulled() -> void:
-	_pulled_active_server = false
-	
-func _handle_grapple_pull_target_server(delta: float) -> void:
-	if !_grapple_pulling_server or !_grapple_latched_server:
-		# stop pulling victim if we were
-		if String(_last_pulled_victim_path) != "":
-			var oldv := get_node_or_null(_last_pulled_victim_path) as Player
-			if oldv and is_instance_valid(oldv):
-				oldv._sv_clear_pulled()
-		_last_pulled_victim_path = NodePath("")
-		return
-
-	# Only works if we latched a BALL or PLAYER (not walls)
-	if _grapple_target_kind_server == 1:
-		var ball := get_node_or_null(_grapple_target_path_server) as RigidBody3D
-		if ball == null or !is_instance_valid(ball):
-			return
-
-		ball.freeze = false
-		ball.sleeping = false
-
-		var to_me := (global_position + Vector3.UP * 0.6) - ball.global_position
-		var dist := to_me.length()
-		if dist <= grapple_stop_dist:
-			ball.linear_velocity = Vector3.ZERO
-			return
-		var dir = to_me / max(dist, 0.001)
-		ball.linear_velocity = dir * grapple_pull_target_speed
-
-	elif _grapple_target_kind_server == 2:
-		var victim := get_node_or_null(_grapple_target_path_server) as Player
-		if victim == null or !is_instance_valid(victim):
-			return
-
-		_last_pulled_victim_path = _grapple_target_path_server
-		victim._sv_set_pulled(global_position, grapple_pull_target_speed)
-func _sv_update_grapple_point_from_target() -> void:
-	# Only meaningful if we are latched
-	if !_grapple_latched_server:
-		return
-
-	# If we latched a BALL, keep hook point glued to ball center
-	if _grapple_target_kind_server == 1:
-		var ball := get_node_or_null(_grapple_target_path_server) as Node3D
-		if ball != null and is_instance_valid(ball):
-			_grapple_point_server = ball.global_position
-		else:
-			# Target disappeared → degrade to "wall point" (or you can auto-release)
-			_grapple_target_kind_server = 0
-			_grapple_target_path_server = NodePath("")
-		return
-
-	# If we latched a PLAYER, keep hook point glued to their chest-ish
-	if _grapple_target_kind_server == 2:
-		var p := get_node_or_null(_grapple_target_path_server) as Player
-		if p != null and is_instance_valid(p):
-			_grapple_point_server = p.global_position + Vector3.UP * 0.9
-		else:
-			_grapple_target_kind_server = 0
-			_grapple_target_path_server = NodePath("")
-		return
-
-	# kind 0 = wall/none → keep original point
-
-# Server tells owner client: "remove the rope visual"
-@rpc("authority", "reliable", "call_local")
-func _rpc_grapple_finish_visual() -> void:
-	if !_is_local_owner():
-		return
-	if _grapple_shot and is_instance_valid(_grapple_shot):
-		_grapple_shot.queue_free()
-	_grapple_shot = null
-	
-	_set_grapple_latched_local(false)
 
 func get_yaw() -> Dictionary:
 	# Consume yaw delta accumulated since the last send (desktop)
@@ -572,8 +357,10 @@ func _ready() -> void:
 		var ev := InputEventMouseButton.new()
 		ev.button_index = MOUSE_BUTTON_LEFT
 		InputMap.action_erase_event("shoot", ev)   # remove mouse-left binding at runtime
-		InputMap.action_erase_event("grapple_fire", ev)
 	_ensure_name_tag()
+	set_ability_local(StringName(ability_id)) # ability_id = "grapple"
+	# or: set_ability_local(&"grapple")
+
 
 func _ensure_name_tag() -> void:
 	if name_tag == null:
@@ -714,38 +501,9 @@ func _local_process(delta: float) -> void:
 		_update_charge_ui_from_replication()
 	if _stam_bar:
 		_update_stamina_ui_from_replication()
-		# ✅ allow release any time a rope exists
-	if Input.is_action_just_pressed("grapple_release") and _grapple_shot and is_instance_valid(_grapple_shot):
-		_grapple_shot.queue_free()
-		_grapple_shot = null
-		_set_grapple_latched_local(false)
-		_request_cancel_grapple()
-		return
-	if grapple_mode_active:
-
-		# keep rope start glued to muzzle while it exists
-		if _grapple_shot and is_instance_valid(_grapple_shot) and cam:
-			_grapple_shot.set_start_world(get_muzzle_from_camera(cam))
-
-		if Input.is_action_just_pressed("grapple_fire"):
-
-			# 2nd press: start reeling (only if latched)
-			if _grapple_shot and is_instance_valid(_grapple_shot) and _grapple_latched_local:
-				rpc_id(1, "_rpc_grapple_set_reel", true)
-				return
-
-			# 1st press: fire new grapple
-			_fire_grapple_visual_center_and_store()
-		if Input.is_action_just_pressed("grapple_pull"):
-			_request_pull(true)
-		if Input.is_action_just_released("grapple_pull"):
-			_request_pull(false)
-
-		# Optional: make rope end follow moving target while latched
-		if _grapple_shot and is_instance_valid(_grapple_shot) and _grapple_latched_local:
-			var tn := get_node_or_null(_grapple_target_path_local)
-			if tn != null:
-				_grapple_shot.set_end_world((tn as Node3D).global_position)
+		# Always tick the ability for the LOCAL OWNER (so visuals can update reliably)
+	if _is_local_owner() and _ability:
+		_ability.client_tick(self, delta)
 
 
 
@@ -757,33 +515,10 @@ func _update_charge_ui_from_replication() -> void:
 func simulate_server(delta: float) -> void:
 	if _is_frozen:
 		return
-
-	_grapple_release_keep_left = maxf(0.0, _grapple_release_keep_left - delta)
-	# ✅ keep grapple point glued to moving ball/player
-	_sv_update_grapple_point_from_target()
-	# If someone is pulling me, override my movement this tick
-	if _pulled_active_server:
-		var to := _pulled_to_server - global_position
-		var dist := to.length()
-		if dist <= grapple_stop_dist:
-			_pulled_active_server = false
-		else:
-			var dir = to / max(dist, 0.001)
-			velocity.x = dir.x * _pulled_speed_server
-			velocity.z = dir.z * _pulled_speed_server
-			apply_gravity(delta)
-			move_and_slide()
-		return
-
+	_air_momentum_keep_left = maxf(0.0, _air_momentum_keep_left - delta)
 	# normal sim continues here
 	_update_player_facing_server(delta)
 
-	# Reel overrides movement (but MUST NOT skip latch + stamina)
-	var reel_handled := _handle_grapple_reel_server(delta)
-
-	# Still allow pulling target even if not reeling (optional)
-	if !reel_handled:
-		_handle_grapple_pull_target_server(delta)
 
 	if current_ball_path:
 		_resolve_ball()
@@ -794,15 +529,22 @@ func simulate_server(delta: float) -> void:
 	# ✅ latch toggle + stamina drain must still happen while reeling
 	_handle_latch_mode_server(delta)
 
-	_handle_grapple_mode_server()
+	
 	_handle_assist_pass_server()
 
 	# ✅ if grapple reel already moved us this tick, don't do normal movement,
 	# but DO keep stamina logic stable and keep ball glued.
-	if reel_handled:
-		_using_sprint = false
-		_update_stamina_server(delta)
-		_update_latched_ball_server(delta)
+	if _external_pull_active:
+		var to := _external_pull_to - global_position
+		var dist := to.length()
+		if dist <= _external_pull_stop_dist:
+			clear_external_pull()
+		else:
+			var dir = to / max(dist, 0.001)
+			velocity.x = dir.x * _external_pull_speed
+			velocity.z = dir.z * _external_pull_speed
+			apply_gravity(delta)
+			move_and_slide()
 		return
 
 	# normal sim continues here
@@ -824,6 +566,17 @@ func simulate_server(delta: float) -> void:
 	_handle_action_server(input_dir, delta)
 	_update_stamina_server(delta)
 	_update_latched_ball_server(delta)
+	_handle_ability_mode_server()
+
+	if ability_mode_active and _ability:
+		_ability.server_tick(self, delta)
+
+		# movement override (grapple reel)
+		if _ability.server_movement_override(self, delta):
+			_using_sprint = false
+			_update_stamina_server(delta)
+			_update_latched_ball_server(delta)
+			return
 
 
 func _can_perform(action: String, stamina_required: float, spend: bool = true) -> bool:
@@ -975,13 +728,13 @@ func _move_server(input_dir: Vector3, delta: float) -> void:
 	var accel := 12.0 if is_on_floor() else 12.0 * air_control
 
 	var no_input := input_dir.length_squared() < 0.0001
-	var just_released_grapple := (_grapple_release_keep_left > 0.0)
 
 	# ✅ If we just released grapple and we're in the air with no input,
-	# do NOT lerp lateral toward zero (keeps momentum).
-	if !(just_released_grapple and no_input and !is_on_floor()):
+	var just_released := (_air_momentum_keep_left > 0.0)
+
+	if !(just_released and no_input and !is_on_floor()):
 		lateral = lateral.lerp(target_vel, clamp(accel * delta, 0.0, 1.0))
-	# else: keep lateral as-is
+	# else: keep lateral as-is (momentum preserved)
 
 	velocity.x = lateral.x
 	velocity.z = lateral.z
@@ -1869,62 +1622,7 @@ func _mark_pass_trap_for_receiver(ball: RigidBody3D, receiver: Node) -> void:
 	}
 	ball.set_meta(PASS_TRAP_META_KEY, info)
 
-func _handle_grapple_mode_server() -> void:
-	if !multiplayer.is_server():
-		return
 
-	if bool(_net.get("grapple_toggle", false)):
-		_net["grapple_toggle"] = false  # ✅ consume edge
-
-		grapple_mode_active = !grapple_mode_active
-
-		var who := "SERVER" if multiplayer.is_server() else "CLIENT"
-		print("GRAPPLE MODE =", grapple_mode_active, " owner_peer_id=", owner_peer_id, " who=", who)
-
-
-func _set_grapple_latched_local(v: bool) -> void:
-	if _grapple_latched_local == v:
-		return
-	_grapple_latched_local = v
-	if _is_local_owner():
-		grapple_latch_ui_changed.emit(v)
-
-func is_grapple_latched() -> bool:
-	return _grapple_latched_local
-
-func _fire_grapple_visual_center() -> void:
-	if cam == null or grapple_shot_scene == null:
-		return
-
-	# Ray from screen center
-	var r = cam.get_center_ray()
-	var ro: Vector3 = r["origin"]
-	var rd: Vector3 = r["dir"]
-
-	var to := ro + rd * grapple_max_dist
-
-	var q := PhysicsRayQueryParameters3D.create(ro, to)
-	q.collision_mask = grapple_hit_mask
-
-	# ✅ exclude should be RID, not Node
-	q.exclude = [get_rid()]
-
-	# ✅ make it robust
-	q.collide_with_bodies = true
-	q.collide_with_areas = true
-	q.hit_from_inside = true
-	q.hit_back_faces = true
-
-	var hit := get_world_3d().direct_space_state.intersect_ray(q)
-
-	var end_pos = hit.position if !hit.is_empty() else to
-
-	# Start point (choose camera origin for now — later you can use a weapon/muzzle socket)
-	var start_pos := get_muzzle_from_camera(cam)
-
-	var shot := grapple_shot_scene.instantiate()
-	get_tree().current_scene.add_child(shot)
-	shot.start(start_pos, end_pos)
 func get_muzzle_from_camera(cam: Camera3D) -> Vector3:
 	var right := cam.global_transform.basis.x
 	var up := cam.global_transform.basis.y
@@ -1934,128 +1632,106 @@ func get_muzzle_from_camera(cam: Camera3D) -> Vector3:
 		+ right * 0.25 \
 		+ up * -0.18 \
 		+ forward * 0.60
-func _handle_grapple_reel_server(delta: float) -> bool:
-	if !_grapple_reeling_server:
-		return false
 
-	# optional stamina drain while reeling
-	if grapple_pull_stamina_drain > 0.0:
-		_stamina = maxf(0.0, _stamina - grapple_pull_stamina_drain * delta)
-		if _stamina <= 0.0:
-			_grapple_reeling_server = false
-			_grapple_latched_server = false
-			rpc_id(owner_peer_id, "_rpc_grapple_finish_visual")
-			return true
+func _make_ability(id: StringName) -> AbilityBase:
+	var key := String(id)
+	var path: String = ABILITY_REGISTRY.get(key, "")
+	if path == "":
+		return null
 
-	var to := _grapple_point_server - global_position
-	var dist := to.length()
+	var script := load(path) as Script
+	if script == null:
+		push_error("Ability script not found: %s" % path)
+		return null
 
-	if dist <= grapple_stop_dist:
-		# ✅ stop reeling, but KEEP latched
-		_grapple_reeling_server = false
-		# keep these ON:
-		# _grapple_latched_server stays true
-		# _grapple_point_server stays the latch point
-		# keep target_kind/path too
+	var inst = script.new()
+	if inst is AbilityBase:
+		return inst as AbilityBase
 
-		# optional: stop any residual velocity
-		velocity = Vector3.ZERO
+	push_error("Ability '%s' (%s) does NOT extend AbilityBase" % [key, path])
+	return null
 
-		# (optional) if you use _grapple_reel flag for UI
-		_grapple_reel = false
-		rpc("_rpc_set_reel_state", false)
+func set_ability_local(id: StringName) -> void:
+	if _ability:
+		_ability.on_unequipped(self)
+	_ability_id = id
+	_ability = _make_ability(id)
+	if _ability:
+		_ability.on_equipped(self)
+	_emit_ability_ui()
 
-		# ✅ do NOT finish visual here
-		return true
-
-	var dir = to / max(dist, 0.001)
-
-	# ✅ pull toward the hook (includes Y, so it can pull you upward too)
-	velocity = dir * grapple_pull_speed
-	move_and_slide()
-	return true
-func _fire_grapple_visual_center_and_store() -> void:
-	if cam == null or grapple_shot_scene == null:
+func _emit_ability_ui() -> void:
+	var visible := ability_mode_active and _ability != null
+	var labels := PackedStringArray(["Action1","Action2","Action3"])
+	var cross := false
+	if _ability:
+		labels = _ability.labels()
+		cross = _ability.wants_crosshair()
+	ability_ui_changed.emit(labels, visible, cross)
+func _handle_ability_mode_server() -> void:
+	if !multiplayer.is_server():
 		return
 
-	# If an old rope exists, clear it
-	if _grapple_shot and is_instance_valid(_grapple_shot):
-		_grapple_shot.queue_free()
-	_grapple_shot = null
-	
-	_set_grapple_latched_local(false)
-	# Ray from screen center
-	var r = cam.get_center_ray()
-	var ro: Vector3 = r["origin"]
-	var rd: Vector3 = r["dir"]
-	var to := ro + rd * grapple_max_dist
+	if bool(_net.get("ability_toggle", false)):
+		_net["ability_toggle"] = false
+		ability_mode_active = !ability_mode_active
 
-	var q := PhysicsRayQueryParameters3D.create(ro, to)
-	q.collision_mask = grapple_hit_mask
-	q.exclude = [self]
+		rpc_id(owner_peer_id, "_rpc_set_ability_mode", ability_mode_active)
+		if _ability:
+			_ability.on_mode_changed(self, ability_mode_active)
 
-	var hit := get_world_3d().direct_space_state.intersect_ray(q)
-	var end_pos: Vector3 = hit.position if !hit.is_empty() else to
+@rpc("authority","reliable","call_local")
+func _rpc_set_ability_mode(v: bool) -> void:
+	ability_mode_active = v
+	_emit_ability_ui()
+	if _ability:
+		_ability.on_mode_changed(self, ability_mode_active)
+func _request_ability_latched(point: Vector3, target_path: NodePath) -> void:
+	rpc_id(1, "_rpc_ability_latched", point, target_path)
 
-	var start_pos := get_muzzle_from_camera(cam)
+func _request_ability_reel(on: bool) -> void:
+	rpc_id(1, "_rpc_ability_reel", on)
 
-	var target_path: NodePath = NodePath("")
-	if !hit.is_empty():
-		var col = hit.get("collider")
-		if col is Node:
-			# Only store if it's a ball or a Player
-			if (col is RigidBody3D and col.is_in_group("ball")) or (col is Player):
-				target_path = (col as Node).get_path()
+func _request_ability_pull(on: bool) -> void:
+	rpc_id(1, "_rpc_ability_pull", on)
 
+func _request_ability_release() -> void:
+	rpc_id(1, "_rpc_ability_release")
+@rpc("any_peer","reliable","call_local")
+func _rpc_ability_latched(point: Vector3, target_path: NodePath) -> void:
+	if !multiplayer.is_server(): return
+	if multiplayer.get_remote_sender_id() != owner_peer_id: return
+	if _ability:
+		_ability.sv_on_latched(self, point, target_path)
 
-	var shot = grapple_shot_scene.instantiate() as GrappleShot
-	get_tree().current_scene.add_child(shot)
-	shot.start(start_pos, end_pos)
+@rpc("any_peer","reliable", "call_local")
+func _rpc_ability_reel(on: bool) -> void:
+	if !multiplayer.is_server(): return
+	if multiplayer.get_remote_sender_id() != owner_peer_id: return
+	if _ability:
+		_ability.sv_on_reel(self, on)
 
-	# when the VISUAL reaches the end point, tell the server “now it’s latched”
-	shot.latched.connect(func(p: Vector3):
-		_set_grapple_latched_local(true)
-		_grapple_target_path_local = target_path  # store for visuals
-		rpc_id(1, "_rpc_grapple_latched", p, target_path)
-	)
+@rpc("any_peer","reliable", "call_local")
+func _rpc_ability_pull(on: bool) -> void:
+	if !multiplayer.is_server(): return
+	if multiplayer.get_remote_sender_id() != owner_peer_id: return
+	if _ability:
+		_ability.sv_on_pull(self, on)
 
+@rpc("any_peer","reliable", "call_local")
+func _rpc_ability_release() -> void:
+	if !multiplayer.is_server(): return
+	if multiplayer.get_remote_sender_id() != owner_peer_id: return
+	if _ability:
+		_ability.sv_on_release(self)
+func apply_external_pull(to_pos: Vector3, speed: float, stop_dist: float = 1.2) -> void:
+	_external_pull_active = true
+	_external_pull_to = to_pos
+	_external_pull_speed = speed
+	_external_pull_stop_dist = stop_dist
 
-	_grapple_shot = shot
-func _request_reel(on: bool) -> void:
-	if multiplayer.is_server():
-		# host: just do it directly (no rpc-to-self)
-		_sv_set_reel(on)
-	else:
-		# client: ask the server
-		rpc_id(1, "_rpc_request_reel", on)
-func _request_cancel_grapple() -> void:
-	if multiplayer.is_server():
-		# listen-server host: DO NOT rpc to self
-		if !_is_local_owner():
-			return
-		_sv_cancel_grapple(true)
-	else:
-		# normal client
-		rpc_id(1, "_rpc_request_cancel_grapple")
-func _sv_cancel_grapple(keep_momentum: bool) -> void:
-	_grapple_reeling_server = false
-	_grapple_latched_server = false
-	_grapple_reel = false
-	_grapple_point_server = Vector3.ZERO
-
-	if keep_momentum:
-		_grapple_release_keep_left = grapple_release_keep_time
-
-	rpc_id(owner_peer_id, "_rpc_grapple_finish_visual")
-func ui_release_grapple() -> void:
-	if !_is_local_owner():
-		return
-
-	# local cleanup
-	if _grapple_shot and is_instance_valid(_grapple_shot):
-		_grapple_shot.queue_free()
-	_grapple_shot = null
-	_set_grapple_latched_local(false)
-
-	# server cleanup
-	_request_cancel_grapple()
+func clear_external_pull() -> void:
+	_external_pull_active = false
+	_external_pull_to = Vector3.ZERO
+	_external_pull_speed = 0.0
+	_external_pull_stop_dist = 1.2

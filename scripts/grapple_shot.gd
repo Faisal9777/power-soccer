@@ -43,6 +43,8 @@ func get_latch_point() -> Vector3:
 func set_start_world(from: Vector3) -> void:
 	_start = from
 
+
+
 func start(from: Vector3, to: Vector3) -> void:
 	set_as_top_level(true)
 
