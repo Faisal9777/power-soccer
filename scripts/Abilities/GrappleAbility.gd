@@ -17,6 +17,8 @@ var _last_pulled_victim_path_server: NodePath = NodePath("")
 @export var fire_icon: Texture2D = preload("res://Texture/Fire_90x90_big.png")
 @export var pull_icon: Texture2D = preload("res://Texture/Pull_90x90_big.png")
 @export var release_icon: Texture2D = preload("res://Texture/Release_90x90_big.png")
+@export var reel_icon: Texture2D = preload("res://Texture/Reel_90x90_big.png") # <-- use your new texture
+var _ui_reel := false
 
 
 # client-only visual state
@@ -42,11 +44,6 @@ func wants_crosshair() -> bool:
 	return true
 
 
-func _ready() -> void:
-	ability_icon = grapple_icon
-	action1_icon = fire_icon
-	action2_icon = pull_icon
-	action3_icon = release_icon
 
 
 func on_unequipped(player: Player) -> void:
@@ -58,6 +55,15 @@ func on_mode_changed(player: Player, enabled: bool) -> void:
 	if !enabled and player._is_local_owner():
 		_client_cleanup(player)
 		player._request_ability_release() # tell server too
+
+func on_equipped(player: Player) -> void:
+	ability_icon = grapple_icon
+	action1_icon = fire_icon
+	action2_icon = pull_icon
+	action3_icon = release_icon
+	_ui_reel = false
+	player.call_deferred("_emit_ability_ui") # ✅ optional: refresh UI right away
+
 
 func client_tick(player: Player, delta: float) -> void:
 	if !player._is_local_owner():
@@ -180,7 +186,7 @@ func _client_cleanup(player: Player) -> void:
 	shot = null
 	latched_local = false
 	target_path_local = NodePath("")
-
+	_update_action1_icon(player) # ✅ swap back Reel -> Fire
 func _fire_visual_and_store(player: Player) -> void:
 	if player.cam == null or grapple_shot_scene == null:
 		return
@@ -221,6 +227,7 @@ func _fire_visual_and_store(player: Player) -> void:
 		latched_local = true
 		latched_point_local = p            # ✅ store latch point
 		target_path_local = target_path
+		_update_action1_icon(player) # ✅ swap Fire -> Reel icon
 		player._request_ability_latched(p, target_path)
 	)
 
@@ -274,3 +281,16 @@ func _sv_handle_pull_target(player: Player) -> void:
 		if victim and is_instance_valid(victim):
 			_last_pulled_victim_path_server = target_path_server
 			victim.apply_external_pull(player.global_position, grapple_pull_target_speed, grapple_stop_dist)
+func _update_action1_icon(player: Player) -> void:
+	# show reel_icon when latched, otherwise fire_icon
+	var want_reel := latched_local
+
+	if want_reel == _ui_reel:
+		return # no change
+
+	_ui_reel = want_reel
+	action1_icon = reel_icon if want_reel else fire_icon
+
+	# force World to receive ability_ui_changed again (so it swaps textures)
+	if player and is_instance_valid(player):
+		player.call_deferred("_emit_ability_ui")
