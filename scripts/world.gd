@@ -1350,3 +1350,17 @@ func _cache_default_ability_textures() -> void:
 	if a1 is TouchScreenButton: _def_tex_a1 = (a1 as TouchScreenButton).texture_normal
 	if a2 is TouchScreenButton: _def_tex_a2 = (a2 as TouchScreenButton).texture_normal
 	if a3 is TouchScreenButton: _def_tex_a3 = (a3 as TouchScreenButton).texture_normal
+func _enter_tree() -> void:
+	if OS.has_feature("mobile"):
+		_disable_left_click_for_action("ability_action1")
+		_disable_left_click_for_action("ability_action2")
+		_disable_left_click_for_action("ability_action3")
+		_disable_left_click_for_action("ability_toggle")
+
+func _disable_left_click_for_action(action_name: StringName) -> void:
+	var events := InputMap.action_get_events(action_name)
+	for ev in events:
+		if ev is InputEventMouseButton:
+			var mb := ev as InputEventMouseButton
+			if mb.button_index == MOUSE_BUTTON_LEFT:
+				InputMap.action_erase_event(action_name, ev)
