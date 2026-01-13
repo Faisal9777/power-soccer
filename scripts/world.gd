@@ -1045,7 +1045,10 @@ func receive_network_input(cmd: Dictionary, peer_id : int) -> void:
 
 @rpc("any_peer", "reliable")
 func receive_network_input_dictionary(msg: int, value : Dictionary) -> void:
-	net.process_input_dictionary(msg, value)
+	if msg == NetCodes.Msg.GAME_END:
+		_game.end_game(value)
+	else:
+		net.process_input_dictionary(msg, value)
 
 @rpc("any_peer", "reliable")
 func transmit_game_data(value : Dictionary, msg : StringName) -> void:
