@@ -13,6 +13,10 @@ var _last_pulled_victim_path_server: NodePath = NodePath("")
 @export var grapple_stop_dist: float = 1.2
 @export var grapple_pull_target_speed: float = 7.0
 @export var keep_momentum_time := 5.0 # seconds
+@export var grapple_icon: Texture2D = preload("res://Texture/Grapple_90x90_big.png")
+@export var fire_icon: Texture2D = preload("res://Texture/Fire_90x90_big.png")
+@export var pull_icon: Texture2D = preload("res://Texture/Pull_90x90_big.png")
+@export var release_icon: Texture2D = preload("res://Texture/Release_90x90_big.png")
 
 
 # client-only visual state
@@ -36,6 +40,14 @@ func labels() -> PackedStringArray:
 
 func wants_crosshair() -> bool:
 	return true
+
+
+func _ready() -> void:
+	ability_icon = grapple_icon
+	action1_icon = fire_icon
+	action2_icon = pull_icon
+	action3_icon = release_icon
+
 
 func on_unequipped(player: Player) -> void:
 	# cleanup visual if exists on owner

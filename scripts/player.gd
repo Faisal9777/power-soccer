@@ -108,8 +108,17 @@ signal ability_ui_changed(labels: PackedStringArray, visible: bool, wants_crossh
 var ability_mode_active: bool = false
 var _ability: AbilityBase = null
 var _ability_id: StringName = &"grapple"
-@export var ability_id: String = "grapple"
-
+# replicated property (this is the one you added in MultiplayerSynchronizer)
+@export var ability_id: StringName = &"grapple":
+	set(v):
+		if _ability_id == v:
+			return
+		_ability_id = v
+		if is_inside_tree():
+			# ✅ when replicated value arrives on client, auto-equip there
+			set_ability_local(_ability_id)
+	get:
+		return _ability_id
 
 var _aim_az := 0.0      # yaw around the ball (left/right)
 var _aim_el := 0.0      # pitch around the ball (up/down)
@@ -358,8 +367,7 @@ func _ready() -> void:
 		ev.button_index = MOUSE_BUTTON_LEFT
 		InputMap.action_erase_event("shoot", ev)   # remove mouse-left binding at runtime
 	_ensure_name_tag()
-	set_ability_local(StringName(ability_id)) # ability_id = "grapple"
-	# or: set_ability_local(&"grapple")
+	set_ability_local(_ability_id)
 
 
 func _ensure_name_tag() -> void:
@@ -1654,10 +1662,14 @@ func _make_ability(id: StringName) -> AbilityBase:
 func set_ability_local(id: StringName) -> void:
 	if _ability:
 		_ability.on_unequipped(self)
+
+	# ✅ set backing field directly
 	_ability_id = id
+
 	_ability = _make_ability(id)
 	if _ability:
 		_ability.on_equipped(self)
+
 	_emit_ability_ui()
 
 func _emit_ability_ui() -> void:
@@ -1735,3 +1747,14 @@ func clear_external_pull() -> void:
 	_external_pull_to = Vector3.ZERO
 	_external_pull_speed = 0.0
 	_external_pull_stop_dist = 1.2
+func get_ability_icons() -> Dictionary:
+	if _ability == null:
+		return {}
+	return {
+		"ability": _ability.ability_icon,
+		"a1": _ability.action1_icon,
+		"a2": _ability.action2_icon,
+		"a3": _ability.action3_icon,
+	}
+func refresh_ability_ui() -> void:
+	_emit_ability_ui()

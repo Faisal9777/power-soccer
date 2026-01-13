@@ -1,6 +1,12 @@
 extends RefCounted
 class_name AbilityBase
 
+@export var ability_icon: Texture2D = preload("res://Texture/Ability_90x90.png")
+@export var action1_icon: Texture2D = preload("res://Texture/Act1_90x90.png")
+@export var action2_icon: Texture2D = preload("res://Texture/Act2_90x90.png")
+@export var action3_icon: Texture2D = preload("res://Texture/Act3_90x90.png")
+
+
 func id() -> StringName:
 	return &"base"
 
