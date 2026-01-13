@@ -10,6 +10,23 @@ extends Node
 @export var player_scene: PackedScene
 @export var bot_player_scene: PackedScene
 
+var _def_tex_ability: Texture2D
+var _def_tex_a1: Texture2D
+var _def_tex_a2: Texture2D
+var _def_tex_a3: Texture2D
+
+func _set_btn_tex(btn: Node, tex: Texture2D, fallback: Texture2D) -> void:
+	var use_tex := tex if tex != null else fallback
+	if use_tex == null or btn == null:
+		return
+
+	if btn is TouchScreenButton:
+		(btn as TouchScreenButton).texture_normal = use_tex
+	elif btn is TextureButton:
+		(btn as TextureButton).texture_normal = use_tex
+	elif btn is Button:
+		(btn as Button).icon = use_tex
+
 
 var _grapple_crosshair_layer: CanvasLayer
 var _grapple_crosshair_root: Control
@@ -119,7 +136,7 @@ func _ready() -> void:
 	_tackle_cd_label = _ensure_cd_label(tackle_btn)
 	_pass_cd_label = _ensure_cd_label(pass_btn)
 	_ensure_grapple_crosshair()
-	
+	_cache_default_ability_textures()
 	# 1) Connect to the Network autoload signals (do it here so it works even if not wired in editor)
 
 	#Network.server_started.connect(_on_server_started)
@@ -865,8 +882,7 @@ func _spawn_player_for2(id: int) -> void:
 	# ✅ APPLY LOBBY-CHOSEN ABILITY HERE
 	var ability_id := String(rec.get("ability", "grapple"))  # default
 	if p is Player:
-		(p as Player).ability_id = ability_id
-		(p as Player).call_deferred("set_ability_local", StringName(ability_id))
+		(p as Player).ability_id = StringName(ability_id)  # ✅ setter equips on server AND will replicate to clients
 
 	# store player_path back into roster (server-side)
 	if GameState.roster.has(id):
@@ -1040,6 +1056,9 @@ func _rpc_attach_cam(player_path: NodePath, _unused_joystick_path: NodePath, bal
 	if not _my_player.ability_ui_changed.is_connected(_on_ability_ui_changed):
 		_my_player.ability_ui_changed.connect(_on_ability_ui_changed)
 
+	# ✅ FORCE INITIAL UI UPDATE (so textures set on game start)
+	if _my_player.has_method("refresh_ability_ui"):
+		_my_player.call_deferred("refresh_ability_ui")
 
 	# Resolve joystick on THIS client
 	#var joystick: Control = null
@@ -1279,22 +1298,36 @@ func ui_release_grapple() -> void:
 func _on_ability_ui_changed(labels: PackedStringArray, visible: bool, wants_crosshair: bool) -> void:
 	var pad := $CanvasLayer/UI/ActionPad
 
-	var a1 := pad.get_node("AbilityAction1")
-	var a2 := pad.get_node("AbilityAction2")
-	var a3 := pad.get_node("AbilityAction3")
+	var ability_btn := pad.get_node_or_null("Ability") # ability toggle button
+	var a1 := pad.get_node_or_null("AbilityAction1")
+	var a2 := pad.get_node_or_null("AbilityAction2")
+	var a3 := pad.get_node_or_null("AbilityAction3")
 
-	a1.visible = visible
-	a2.visible = visible
-	a3.visible = visible
-	
-	#_set_btn_label(a1, labels.size() > 0 ? labels[0] : "")
-	#_set_btn_label(a2, labels.size() > 1 ? labels[1] : "")
-	#_set_btn_label(a3, labels.size() > 2 ? labels[2] : "")
+	# show/hide
+	if a1: a1.visible = visible
+	if a2: a2.visible = visible
+	if a3: a3.visible = visible
+	if ability_btn: ability_btn.visible = true  # your choice
 
-	
-	# Crosshair (use your existing node reference or path)
+	# (optional) labels on top of textures
+	# _set_btn_label(a1, labels.size() > 0 ? labels[0] : "")
+	# _set_btn_label(a2, labels.size() > 1 ? labels[1] : "")
+	# _set_btn_label(a3, labels.size() > 2 ? labels[2] : "")
+
+	# ✅ swap textures based on currently equipped ability
+	var icons := {}
+	if is_instance_valid(_my_player) and _my_player.has_method("get_ability_icons"):
+		icons = _my_player.get_ability_icons()
+
+	_set_btn_tex(ability_btn, icons.get("ability", null), _def_tex_ability)
+	_set_btn_tex(a1, icons.get("a1", null), _def_tex_a1)
+	_set_btn_tex(a2, icons.get("a2", null), _def_tex_a2)
+	_set_btn_tex(a3, icons.get("a3", null), _def_tex_a3)
+
+	# crosshair
 	if is_instance_valid(_grapple_crosshair):
 		_grapple_crosshair.visible = visible and wants_crosshair
+
 func _set_btn_label(btn: Node, t: String) -> void:
 	if btn == null: return
 	var lbl := btn.get_node_or_null("Label") as Label
@@ -1305,3 +1338,15 @@ func _set_btn_label(btn: Node, t: String) -> void:
 		if c is Label:
 			(c as Label).text = t
 			return
+func _cache_default_ability_textures() -> void:
+	var pad := $CanvasLayer/UI/ActionPad
+
+	var ability_btn := pad.get_node_or_null("Ability") # <- your "Ability toggle" button node name
+	var a1 := pad.get_node_or_null("AbilityAction1")
+	var a2 := pad.get_node_or_null("AbilityAction2")
+	var a3 := pad.get_node_or_null("AbilityAction3")
+
+	if ability_btn is TouchScreenButton: _def_tex_ability = (ability_btn as TouchScreenButton).texture_normal
+	if a1 is TouchScreenButton: _def_tex_a1 = (a1 as TouchScreenButton).texture_normal
+	if a2 is TouchScreenButton: _def_tex_a2 = (a2 as TouchScreenButton).texture_normal
+	if a3 is TouchScreenButton: _def_tex_a3 = (a3 as TouchScreenButton).texture_normal
