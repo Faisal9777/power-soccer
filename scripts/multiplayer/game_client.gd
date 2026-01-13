@@ -240,6 +240,11 @@ func start_game() -> void:
 	#var spawns_red : Node3D = get_node(snapshots["spawns_red"])
 	_position_players2()
 
+func end_game(value : Dictionary) -> void:
+	var duration := value.get("duration", 3) as int
+	var scene := value.get("scene", NodePath("")) as NodePath
+	_end_match("End!", duration, scene)
+
 func _toggle_player_process(toggle : bool) -> void:
 	var switch := false
 	if not toggle:
@@ -317,3 +322,16 @@ func _init_entry(pid: int, name: String, team: int) -> void:
 	#if _scoreboard_instance:
 		#var stats_array = get_stats_in_array()
 		#_scoreboard_instance.set_stats(stats_array)
+func _end_match(text: String, seconds: float, scene_path_to_load: String) -> void:
+	await _show_banner_for(text, seconds)
+	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+	get_tree().change_scene_to_file(scene_path_to_load)
+
+func _show_banner_for(text: String, seconds: float) -> void:
+	if _countdown_label == null:  # or is_instance_valid(_countdown_label)
+		return
+	_countdown_label.text = text
+	_countdown_label.show()
+	var t := get_tree().create_timer(seconds)  # local, per-client
+	await t.timeout
+	_countdown_label.hide()

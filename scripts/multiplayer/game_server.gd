@@ -230,6 +230,9 @@ func _physics_process(delta: float) -> void:
 		
 		
 func _physics_process_server(delta: float) -> void:
+	for k in GameState.roster.keys():
+		var p_path :NodePath= GameState.roster[k]["player_path"]
+		var p := get_node(p_path)
 	if state.time_left_ms == 0:
 		_process_game_end()
 	if state.is_paused and state.countdown_ms == 0:
@@ -389,13 +392,25 @@ func _process_game_end() -> void:
 		blue_scene = lose_scene_path
 		red_scene = win_scene_path
 	for k in GameState.roster.keys():
-		var p := get_node(GameState.roster[k]["player_path"]) as Node3D		
+		var p_path :NodePath= GameState.roster[k]["player_path"]
+		var p := get_node(p_path)	
+
 		p.freeze(true)
 		var pid = int(k)
 		if GameState.is_blue(pid):
-			rpc_id(pid, "_cl_end_match", "End!", 3.0, blue_scene)
+			_finalize_game_end(pid,{"duration" : 3, "scene" : blue_scene})
 		else:
-			rpc_id(pid, "_cl_end_match", "End!", 3.0, red_scene)
+			_finalize_game_end(pid,{"duration" : 3, "scene" : red_scene})
+	if _client and GameState.is_blue(multiplayer.get_unique_id()):
+		_client.end_game({"duration" : 3, "scene" : blue_scene})
+	else:
+		_client.end_game({"duration" : 3, "scene" : red_scene})
+func _finalize_game_end(pid : int, data : Dictionary) -> void:
+	var _pid = int(pid)
+	if pid != multiplayer.get_unique_id():
+		_network_endpoint.rpc_id(_pid, "receive_network_input_dictionary", NetCodes.Msg.GAME_END, data)
+	#if _client and :
+		#_
 
 
 #@rpc("authority", "reliable", "call_local")
@@ -515,7 +530,7 @@ func _apply_goal_update(scoring_team : String, goal_player : int, assist_player 
 		state.add_goal(goal_player)
 	else:
 		state.sub_goal(goal_player)
-	if assist_player != -1 and not is_in_the_same_team:
+	if assist_player != -1 and is_in_the_same_team:
 		state.add_assist(assist_player)
 	if scoring_team == "red":
 		state.blue_score += 1
@@ -536,12 +551,12 @@ func _show_banner_for(text: String, seconds: float) -> void:
 	#var t := get_tree().create_timer(seconds)  # local, per-client
 	#await t.timeout
 	#_countdown_label.hide()
-	return
+	pass
 
 
 
 # On the same node (path) on all peers:
-@rpc("authority", "reliable", "call_local")  # server calls; clients execute
+@rpc("authority", "reliable")  # server calls; clients execute
 func _cl_end_match(text: String, seconds: float, scene_path_to_load: String) -> void:
 	await _show_banner_for(text, seconds)
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)

@@ -106,8 +106,6 @@ func _physics_process(delta: float) -> void:
 	if not _latest_local_snapshot.is_empty():
 		var snap := _latest_local_snapshot
 		_latest_local_snapshot = {}
-		print("Reconciling with snap.last_server_seq =", int(snap.get("last_server_seq", -999)))
-		print("the client's position: ", snap["pos"])
 		_reconcile_local(me, snap, delta)
 
 	# 2) Local prediction + send input
@@ -179,6 +177,8 @@ func _process(_delta: float) -> void:
 		var xa := a["xform"] as Transform3D
 		var xb := b["xform"] as Transform3D
 		#dbg_print_if_moved_xz(p)
+		if not p:
+			print("client error")
 		p.global_transform = xa.interpolate_with(xb, alpha)
 
 # ---------- Snapshot storage ----------

@@ -10,4 +10,5 @@ enum Msg {
 	GAME_ROSTER = 3,
 	SET_PLAYERS   = 4,
 	GAME_BEGIN       = 5,
+	GAME_END       = 6,
 }
