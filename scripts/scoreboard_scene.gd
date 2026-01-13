@@ -3,7 +3,8 @@ extends Control
 
 @export var tree_path: NodePath   # assign in Inspector (to your Tree)
 var _tree: Tree
-
+var _game_data_holder : Node
+var _sc_popup : Control
 enum Team { BLUE, RED }
 
 const TEAM_NAME := { Team.BLUE: "BLUE", Team.RED: "RED" }
@@ -36,6 +37,18 @@ func _ready() -> void:
 	_setup_columns()
 	# Render the fake data now
 	set_stats(_fake_stats)
+
+func set_game_data_holder(holder: Node, sc_popup : Control) -> void:
+
+	_game_data_holder = holder
+	_sc_popup = sc_popup
+	# Team he
+
+func show_score(toggle : bool) -> void:
+	var data : Dictionary = _game_data_holder.get_game_data()
+	var stats : Array = _get_stats_in_array(data)
+	set_stats(stats)
+	_sc_popup.visible = toggle
 
 # -------- Public API: call later with real data --------
 # snapshot = [{id, name, team (0/1), goals, assists, saves}, ...]
@@ -88,3 +101,34 @@ func _setup_columns() -> void:
 func _unhandled_input(e: InputEvent) -> void:
 	if e is InputEventKey and e.pressed and !e.echo and (e.keycode == KEY_ESCAPE or e.physical_keycode == KEY_ESCAPE):
 		queue_free()
+
+func _get_stats_in_array(game: Dictionary) -> Array[Dictionary]:
+	var stats: Array[Dictionary] = []
+
+	for k in game.keys():
+		var pid: int = int(k)
+		var e := game[k] as Dictionary
+
+		# name: prefer _game entry; fall back to GameState.roster
+		var name_val: String = ""
+		if e.has("name"):
+			name_val = String(e["name"])
+
+		# team: derive from your helper
+		var team_val := e["team"] as int
+
+
+		# build one row
+		var row: Dictionary = {
+			"id": k,
+			"name": name_val,
+			"team": team_val,
+			"goals": int(e.get("goals", 0)),
+			"assists": int(e.get("assists", 0)),
+			"saves": int(e.get("saves", 0)),  # default to 0 if you don't track it
+		}
+		stats.append(row)
+
+	# (Optional) stable ordering by id
+	stats.sort_custom(func(a, b): return int(a["id"]) < int(b["id"]))
+	return stats
