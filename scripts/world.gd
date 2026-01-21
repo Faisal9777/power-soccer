@@ -9,6 +9,8 @@ extends Node
 @export var scoreboard_scene_path: String = "res://scenes/ScoreboardScene.tscn"
 @export var player_scene: PackedScene
 @export var bot_player_scene: PackedScene
+@export var teleporter_gadget_scene: PackedScene
+@onready var teleporter_gadgets_root: Node = $Teleporters/Gadgets
 
 var _def_tex_ability: Texture2D
 var _def_tex_a1: Texture2D
@@ -127,6 +129,9 @@ func _ready() -> void:
 	if bot_player_scene:
 		spawner.add_spawnable_scene(bot_player_scene.resource_path)
 
+	if teleporter_gadget_scene:
+		spawner.add_spawnable_scene(teleporter_gadget_scene.resource_path)
+	_setup_teleporter_gadget_spawner()
 	_create_ball_spawner()
 	_initialize_game()
 	_setup_pause_dialog()
@@ -1364,3 +1369,17 @@ func _disable_left_click_for_action(action_name: StringName) -> void:
 			var mb := ev as InputEventMouseButton
 			if mb.button_index == MOUSE_BUTTON_LEFT:
 				InputMap.action_erase_event(action_name, ev)
+
+func _setup_teleporter_gadget_spawner() -> void:
+	var sp := teleporter_gadgets_root.get_node_or_null("MultiplayerSpawner") as MultiplayerSpawner
+	if sp == null:
+		sp = MultiplayerSpawner.new()
+		sp.name = "MultiplayerSpawner"
+		sp.spawn_path = teleporter_gadgets_root.get_path() # ✅ gadgets replicate here
+		teleporter_gadgets_root.add_child(sp)
+
+	# register gadget scene
+	if teleporter_gadget_scene:
+		sp.add_spawnable_scene(teleporter_gadget_scene.resource_path)
+	else:
+		sp.add_spawnable_scene("res://scenes/TeleportGadget.tscn") # fallback

@@ -32,9 +32,11 @@ var ROLE_NAME := {
 	GameState.Role.FORWARD: "Forward",
 }
 # ⬇ NEW: Ability IDs + names
-const ABILITY_IDS: Array[String] = ["grapple"]  # add later: ["grapple","dash","blink",...]
+const ABILITY_IDS: Array[String] = ["grapple", "teleporter"]
+
 var ABILITY_NAME := {
 	"grapple": "Grapple",
+	"teleporter": "Teleporter",
 }
 
 func _get_ability_id(e: Dictionary) -> String:

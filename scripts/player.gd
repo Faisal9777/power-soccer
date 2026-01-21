@@ -89,6 +89,15 @@ var _tackle_phasing: bool = false
 @export var aim_pitch_max := deg_to_rad( 80)
 # --- Generic: keep air momentum (used by abilities like Grapple) ---
 var _air_momentum_keep_left := 0.0
+# --- Teleport momentum glide (server-side movement feel) ---
+var _tp_glide_left: float = 0.0
+var _tp_glide_accel_mul: float = 0.25   # < 1 = more slippery steering
+var _tp_glide_idle_decel: float = 1.2   # smaller = slower stop (slide longer)
+
+func start_teleport_glide(seconds: float = 0.9, accel_mul: float = 0.25, idle_decel: float = 1.2) -> void:
+	_tp_glide_left = maxf(_tp_glide_left, seconds)
+	_tp_glide_accel_mul = clampf(accel_mul, 0.05, 1.0)
+	_tp_glide_idle_decel = maxf(0.05, idle_decel)
 
 func start_air_momentum_keep(seconds: float) -> void:
 	_air_momentum_keep_left = maxf(_air_momentum_keep_left, seconds)
@@ -100,8 +109,13 @@ var _external_pull_speed := 0.0
 var _external_pull_stop_dist := 1.2
 
 # --- Abilities ---
+@export var grapple_vfx_active := false
+@export var grapple_vfx_point := Vector3.ZERO
+@export var grapple_vfx_target_path: NodePath = NodePath("")
+var _remote_grapple_shot: GrappleShot = null
 const ABILITY_REGISTRY := {
 	"grapple": "res://scripts/Abilities/GrappleAbility.gd",
+	"teleporter": "res://scripts/Abilities/teleporter.gd",
 }
 signal ability_ui_changed(labels: PackedStringArray, visible: bool, wants_crosshair: bool)
 
@@ -119,6 +133,14 @@ var _ability_id: StringName = &"grapple"
 			set_ability_local(_ability_id)
 	get:
 		return _ability_id
+var _teleporter_gadget_active: bool = false
+# --- Teleporter: block switch while inside layer 9 zone ---
+const NO_SWITCH_LAYER_NUM := 9
+@export var no_switch_check_radius: float = 0.55   # tune
+@export var no_switch_check_height: float = 0.9    # tune (torso height)
+
+var _no_switch_shape := SphereShape3D.new()
+var _no_switch_q := PhysicsShapeQueryParameters3D.new()
 
 var _aim_az := 0.0      # yaw around the ball (left/right)
 var _aim_el := 0.0      # pitch around the ball (up/down)
@@ -368,6 +390,22 @@ func _ready() -> void:
 		InputMap.action_erase_event("shoot", ev)   # remove mouse-left binding at runtime
 	_ensure_name_tag()
 	set_ability_local(_ability_id)
+	
+	_no_switch_shape.radius = no_switch_check_radius
+	_no_switch_q.shape = _no_switch_shape
+	_no_switch_q.margin = 0.01
+	_no_switch_q.collision_mask = 1 << (NO_SWITCH_LAYER_NUM - 1) # layer 9 bit
+	_no_switch_q.exclude = [self.get_rid()]
+	_no_switch_q.collide_with_bodies = true
+	_no_switch_q.collide_with_areas = true
+
+func is_in_layer9_zone() -> bool:
+	if !is_inside_tree():
+		return false
+	var space := get_world_3d().direct_space_state
+	_no_switch_q.transform = Transform3D(Basis(), global_position + Vector3.UP * no_switch_check_height)
+	var hits := space.intersect_shape(_no_switch_q, 8)
+	return hits.size() > 0
 
 
 func _ensure_name_tag() -> void:
@@ -413,7 +451,7 @@ func _physics_process(delta: float) -> void:
 
 
 func _process(delta: float) -> void:
-
+	_update_remote_grapple_vfx()
 	if get_tree().get_multiplayer().get_unique_id() == owner_peer_id: 
 		_local_process(delta)
 	if name_tag:
@@ -539,7 +577,7 @@ func simulate_server(delta: float) -> void:
 
 	
 	_handle_assist_pass_server()
-
+	
 	# ✅ if grapple reel already moved us this tick, don't do normal movement,
 	# but DO keep stamina logic stable and keep ball glued.
 	if _external_pull_active:
@@ -557,7 +595,8 @@ func simulate_server(delta: float) -> void:
 
 	# normal sim continues here
 	apply_gravity(delta)
-
+	_tp_glide_left = maxf(0.0, _tp_glide_left - delta)
+	
 	var input_dir := _get_input_dir_server()
 
 	# sprint decision
@@ -734,14 +773,26 @@ func _move_server(input_dir: Vector3, delta: float) -> void:
 
 	var target_vel := input_dir * target_speed
 	var accel := 12.0 if is_on_floor() else 12.0 * air_control
-
 	var no_input := input_dir.length_squared() < 0.0001
 
-	# ✅ If we just released grapple and we're in the air with no input,
+	# Keep-air-momentum rule (your existing grapple behavior)
 	var just_released := (_air_momentum_keep_left > 0.0)
+	if just_released and no_input and !is_on_floor():
+		# keep lateral as-is
+		pass
+	else:
+		# ✅ Teleport glide: slippery steering + slow idle decel
+		if _tp_glide_left > 0.0:
+			accel *= _tp_glide_accel_mul
 
-	if !(just_released and no_input and !is_on_floor()):
-		lateral = lateral.lerp(target_vel, clamp(accel * delta, 0.0, 1.0))
+			if no_input:
+				# slow drift-down toward 0 instead of snapping
+				lateral = lateral.lerp(Vector3.ZERO, clamp(_tp_glide_idle_decel * delta, 0.0, 1.0))
+			else:
+				lateral = lateral.lerp(target_vel, clamp(accel * delta, 0.0, 1.0))
+		else:
+			# normal movement
+			lateral = lateral.lerp(target_vel, clamp(accel * delta, 0.0, 1.0))
 	# else: keep lateral as-is (momentum preserved)
 
 	velocity.x = lateral.x
@@ -1078,6 +1129,12 @@ func _unlatch_ball_server() -> void:
 	ball.collision_mask  = _saved_ball_mask
 
 func _handle_latch_mode_server(delta: float) -> void:
+	# ✅ HARD BLOCK: while teleporter gadget exists, latch input does nothing.
+	if _teleporter_gadget_active:
+		# eat the edge so it never queues up
+		if bool(_net.get("latch_toggle", false)):
+			_net["latch_toggle"] = false
+		return
 	# Edge-triggered latch toggle from network input
 	var toggle := bool(_net.get("latch_toggle", false))
 	if toggle:
@@ -1715,6 +1772,9 @@ func _rpc_ability_latched(point: Vector3, target_path: NodePath) -> void:
 	if multiplayer.get_remote_sender_id() != owner_peer_id: return
 	if _ability:
 		_ability.sv_on_latched(self, point, target_path)
+		grapple_vfx_active = true
+		grapple_vfx_point = point
+		grapple_vfx_target_path = target_path
 
 @rpc("any_peer","reliable", "call_local")
 func _rpc_ability_reel(on: bool) -> void:
@@ -1736,6 +1796,10 @@ func _rpc_ability_release() -> void:
 	if multiplayer.get_remote_sender_id() != owner_peer_id: return
 	if _ability:
 		_ability.sv_on_release(self)
+		grapple_vfx_active = false
+		grapple_vfx_point = Vector3.ZERO
+		grapple_vfx_target_path = NodePath("")
+
 func apply_external_pull(to_pos: Vector3, speed: float, stop_dist: float = 1.2) -> void:
 	_external_pull_active = true
 	_external_pull_to = to_pos
@@ -1758,3 +1822,149 @@ func get_ability_icons() -> Dictionary:
 	}
 func refresh_ability_ui() -> void:
 	_emit_ability_ui()
+	
+
+func _update_remote_grapple_vfx() -> void:
+	# owner already draws their own grapple via GrappleAbility.client_tick()
+	if _is_local_owner():
+		return
+
+	if !grapple_vfx_active:
+		if _remote_grapple_shot and is_instance_valid(_remote_grapple_shot):
+			_remote_grapple_shot.queue_free()
+		_remote_grapple_shot = null
+		return
+
+	var start_pos := global_position + Vector3.UP * 1.1  # simple muzzle fallback
+	var end_pos := grapple_vfx_point
+
+	if String(grapple_vfx_target_path) != "":
+		var t := get_node_or_null(grapple_vfx_target_path)
+		if t is Node3D:
+			end_pos = (t as Node3D).global_position
+
+	if _remote_grapple_shot == null or !is_instance_valid(_remote_grapple_shot):
+		_remote_grapple_shot = preload("res://scenes/GrappleShot.tscn").instantiate() as GrappleShot
+		get_tree().current_scene.add_child(_remote_grapple_shot)
+		_remote_grapple_shot.start(start_pos, end_pos)
+
+	_remote_grapple_shot.set_start_world(start_pos)
+	_remote_grapple_shot.set_end_world(end_pos)
+	
+func _sv_set_teleporter_thrown(v: bool) -> void:
+	if !multiplayer.is_server():
+		return
+
+	_teleporter_gadget_active = v
+
+	# Optional safety: if gadget becomes active, force latch OFF so player can't be stuck in latch mode.
+	if v:
+		if latch_mode_active:
+			latch_mode_active = false
+		if ball_latched:
+			_unlatch_ball_server()
+
+	rpc_id(owner_peer_id, "_rpc_teleporter_set_thrown", v) # ✅ real RPC to owner
+
+@rpc("authority", "reliable", "call_local")
+func _rpc_teleporter_set_thrown(v: bool) -> void:
+	if _ability != null and _ability.id() == &"teleporter":
+		(_ability as Teleporter).cl_set_thrown_state(self, v)
+
+func _request_teleporter_action1(target_world: Vector3) -> void:
+	if multiplayer.is_server():
+		# host/server direct path
+		_sv_teleporter_action1(target_world)
+	else:
+		# client -> server
+		rpc_id(1, "_rpc_teleporter_action1", target_world)
+
+func _sv_teleporter_action1(target_world: Vector3) -> void:
+	if !ability_mode_active:
+		return
+	if _ability == null or _ability.id() != &"teleporter":
+		return
+
+	(_ability as Teleporter).sv_action1(self, target_world)
+
+@rpc("any_peer", "reliable")
+func _rpc_teleporter_action1(target_world: Vector3) -> void:
+	if !multiplayer.is_server():
+		return
+
+	# ✅ security: only owner can trigger
+	var from := multiplayer.get_remote_sender_id()
+	if from != owner_peer_id:
+		return
+
+	_sv_teleporter_action1(target_world)
+
+func _request_teleporter_action2() -> void:
+	if multiplayer.is_server():
+		_sv_teleporter_action2()
+	else:
+		rpc_id(1, "_rpc_teleporter_action2")
+
+func _sv_teleporter_action2() -> void:
+	if !ability_mode_active:
+		return
+	if _ability == null or _ability.id() != &"teleporter":
+		return
+	(_ability as Teleporter).sv_action2(self)
+
+@rpc("any_peer", "reliable")
+func _rpc_teleporter_action2() -> void:
+	if !multiplayer.is_server():
+		return
+	var from := multiplayer.get_remote_sender_id()
+	if from != owner_peer_id:
+		return
+	_sv_teleporter_action2()
+
+func _request_teleporter_action3() -> void:
+	if multiplayer.is_server():
+		_sv_teleporter_action3()
+	else:
+		rpc_id(1, "_rpc_teleporter_action3")
+
+func _sv_teleporter_action3() -> void:
+	if !ability_mode_active:
+		return
+	if _ability == null or _ability.id() != &"teleporter":
+		return
+	(_ability as Teleporter).sv_action3(self)
+
+@rpc("any_peer", "reliable")
+func _rpc_teleporter_action3() -> void:
+	if !multiplayer.is_server():
+		return
+	var from := multiplayer.get_remote_sender_id()
+	if from != owner_peer_id:
+		return
+	_sv_teleporter_action3()
+
+
+
+func _get_crosshair_target_world(max_dist: float = 200.0, ray_mask: int = 0x7FFFFFFF) -> Vector3:
+	# Fallback if no camera
+	if cam == null or !is_instance_valid(cam):
+		return global_position + (-global_transform.basis.z) * max_dist
+
+	var vp := get_viewport()
+	var center := vp.get_visible_rect().size * 0.5
+
+	var ro: Vector3 = cam.project_ray_origin(center)
+	var rd: Vector3 = cam.project_ray_normal(center).normalized()
+
+	var space := get_world_3d().direct_space_state
+	var q := PhysicsRayQueryParameters3D.create(ro, ro + rd * max_dist)
+	q.collision_mask = ray_mask
+	q.exclude = [self.get_rid()]
+	q.collide_with_areas = false
+	q.collide_with_bodies = true
+
+	var hit := space.intersect_ray(q)
+	if hit.has("position"):
+		return hit["position"]
+
+	return ro + rd * max_dist

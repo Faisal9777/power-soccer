@@ -35,12 +35,18 @@ properties/5/replication_mode = 1
 properties/6/path = NodePath(".:tackle_cd_ui")
 properties/6/spawn = true
 properties/6/replication_mode = 2
-properties/7/path = NodePath(".:grapple_mode_active")
+properties/7/path = NodePath(".:ability_id")
 properties/7/spawn = true
-properties/7/replication_mode = 2
-properties/8/path = NodePath(".:ability_id")
+properties/7/replication_mode = 1
+properties/8/path = NodePath(".:grapple_vfx_target_path")
 properties/8/spawn = true
-properties/8/replication_mode = 1
+properties/8/replication_mode = 2
+properties/9/path = NodePath(".:grapple_vfx_active")
+properties/9/spawn = true
+properties/9/replication_mode = 2
+properties/10/path = NodePath(".:grapple_vfx_point")
+properties/10/spawn = true
+properties/10/replication_mode = 2
 
 [sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_xhfnw"]
 properties/0/path = NodePath(".:rotation")
