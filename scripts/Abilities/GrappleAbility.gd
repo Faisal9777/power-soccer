@@ -8,6 +8,7 @@ var latched_point_local := Vector3.ZERO
 @export var release_keep_momentum_time: float = 5.0
 # server: remember who we were pulling so we can clear it when pull stops
 var _last_pulled_victim_path_server: NodePath = NodePath("")
+var _player : Node
 
 @export var grapple_pull_speed: float = 10.0
 @export var grapple_stop_dist: float = 1.2
@@ -48,6 +49,42 @@ func _ready() -> void:
 	action2_icon = pull_icon
 	action3_icon = release_icon
 
+func init(net : Node, player : Node) -> void:
+	net.subscribe(self)
+	_player = player
+
+func handle_action(inputs : Dictionary) -> void:
+
+	# Always keep rope visuals updated (if any)
+	if shot and is_instance_valid(shot):
+		shot.set_start_world(_player.get_muzzle_from_view())
+
+	if shot and is_instance_valid(shot) and latched_local:
+		var end_pos := latched_point_local
+		if String(target_path_local) != "":
+			var t := _player.get_node_or_null(target_path_local)
+			if t is Node3D:
+				end_pos = (t as Node3D).global_position
+				if t is Player:
+					end_pos += Vector3.UP * 0.9
+		if shot.has_method("set_end_world"):
+			shot.set_end_world(end_pos)
+
+	# ✅ Block ability inputs unless the mode is active
+	if !_player.ability_mode_active:
+		return
+
+	# Now handle inputs
+	if inputs.get("ability_action1"):
+		action1_pressed(_player)
+
+	if inputs.get("ability_action2"):
+		action2_pressed(_player)
+	if inputs.get("ability_action2"):
+		action2_released(_player)
+
+	if inputs.get("ability_action3"):
+		action3_pressed(_player)
 
 func on_unequipped(player: Player) -> void:
 	# cleanup visual if exists on owner
@@ -94,10 +131,17 @@ func client_tick(player: Player, delta: float) -> void:
 	if Input.is_action_just_pressed("ability_action3"):
 		action3_pressed(player)
 
+#func action1_pressed(player: Player) -> void:
+	## If already latched -> reel
+	#if shot and is_instance_valid(shot) and latched_local:
+		#player._request_ability_reel(true)
+		#return
+	#_fire_visual_and_store(player)
+
 func action1_pressed(player: Player) -> void:
 	# If already latched -> reel
 	if shot and is_instance_valid(shot) and latched_local:
-		player._request_ability_reel(true)
+		sv_on_reel(player, true)
 		return
 	_fire_visual_and_store(player)
 

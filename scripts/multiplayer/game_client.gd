@@ -324,6 +324,9 @@ func _init_entry(pid: int, name: String, team: int) -> void:
 		#_scoreboard_instance.set_stats(stats_array)
 func _end_match(text: String, seconds: float, scene_path_to_load: String) -> void:
 	await _show_banner_for(text, seconds)
+	print("mid: ", multiplayer.get_unique_id())
+	print("scene path to load: ", scene_path_to_load)
+	
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 	get_tree().change_scene_to_file(scene_path_to_load)
 
