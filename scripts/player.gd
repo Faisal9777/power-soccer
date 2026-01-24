@@ -261,7 +261,7 @@ func apply_net_input(d: Dictionary) -> void:
 	if d.get("assist_pass_pressed", false):
 		var who := "SERVER" if multiplayer.is_server() else "CLIENT"
 		print("PLAYER GOT assist_pass_pressed! who=", who)
-
+	
 	for k in _net.keys():
 		if d.has(k):
 			_net[k] = d[k]
@@ -492,7 +492,8 @@ func _physics_process(delta: float) -> void:
 
 
 func _process(delta: float) -> void:
-
+	if _ability:
+		_ability.client_tick(self, delta)
 	if get_tree().get_multiplayer().get_unique_id() == owner_peer_id: 
 		_local_process(delta)
 	if name_tag:
@@ -589,8 +590,8 @@ func _local_process(delta: float) -> void:
 	if _stam_bar:
 		_update_stamina_ui_from_replication()
 		# Always tick the ability for the LOCAL OWNER (so visuals can update reliably)
-	if _is_local_owner() and _ability:
-		_ability.client_tick(self, delta)
+	#if _ability:
+		#_ability.client_tick(self, delta)
 
 
 
@@ -861,7 +862,7 @@ func _move_server(input_dir: Vector3, delta: float, is_sprinting : bool) -> void
 
 	# Base speed is picked ONLY from sprint toggle.
 	# Joystick magnitude just scales it down (analog walk).
-	var base_speed := sprint_speed if _using_sprint else walk_speed
+	var base_speed := sprint_speed if is_sprinting and _can_perform("sprint", stamina_sprint_drain * delta) else walk_speed
 	var target_speed := base_speed * mag
 
 # ✅ LATCH slow only on ground (NOT grapple)
@@ -872,8 +873,6 @@ func _move_server(input_dir: Vector3, delta: float, is_sprinting : bool) -> void
 	var lateral := velocity
 	lateral.y = 0.0
 
-	var target_speed := sprint_speed if is_sprinting and _can_perform("sprint", stamina_sprint_drain * delta) else walk_speed
-	var lateral := velocity; lateral.y = 0.0
 	var target_vel := input_dir * target_speed
 	var accel := 12.0 if is_on_floor() else 12.0 * air_control
 
@@ -1809,6 +1808,26 @@ func get_muzzle_from_camera(cam: Camera3D) -> Vector3:
 		+ right * 0.25 \
 		+ up * -0.18 \
 		+ forward * 0.60
+
+func get_muzzle_from_view() -> Vector3:
+	# pick a stable anchor point on the player
+	var is_owner := (multiplayer.get_unique_id() == owner_peer_id)
+	var pxf: Transform3D = (global_transform if is_owner else get_global_transform_interpolated())
+
+	var origin := pxf.origin
+	var pivot := get_node_or_null("AimPivot") as Node3D
+	if is_instance_valid(pivot):
+		origin = (pivot.global_transform.origin if is_owner else pivot.get_global_transform_interpolated().origin)
+
+	# build view basis from your stored angles (world-space view)
+	var basis := Basis().rotated(Vector3.UP, _yaw_abs).rotated(Vector3.RIGHT, _pitch_abs)
+
+	var right := basis.x
+	var up := basis.y
+	var forward := -basis.z
+
+	# same offsets you used for camera (tune if needed)
+	return origin + right * 0.25 + up * -0.18 + forward * 0.60
 
 func _make_ability(id: StringName) -> AbilityBase:
 	var key := String(id)

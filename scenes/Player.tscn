@@ -1,6 +1,6 @@
 [gd_scene load_steps=8 format=3 uid="uid://dv5l1qjf5gwfn"]
 
-[ext_resource type="Script" uid="uid://cpn8a4o2wga3b" path="res://scripts/player.gd" id="1_xhfnw"]
+[ext_resource type="Script" uid="uid://cksqhyeog75s7" path="res://scripts/player.gd" id="1_xhfnw"]
 [ext_resource type="ArrayMesh" uid="uid://dfkb3j37cjp2g" path="res://3DModels/android_phone.obj" id="2_kpjcp"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_ld6s0"]
@@ -35,12 +35,9 @@ properties/5/replication_mode = 1
 properties/6/path = NodePath(".:tackle_cd_ui")
 properties/6/spawn = true
 properties/6/replication_mode = 2
-properties/7/path = NodePath(".:grapple_mode_active")
+properties/7/path = NodePath(".:ability_id")
 properties/7/spawn = true
-properties/7/replication_mode = 2
-properties/8/path = NodePath(".:ability_id")
-properties/8/spawn = true
-properties/8/replication_mode = 1
+properties/7/replication_mode = 1
 
 [sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_xhfnw"]
 properties/0/path = NodePath(".:rotation")
@@ -62,7 +59,7 @@ latch_stamina_drain = 15.0
 latch_min_to_start = 100.0
 
 [node name="Mesh" type="MeshInstance3D" parent="."]
-transform = Transform3D(3.821371e-17, 8.7422775e-10, 0.02, 0.02, -8.7422775e-10, 0, 8.7422775e-10, 0.02, -8.7422775e-10, 0.8497119, -1.4332567, 0.239928)
+transform = Transform3D(3.82137e-17, 8.74228e-10, 0.02, 0.02, -8.74228e-10, 0, 8.74228e-10, 0.02, -8.74228e-10, 0.849712, -1.43326, 0.239928)
 mesh = ExtResource("2_kpjcp")
 
 [node name="PlayerCollision" type="CollisionShape3D" parent="."]

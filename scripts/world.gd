@@ -113,6 +113,9 @@ func build_game_controller() -> void:
 	_initalize_game_controller()
 
 func _ready() -> void:
+	if not multiplayer.is_server():
+		net = WorldClientScript.new()
+		_initialize_multiplayer("NetClient", net)
 	if multiplayer.is_server():
 		out_bounds.body_entered.connect(_on_ball_out_of_bounds)
 	if OS.has_feature("mobile"):
@@ -1032,10 +1035,9 @@ func _spawn_player_for2(id: int) -> void:
 	_players[id] = p
 	players_root.add_child(p, true)
 
-	# ✅ APPLY LOBBY-CHOSEN ABILITY HERE
 	var ability_id := String(rec.get("ability", "grapple"))  # default
 	if p is Player:
-		(p as Player).ability_id = StringName(ability_id)  # ✅ setter equips on server AND will replicate to clients
+		(p as Player).ability_id = StringName(ability_id)  
 
 	# store player_path back into roster (server-side)
 	if GameState.roster.has(id):
@@ -1117,37 +1119,6 @@ func _gather_input() -> Dictionary:
 		cam = get_viewport().get_camera_3d()
 		if cam and cam.has_method("consume_facing_delta"):
 			facing = cam.consume_facing_delta()
-	return {
-		"mvx": mvx,
-		"mvz": mvz,
-		"sprint": Input.is_action_pressed("sprint"),
-		"jump_pressed": jump_edge_latched,
-		"tackle_pressed": tackle_edge_latched,
-		"dribble": Input.is_action_pressed("dribble"),
-		"stop_ball": stop_ball_edge_latched,
-		"shoot_down": Input.is_action_pressed(_shoot_action()),
-		"shoot_up": shoot_edge_latched,
-		"rmb": Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT),
-		#"facing": _my_player.get_yaw() if _my_player else {},
-		"aim_position":_my_player.get_aim_arrow_position() if _my_player and shoot_edge_latched else null
-	}
-
-func _send_local_input() -> void:
-	# 0) If there is no network peer yet (single-player / not joined / not hosting), do nothing
-	if multiplayer.multiplayer_peer == null:
-		print("no player has joined yet")
-		return
-	var d := _gather_input()
-	if _players.has(1):
-		#print("_players.has(1)")
-		var p: CharacterBody3D = _players[1]
-		if p and p.has_method("apply_net_input"):
-			#print("_players.has(1)2")
-			p.apply_net_input(d)
-	else:
-		# Client: only send if we’re actually connected to the server (peer 1)
-		if multiplayer.get_peers().has(1):
-			rpc_id(1, "_rpc_client_input", multiplayer.get_unique_id(), d)
 		else:
 			facing = Dictionary()
 	else:
@@ -1180,8 +1151,8 @@ func _send_local_input() -> void:
 	"ability_action1": ability_a1_edge_latched,
 	"ability_action2": Input.is_action_pressed("ability_action2"),
 	"ability_action3": ability_a3_edge_latched,  
+	}
 
-}
 
 func _send_local_input() -> void:
 	if multiplayer.multiplayer_peer == null:
@@ -1252,7 +1223,6 @@ func _rpc_attach_cam(player_path: NodePath, _unused_joystick_path: NodePath, bal
 			#var world := get_node_or_null("/root/World")
 			#if world:
 				#joystick = world.find_child("JoyStick", true, false) as Control
-
 	# Resolve camera
 	var cam: Camera3D = get_node_or_null("/root/World/Scene/Camera3D") as Camera3D
 	if cam == null:
@@ -1308,6 +1278,8 @@ func receive_network_input_dictionary(msg: int, value : Dictionary) -> void:
 	if msg == NetCodes.Msg.GAME_END:
 		_game.end_game(value)
 	else:
+		if not net:
+			print("net does not exist for: ", multiplayer.get_unique_id())
 		net.process_input_dictionary(msg, value)
 
 @rpc("any_peer", "reliable")

@@ -3,8 +3,8 @@ extends Node
 signal hud_update(score_blue:int, score_red:int, time_left:float, phase:String)
 signal match_ended(winner:int) # -1 draw, 0 blue, 1 red
 # Injected from Lobby/World before/after _ready:
-@export var win_scene_path: String = "res://WinScene.tscn"
-@export var lose_scene_path: String = "res://DefeatScene.tscn"
+@export var win_scene_path: String = "res://scenes/WinScene.tscn"
+@export var lose_scene_path: String = "res://scenes/DefeatScene.tscn"
 @onready var state: Node = get_node("../ingame_state") as Node
 
 @onready var _blue_zone: Area3D = get_node("Teams/TeamBlue/Goal_A/ScoreZone")
