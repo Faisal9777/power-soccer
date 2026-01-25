@@ -1,6 +1,6 @@
 [gd_scene load_steps=84 format=4 uid="uid://ex55agd4o2wj"]
 
-[ext_resource type="Script" uid="uid://dx5tfh7u8t6mb" path="res://scripts/world.gd" id="1_rup4s"]
+[ext_resource type="Script" uid="uid://5ahpxx881e74" path="res://scripts/world.gd" id="1_rup4s"]
 [ext_resource type="PackedScene" uid="uid://dv5l1qjf5gwfn" path="res://scenes/Player.tscn" id="2_4kbfs"]
 [ext_resource type="PackedScene" uid="uid://c7c8psuolfrbi" path="res://scenes/BotPlayer.tscn" id="3_f17e3"]
 [ext_resource type="PackedScene" uid="uid://ceepxpydsue2a" path="res://scenes/TeleportGadget.tscn" id="4_6oujy"]
@@ -10,10 +10,10 @@
 [ext_resource type="PackedScene" uid="uid://dpicujbq5yvvi" path="res://scenes/PlayerCamera.tscn" id="7_l8ah6"]
 [ext_resource type="Script" uid="uid://6yehu4wm4wm2" path="res://scripts/GoalTrigger.gd" id="8_e75v4"]
 [ext_resource type="Texture2D" uid="uid://b3r4sx5dkov6i" path="res://Texture/fence.png" id="9_8u370"]
-[ext_resource type="Script" uid="uid://c16lvcs2s31j7" path="res://scripts/teleporter_pad.gd" id="10_rga7q"]
+[ext_resource type="Script" uid="uid://dc6b1ohgpx1ni" path="res://scripts/teleporter_pad.gd" id="10_rga7q"]
 [ext_resource type="Texture2D" uid="uid://dq37xpv80pfh8" path="res://Texture/teleporter.png" id="11_6oujy"]
 [ext_resource type="Texture2D" uid="uid://cicfh8nywp38p" path="res://Texture/TeleporterRed.png" id="12_hi6a0"]
-[ext_resource type="Script" uid="uid://uobuw5ls8m2w" path="res://scripts/spring_pad.gd" id="13_eo1xk"]
+[ext_resource type="Script" uid="uid://cl3x21a71h8bc" path="res://scripts/spring_pad.gd" id="13_eo1xk"]
 [ext_resource type="Script" uid="uid://cw1hucpin5hpc" path="res://scripts/spring_mesh.gd" id="14_18clu"]
 [ext_resource type="Script" uid="uid://qy2wikuman02" path="res://scripts/ui.gd" id="15_4wdv8"]
 [ext_resource type="Script" uid="uid://pfcvhibsl1rj" path="res://scripts/joy_stick.gd" id="16_d46x8"]
@@ -38,12 +38,15 @@
 [ext_resource type="Texture2D" uid="uid://pvoi51a3i4j1" path="res://Texture/TP_90x90_big.png" id="32_pq8jk"]
 [ext_resource type="Texture2D" uid="uid://3wairufbjtf4" path="res://Texture/PlatformAlbedo.PNG" id="32_rga7q"]
 [ext_resource type="Texture2D" uid="uid://tvg2d0a1xxo3" path="res://Texture/PlatformAo.PNG" id="33_6oujy"]
-[ext_resource type="Script" uid="uid://ck4pxkt0frem3" path="res://scripts/tp.gd" id="33_q57r8"]
+[ext_resource type="Script" uid="uid://c8kdtck17x3mx" path="res://scripts/tp.gd" id="33_q57r8"]
 [ext_resource type="Texture2D" uid="uid://dr3f3rck5j8wj" path="res://Texture/PlatformNormal.png" id="34_hi6a0"]
 [ext_resource type="Texture2D" uid="uid://cwtp6b7qg6wy3" path="res://Texture/PlatformRoughness.PNG" id="35_eo1xk"]
-[ext_resource type="Script" uid="uid://frlklf65p2cq" path="res://scripts/springs.gd" id="37_hi6a0"]
+[ext_resource type="Script" uid="uid://bcsrrkbribgyq" path="res://scripts/springs.gd" id="37_hi6a0"]
 [ext_resource type="Texture2D" uid="uid://b1umkmyts2eap" path="res://Texture/ChatGPT Image Nov 23, 2025, 09_56_57 PM.png" id="39_e75v4"]
 [ext_resource type="Texture2D" uid="uid://c4tkxpnkywy3x" path="res://Texture/ChatGPT Image Nov 23, 2025, 09_58_58 PM.png" id="40_8u370"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_ioo17"]
+size = Vector2(90, 90)
 
 [sub_resource type="PanoramaSkyMaterial" id="PanoramaSkyMaterial_qktwf"]
 panorama = ExtResource("5_817gm")
@@ -59,9 +62,6 @@ sky = SubResource("Sky_cwee5")
 ambient_light_source = 3
 ambient_light_color = Color(0.9411765, 0.8117647, 0.5411765, 1)
 ambient_light_energy = 0.0
-
-[sub_resource type="RectangleShape2D" id="RectangleShape2D_ioo17"]
-size = Vector2(90, 90)
 
 [sub_resource type="BoxMesh" id="BoxMesh_37uin"]
 size = Vector3(50, 1, 50)
@@ -240,9 +240,6 @@ bot_player_scene = ExtResource("3_f17e3")
 teleporter_gadget_scene = ExtResource("4_6oujy")
 ball_packed = ExtResource("4_x2olw")
 joystick_path = NodePath("CanvasLayer/UI/JoyStick")
-
-[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
-environment = SubResource("Environment_2tuav")
 
 [node name="CanvasLayer" type="CanvasLayer" parent="."]
 
@@ -502,6 +499,9 @@ shape = SubResource("RectangleShape2D_ioo17")
 passby_press = true
 script = ExtResource("33_q57r8")
 camera_path = NodePath("../../../../Scene/Camera3D")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_2tuav")
 
 [node name="Scene" type="Node3D" parent="."]
 

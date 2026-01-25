@@ -12,6 +12,9 @@ var tex_quality := 2      # 0=Low, 1=Med, 2=High (Textures)
 
 # NEW: 3D render scale (Project Settings -> Rendering -> Scaling 3D -> Scale)
 var scale_3d: float = 1.0
+# Layout state for your CanvasLayer UI (saved from TitleScreen layout tab)
+# key: String (node path), value: Dictionary (anchors/offsets or Node2D position)
+var layout_state: Dictionary = {}
 
 func _enter_tree() -> void:
 	_load()
@@ -73,6 +76,10 @@ func _load() -> void:
 
 		# profile
 		player_name = cfg.get_value("profile", "name", player_name)
+		# layout
+		layout_state = cfg.get_value("layout", "state", layout_state)
+		if typeof(layout_state) != TYPE_DICTIONARY:
+			layout_state = {}
 
 func _save() -> void:
 	var cfg := ConfigFile.new()
@@ -86,6 +93,8 @@ func _save() -> void:
 	cfg.set_value("video", "scale_3d", scale_3d)
 
 	cfg.set_value("profile", "name", player_name)
+	# layout
+	cfg.set_value("layout", "state", layout_state)
 
 	cfg.save(CFG_PATH)
 
@@ -99,3 +108,13 @@ func set_player_name_and_save(name: String) -> void:
 	if player_name == "":
 		player_name = "Player_%d" % randi()
 	_save()
+func set_layout_state_and_save(state: Dictionary) -> void:
+	layout_state = state.duplicate(true)
+	_save()
+
+func clear_layout_state_and_save() -> void:
+	layout_state.clear()
+	_save()
+
+func has_layout_state() -> bool:
+	return not layout_state.is_empty()

@@ -6,6 +6,7 @@ extends Control
 @onready var btn_play: Button = $CenterContainer/VBoxContainer/TestButton
 @onready var btn_multi: Button = $CenterContainer/VBoxContainer/MultiPlayerButton
 @onready var quit_btn: Button = vb.get_node_or_null("QuitButton")
+const HIT_SLOP := 12.0 # pixels of extra touch forgiveness (try 24–40 on mobile)
 
 @onready var popup: Window = $MultiplayerPopup
 @onready var btn_find: Button = $MultiplayerPopup/VBox/FindServerButton
@@ -16,9 +17,21 @@ extends Control
 @onready var status_label: Label = $MultiplayerPopup/VBox/Label if has_node("MultiplayerPopup/VBox/Label") else null
 
 var _gfx_ui: Control = null
+# --- Layout preview drag state ---
+var _layout_svc: SubViewportContainer = null
+var _layout_sv: SubViewport = null
+var _layout_canvas: Node = null
+var _layout_candidates: Array[CanvasItem] = []
+
+var _layout_drag_item: CanvasItem = null
+var _layout_drag_offset: Vector2 = Vector2.ZERO
+var _layout_defaults: Dictionary = {}  # key -> Vector2
+var _layout_working: Dictionary = {}   # key -> Vector2
 
 
 const LOBBY_SCENE := "res://scenes/Lobby.tscn"
+@export var world_scene_for_layout: PackedScene = preload("res://scenes/world.tscn")
+@export var canvaslayer_path_in_world: NodePath = ^"CanvasLayer"
 
 func _ready() -> void:
 	
@@ -69,7 +82,7 @@ func _ready() -> void:
 	btn_find.pressed.connect(_on_find_server)
 	btn_create.pressed.connect(_on_create_server)
 	btn_connect.pressed.connect(_on_connect_to_ip)
-
+	popup.close_requested.connect(_on_close_clicked)
 	# Network callbacks while we are on the title screen
 	Network.joined_server.connect(_on_joined_server)
 	Network.connection_failed.connect(_on_connection_failed)
@@ -192,6 +205,9 @@ func _on_connect_to_ip() -> void:
 	# Use the typed IP here:
 	Network.join(ip)
 
+func _on_close_clicked() -> void:	
+	popup.visible = false
+
 func get_lan_ip() -> String:
 	for addr in IP.get_local_addresses():  # PackedStringArray of addresses
 		var is_ipv6 := String(addr).find(":") != -1
@@ -271,8 +287,8 @@ func _create_graphics_settings_ui() -> Control:
 
 	# ✅ Make panel fit the screen (avoid going off-screen on small displays)
 	var vp := get_viewport_rect().size
-	var w := int(min(520.0, vp.x - 40.0))
-	var h := int(min(520.0, vp.y - 40.0))
+	var w := int(min(vp.x, vp.x - 40.0))
+	var h := int(min(vp.y, vp.y - 40.0))
 	panel.custom_minimum_size = Vector2i(max(360, w), max(300, h))
 	center.add_child(panel)
 
@@ -285,7 +301,7 @@ func _create_graphics_settings_ui() -> Control:
 	pad.add_theme_constant_override("margin_bottom", 16)
 	panel.add_child(pad)
 
-	# main layout: Header + Scroll + Buttons
+	# main layout: Header + Tabs + Buttons
 	var main_v := VBoxContainer.new()
 	main_v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	main_v.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -313,15 +329,30 @@ func _create_graphics_settings_ui() -> Control:
 	header.add_child(close_btn)
 
 	# --------------------
-	# Scrollable content
+	# Tabs (Graphics / Layout)
 	# --------------------
+	var tabs := TabContainer.new()
+	tabs.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	main_v.add_child(tabs)
+
+	# ===== Graphics Tab (your existing settings) =====
+	var tab_graphics := Control.new()
+	tab_graphics.set_anchors_preset(Control.PRESET_FULL_RECT)
+	tab_graphics.name = "Graphics"
+	tab_graphics.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tab_graphics.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	tabs.add_child(tab_graphics)
+
 	var scroll := ScrollContainer.new()
+	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
 	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	main_v.add_child(scroll)
+	tab_graphics.add_child(scroll)
 
 	var v := VBoxContainer.new()
 	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	v.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	v.add_theme_constant_override("separation", 14)
 	scroll.add_child(v)
 
@@ -368,7 +399,7 @@ func _create_graphics_settings_ui() -> Control:
 	tex_quality.select(clamp(Settings.tex_quality, 0, 2))
 	v.add_child(tex_quality)
 
-	# --- 3D Render Scale (Scaling 3D -> Scale) ---
+	# --- 3D Render Scale ---
 	var scale_label := Label.new()
 	scale_label.text = "3D Render Scale"
 	v.add_child(scale_label)
@@ -398,6 +429,71 @@ func _create_graphics_settings_ui() -> Control:
 		_update_scale_text.call()
 	)
 
+	# ===== Layout Tab (EMPTY) =====
+	var tab_layout := Control.new()
+	tab_layout.set_anchors_preset(Control.PRESET_FULL_RECT)
+	tab_layout.name = "Layout"
+	tab_layout.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tab_layout.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	tabs.add_child(tab_layout)
+	# --- Layout preview area (SubViewport) ---
+	var svc := SubViewportContainer.new()
+	svc.mouse_filter = Control.MOUSE_FILTER_STOP
+	svc.gui_input.connect(_on_layout_preview_gui_input)
+
+	# store refs for drag helpers
+	_layout_svc = svc
+
+	svc.set_anchors_preset(Control.PRESET_FULL_RECT)
+	svc.stretch = true
+	var base_w := int(ProjectSettings.get_setting("display/window/size/viewport_width"))
+	var base_h := int(ProjectSettings.get_setting("display/window/size/viewport_height"))
+
+	var ar := AspectRatioContainer.new()
+	ar.set_anchors_preset(Control.PRESET_FULL_RECT)
+	ar.ratio = float(base_w) / float(base_h)
+	ar.stretch_mode = AspectRatioContainer.STRETCH_FIT
+	tab_layout.add_child(ar)
+
+	ar.add_child(svc)
+
+
+	var sv := SubViewport.new()
+	# keep UI buttons from actually clicking/working
+	sv.gui_disable_input = true
+
+	_layout_sv = sv
+
+	sv.gui_disable_input = true
+	sv.transparent_bg = true
+	sv.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	svc.add_child(sv)
+
+	# Keep SubViewport size matched to the blue area
+	var _sync_sv_size := func():
+		var base_ww := int(ProjectSettings.get_setting("display/window/size/viewport_width"))
+		var base_hh := int(ProjectSettings.get_setting("display/window/size/viewport_height"))
+		sv.size = Vector2i(max(1, base_ww), max(1, base_hh))
+
+	_sync_sv_size.call()
+	svc.resized.connect(_sync_sv_size)
+
+	# Spawn CanvasLayer branch from World inside the SubViewport (no separate scene needed)
+	if world_scene_for_layout:
+		var wd := world_scene_for_layout.instantiate()
+		var cl := wd.get_node_or_null(canvaslayer_path_in_world)
+		if cl:
+			wd.remove_child(cl)     # detach from World instance
+			sv.add_child(cl) 
+			cl.process_mode = Node.PROCESS_MODE_DISABLED
+			_layout_canvas = cl
+			_layout_rebuild_candidates()
+
+	 # attach to SubViewport
+			wd.queue_free()         # free the rest of World
+	call_deferred("_layout_finalize_defaults")
+
+
 	# --------------------
 	# Bottom buttons (always visible)
 	# --------------------
@@ -417,6 +513,17 @@ func _create_graphics_settings_ui() -> Control:
 	back.custom_minimum_size = Vector2i(160, 48)
 	hrow.add_child(back)
 
+	var save_layout := Button.new()
+	save_layout.text = "Save Layout"
+	save_layout.custom_minimum_size = Vector2i(160, 48)
+	hrow.add_child(save_layout)
+
+	var reset_layout := Button.new()
+	reset_layout.text = "Reset Layout"
+	reset_layout.custom_minimum_size = Vector2i(160, 48)
+	hrow.add_child(reset_layout)
+
+
 	# --- handlers ---
 	var _close := func():
 		root.hide()
@@ -434,8 +541,286 @@ func _create_graphics_settings_ui() -> Control:
 		)
 	)
 
+	# Disable Apply when Layout tab is selected
+	tabs.tab_changed.connect(func(tab_idx: int):
+		var on_graphics := (tab_idx == 0)
+		var on_layout := (tab_idx == 1)
+
+		# Graphics tab
+		apply.visible = on_graphics
+		apply.disabled = not on_graphics
+		back.visible = true
+
+		# Layout tab
+		save_layout.visible = on_layout
+		reset_layout.visible = on_layout
+)
+
+	apply.disabled = false
+	save_layout.visible = false
+	reset_layout.visible = false
+	# Save current working layout into Settings.cfg
+	save_layout.pressed.connect(func():
+		Settings.set_layout_state_and_save(_layout_working)
+	)
+
+
+	# Reset = restore from Settings if available, otherwise fallback to captured defaults
+	reset_layout.pressed.connect(func():
+		_layout_working = _layout_defaults.duplicate(true) # factory/original
+		_layout_apply_positions(_layout_working)
+	)
+
+
+
 	return root
 
 
 func _apply_graphics_settings(fullscreen: bool, vsync: bool, quality: int, tex_quality: int, scale_3d: float) -> void:
 	Settings.set_and_save(fullscreen, vsync, quality, tex_quality, scale_3d)
+
+func _layout_svc_to_vp(p: Vector2) -> Vector2:
+	# Convert mouse pos from SubViewportContainer space to SubViewport space
+	if _layout_svc == null or _layout_sv == null:
+		return p
+	if _layout_svc.size.x <= 0.0 or _layout_svc.size.y <= 0.0:
+		return p
+
+	var sx := float(_layout_sv.size.x) / float(_layout_svc.size.x)
+	var sy := float(_layout_sv.size.y) / float(_layout_svc.size.y)
+	return Vector2(p.x * sx, p.y * sy)
+
+func _layout_rebuild_candidates() -> void:
+	_layout_candidates.clear()
+	if _layout_canvas == null:
+		return
+
+	# Prefer CanvasLayer/UI branch if it exists
+	var ui := _layout_canvas.get_node_or_null(^"UI")
+	var root := ui if ui != null else _layout_canvas
+	_layout_collect_candidates(root)
+
+func _layout_collect_candidates(n: Node) -> void:
+	for c in n.get_children():
+		# If we reached JoyStick, add ONLY JoyStick and DO NOT recurse into it.
+		if c is CanvasItem and c.name == "JoyStick":
+			_layout_candidates.append(c)
+			continue
+
+		# Skip joystick internals if they ever appear (extra safety)
+		if c.get_parent() and c.get_parent().name == "JoyStick":
+			continue
+
+		if c is CanvasItem:
+			if c.name != "UI":
+				_layout_candidates.append(c)
+
+		_layout_collect_candidates(c)
+
+func _joy_knob_hit(joy: CanvasItem, vp_pos: Vector2) -> bool:
+	var knob := joy.get_node_or_null(^"Knob")
+	if knob == null:
+		return false
+
+	# TouchScreenButton knob (most common)
+	if knob is TouchScreenButton:
+		var ts := knob as TouchScreenButton
+		var tex: Texture2D = ts.texture_normal
+		if tex:
+			var size := tex.get_size() * ts.global_scale
+			var rect := Rect2(ts.global_position - size * 0.5, size)
+			return rect.has_point(vp_pos)
+		return ts.global_position.distance_to(vp_pos) <= 48.0
+
+	# TextureRect / Button / other Control knob
+	if knob is Control:
+		return (knob as Control).get_global_rect().has_point(vp_pos)
+
+	# Fallback: distance pick
+	var origin := (knob as CanvasItem).get_global_transform_with_canvas().origin
+	return origin.distance_to(vp_pos) <= 32.0
+
+
+func _layout_pick_at(vp_pos: Vector2) -> CanvasItem:
+	# Iterate reverse so later items are preferred (roughly topmost)
+	for i in range(_layout_candidates.size() - 1, -1, -1):
+		var item := _layout_candidates[i]
+		if not is_instance_valid(item) or not item.visible:
+			continue
+
+		# ✅ ADD THIS BLOCK HERE
+		# JoyStick: ONLY allow dragging when the Knob is hit (not the big blank area)
+		if item.name == "JoyStick":
+			if _joy_knob_hit(item, vp_pos):
+				return item   # drag the JoyStick node
+			continue
+		# Focus container: DO NOT drag the blank parent area.
+		# Only its child TouchScreenButtons should be draggable.
+		if item.name == "Focus button" and item.get_child_count() > 0:
+			continue
+
+		# Controls: use rect hit test
+		if item is Control:
+			var r := (item as Control).get_global_rect().grow(HIT_SLOP)
+			if r.has_point(vp_pos):
+				return item
+			continue
+
+		# TouchScreenButton / Node2D: approximate using texture size if possible, else radius
+		if item is TouchScreenButton:
+			var ts := item as TouchScreenButton
+			var tex: Texture2D = ts.texture_normal
+			if tex:
+				var size := tex.get_size() * ts.global_scale
+				var rect := Rect2(ts.global_position - size * 0.5, size)
+				rect = rect.grow(HIT_SLOP)
+				if rect.has_point(vp_pos):
+					return item
+			else:
+				if ts.global_position.distance_to(vp_pos) <= (48.0 + HIT_SLOP):
+					return item
+			continue
+
+		# Generic Node2D-like items: pick by distance to origin
+		var origin := item.get_global_transform_with_canvas().origin
+		if origin.distance_to(vp_pos) <= 32.0:
+			return item
+
+	return null
+
+func _on_layout_preview_gui_input(event: InputEvent) -> void:
+	if _layout_svc == null:
+		return
+
+	# -------------------------
+	# MOUSE (desktop)
+	# -------------------------
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		var mb := event as InputEventMouseButton
+		var vp_pos := _layout_svc_to_vp(mb.position)
+
+		if mb.pressed:
+			var picked := _layout_pick_at(vp_pos)
+			if picked != null:
+				_layout_drag_item = picked
+				_layout_drag_offset = vp_pos - _layout_drag_item.global_position
+		else:
+			_layout_drag_item = null
+
+		_layout_svc.accept_event()
+		return
+
+	if event is InputEventMouseMotion and _layout_drag_item != null:
+		var mm := event as InputEventMouseMotion
+		var vp_pos2 := _layout_svc_to_vp(mm.position)
+
+		if is_instance_valid(_layout_drag_item):
+			_layout_drag_item.global_position = vp_pos2 - _layout_drag_offset
+			_layout_working[_layout_key(_layout_drag_item)] = _layout_read_state(_layout_drag_item)
+
+		_layout_svc.accept_event()
+		return
+
+	# -------------------------
+	# TOUCH (mobile)
+	# -------------------------
+	if event is InputEventScreenTouch:
+		var st := event as InputEventScreenTouch
+		var vp_pos_t := _layout_svc_to_vp(st.position)
+
+		if st.pressed:
+			var picked_t := _layout_pick_at(vp_pos_t)
+			if picked_t != null:
+				_layout_drag_item = picked_t
+				_layout_drag_offset = vp_pos_t - _layout_drag_item.global_position
+		else:
+			_layout_drag_item = null
+
+		_layout_svc.accept_event()
+		return
+
+	if event is InputEventScreenDrag and _layout_drag_item != null:
+		var sd := event as InputEventScreenDrag
+		var vp_pos3 := _layout_svc_to_vp(sd.position)
+
+		if is_instance_valid(_layout_drag_item):
+			_layout_drag_item.global_position = vp_pos3 - _layout_drag_offset
+			_layout_working[_layout_key(_layout_drag_item)] = _layout_read_state(_layout_drag_item)
+
+		_layout_svc.accept_event()
+		return
+
+func _layout_key(item: CanvasItem) -> String:
+	if _layout_canvas == null:
+		return item.name
+	# unique + stable within the preview tree
+	return String(_layout_canvas.get_path_to(item))
+
+func _layout_read_state(item: CanvasItem) -> Dictionary:
+	# Save a stable "layout state"
+	if item is Control:
+		var c := item as Control
+		return {
+			"t": "c",
+			"al": c.anchor_left, "at": c.anchor_top, "ar": c.anchor_right, "ab": c.anchor_bottom,
+			"ol": c.offset_left, "ot": c.offset_top, "or": c.offset_right, "ob": c.offset_bottom
+		}
+	else:
+		# Node2D / TouchScreenButton etc.
+		return {"t": "n", "p": item.position}
+
+func _layout_apply_state(item: CanvasItem, state: Dictionary) -> void:
+	if not state.has("t"):
+		return
+
+	if state["t"] == "c" and item is Control:
+		var c := item as Control
+		# Restore anchors first, then offsets
+		c.anchor_left = state["al"]; c.anchor_top = state["at"]
+		c.anchor_right = state["ar"]; c.anchor_bottom = state["ab"]
+		c.offset_left = state["ol"]; c.offset_top = state["ot"]
+		c.offset_right = state["or"]; c.offset_bottom = state["ob"]
+	else:
+		# Node2D path
+		if state.has("p"):
+			item.position = state["p"]
+
+func _layout_finalize_defaults() -> void:
+	# Run after 1 frame so the SubViewport + UI have valid layout
+	if _layout_canvas == null:
+		return
+
+	_layout_rebuild_candidates()
+
+	# "Factory default" from the scene
+	_layout_capture_defaults()
+
+	# If user saved layout exists, use it as the current working layout
+	if Settings.has_layout_state():
+		_layout_working = Settings.layout_state.duplicate(true)
+	else:
+		_layout_working = _layout_defaults.duplicate(true)
+
+	_layout_apply_positions(_layout_working)
+
+
+func _layout_capture_defaults() -> void:
+	_layout_defaults.clear()
+	if _layout_candidates.is_empty():
+		return
+	for item in _layout_candidates:
+		if is_instance_valid(item):
+			_layout_defaults[_layout_key(item)] = _layout_read_state(item)
+
+func _layout_apply_working_from_defaults() -> void:
+	_layout_working = _layout_defaults.duplicate(true)
+
+func _layout_apply_positions(dict: Dictionary) -> void:
+	if _layout_candidates.is_empty():
+		return
+	for item in _layout_candidates:
+		if not is_instance_valid(item):
+			continue
+		var k := _layout_key(item)
+		if dict.has(k):
+			_layout_apply_state(item, dict[k])

@@ -1,6 +1,6 @@
 [gd_scene load_steps=4 format=3 uid="uid://c7aw8ja2qjdd3"]
 
-[ext_resource type="Script" uid="uid://g7bxujmiwabn" path="res://scripts/title_screen.gd" id="1_sa3yf"]
+[ext_resource type="Script" uid="uid://btoe5651qq1k4" path="res://scripts/title_screen.gd" id="1_sa3yf"]
 [ext_resource type="Texture2D" uid="uid://bsg80ej0slplt" path="res://Texture/backgrou.png" id="2_s4lrb"]
 
 [sub_resource type="Theme" id="Theme_1s85s"]
@@ -58,14 +58,16 @@ text = "Multiplayer
 
 [node name="MultiplayerPopup" type="Window" parent="."]
 scaling_3d_scale = 0.25
+oversampling_override = 1.0
 title = "Multiplayer"
+position = Vector2i(0, 36)
 size = Vector2i(460, 300)
 visible = false
 popup_window = true
 
 [node name="VBox" type="VBoxContainer" parent="MultiplayerPopup"]
-offset_right = 40.0
-offset_bottom = 40.0
+offset_right = 470.0
+offset_bottom = 158.0
 
 [node name="FindServerButton" type="Button" parent="MultiplayerPopup/VBox"]
 layout_mode = 2
@@ -79,6 +81,7 @@ text = "Create Server"
 layout_mode = 2
 
 [node name="IpLine" type="LineEdit" parent="MultiplayerPopup/VBox/HBox"]
+custom_minimum_size = Vector2(330, 0)
 layout_mode = 2
 placeholder_text = "Enter IP (e.g. 192.168.0.42)"
 
