@@ -175,7 +175,7 @@ func _ready() -> void:
 	
 	# 2) If a Player is already in the scene (your case), register it for the host
 	var pre := get_node_or_null("Player")
-	if pre != null:
+	if pre != null and not GameState.is_dedicated_server():
 		# Server must own/simulate every player in server-auth
 		pre.set_multiplayer_authority(1)
 		_players[1] = pre

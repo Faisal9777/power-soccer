@@ -103,6 +103,8 @@ func process_input_dictionary(msg: int, value : Dictionary) -> void:
 
 func _ready() -> void:
 	_network_endpoint = get_parent()
+	if GameState.is_dedicated_server():
+		_is_also_player = false
 	#_network_endpoint.build_game_controller()
 	#_network_endpoint.build_game_updater(GameState.roster)
 	#print("about to tell the cclient to start game init")
@@ -110,9 +112,10 @@ func _ready() -> void:
 
 
 func _physics_process(delta: float) -> void:
-	var p : Node = _players[multiplayer.get_unique_id()]
-	var inp_data := p.get_input_data() as Dictionary
-	p.update_player_states(inp_data, delta)
+	if _is_also_player:
+		var p : Node = _players[multiplayer.get_unique_id()]
+		var inp_data := p.get_input_data() as Dictionary
+		p.update_player_states(inp_data, delta)
 	_update_local_player_states(delta)
 	_input_accum += delta
 	var step: float = 1.0 / NET_INPUT_HZ
