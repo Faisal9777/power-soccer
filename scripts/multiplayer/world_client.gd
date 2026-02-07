@@ -11,11 +11,18 @@ var GameClient := load("res://scripts/multiplayer/game_client.gd")
 # How far "behind" we render remote players for smooth interpolation (ms)
 @export var remote_interp_delay_ms: int = 120
 @export var remote_buffer_max: int = 10
+@export var visual_catchup_speed := 18.0
+var _visual_offset := Vector3.ZERO
+
+var _view_error_pos: Vector3 = Vector3.ZERO
+var _view_error_yaw: float = 0.0
+@export var view_catchup_speed := 18.0
+@export var teleport_snap_dist := 2.5  # meters; snap if correction is huge
 
 # --- assigned/managed externally ---
 # You can set this from your World script when players spawn.
 var _players: Dictionary[int, Node] = {}  # peer_id -> Player node
-
+var _visual_nodes : Array 
 # --- local prediction/reconciliation ---
 var _pending_inputs: Array[Dictionary] = []   # only for LOCAL player
 var _next_input_seq: int = -1
@@ -106,7 +113,8 @@ func _physics_process(delta: float) -> void:
 	if not _latest_local_snapshot.is_empty():
 		var snap := _latest_local_snapshot
 		_latest_local_snapshot = {}
-		_reconcile_local(me, snap, delta)
+		#_reconcile_local(me, snap, delta)
+		_reconcile_local_best_practice(me, snap)
 
 	# 2) Local prediction + send input
 	var cmd: Dictionary = {}
@@ -140,6 +148,8 @@ func _physics_process(delta: float) -> void:
 
 
 func _process(_delta: float) -> void:
+	#_smooth_local_visual(_delta)
+	_smooth_local_view(_delta)
 	# Remote interpolation runs every render frame for smoothness
 	var now := Time.get_ticks_msec()
 	var render_time := now - remote_interp_delay_ms
@@ -196,6 +206,8 @@ func _store_snapshots(snapshots: Dictionary) -> void:
 		var snap_id := int(snap.get("server_tick", snap.get("last_server_seq", -1)))
 
 		if peer_id == _my_id:
+			#_calculate_offset_for_local_visual(peer_id, snap)
+			
 			# Local player: keep ONLY newest snapshot
 			if snap_id > _latest_local_snapshot_id:
 				_latest_local_snapshot_id = snap_id
@@ -249,6 +261,44 @@ func _reconcile_local(p: Node, snap: Dictionary, delta : float) -> void:
 		p.update_player_states(cmd, delta)
 
 
+func _reconcile_local_best_practice(p: Node3D, snap: Dictionary) -> void:
+	# --- A) capture the CURRENT VIEW (what camera should keep seeing) ---
+	var old_view_pos := p.global_position + _view_error_pos
+	var old_view_yaw := p.rotation.y + _view_error_yaw
+
+	# --- B) apply authoritative snap (server state) ---
+	if p.has_method("apply_snapshot"):
+		p.apply_snapshot(snap)
+	else:
+		p.global_transform = _snap_to_xform(snap, p)
+
+	# --- C) drop confirmed inputs ---
+	var last_server_seq := int(snap.get("last_server_seq", -1))
+
+	var i := 0
+	while i < _pending_inputs.size():
+		var seq := int((_pending_inputs[i] as Dictionary).get("seq", -1))
+		if seq <= last_server_seq:
+			_pending_inputs.remove_at(i)
+		else:
+			i += 1
+
+	# --- D) replay remaining inputs using FIXED dt (determinism) ---
+	for cmd in _pending_inputs:
+		p.update_player_states(cmd, _fixed_dt)
+
+	# --- E) set error so the VIEW stays continuous (no snapback) ---
+	var new_pred_pos := p.global_position
+	var new_pred_yaw := p.rotation.y
+
+	_view_error_pos = old_view_pos - new_pred_pos
+	_view_error_yaw = wrapf(old_view_yaw - new_pred_yaw, -PI, PI)
+
+	# Optional: if correction is enormous, snap view too (prevents “rubber band tail”)
+	if _view_error_pos.length() > teleport_snap_dist:
+		_view_error_pos = Vector3.ZERO
+		_view_error_yaw = 0.0
+
 # ---------- Helpers ----------
 #func _snap_to_xform(snap: Dictionary, fallback_node: Node) -> Transform3D:
 	## Best-case: snapshot already contains a Transform3D
@@ -290,3 +340,52 @@ func _resolve_players_from_roster() -> void:
 
 		if node != null:
 			_players[k] = node
+
+func _calculate_offset_for_local_visual(peer_id : int, snap : Dictionary) -> void:
+	var p := _players[peer_id]
+	var new_pos : Vector3 = snap["pos"]
+	var old_pos : Vector3 = p.global_position
+	# 3) compute the correction delta in GLOBAL space
+	var delta_global := old_pos - new_pos
+
+	# 4) convert that delta into PLAYER-LOCAL space and accumulate it
+	#    (so it behaves correctly even if player rotates)
+	var delta_local : Vector3  = p.global_transform.basis.inverse() * delta_global
+	_visual_offset += delta_local
+
+func _smooth_local_visual(delta : float) -> void:
+	if not _players.has(multiplayer.get_unique_id()):
+		return
+	# Smoothly remove the local offset back to 0
+	var a := 1.0 - pow(0.001, delta * visual_catchup_speed)
+	_visual_offset = _visual_offset.lerp(Vector3.ZERO, a)
+
+	# Apply ONLY the local offset to the visual
+	var visual : Node = _players[multiplayer.get_unique_id()].get_view_node()
+	
+	visual.position = _visual_offset
+
+func _smooth_local_view(delta: float) -> void:
+	if not _players.has(_my_id):
+		return
+	var p: Node3D = _players[_my_id]
+	if not is_instance_valid(p):
+		return
+
+	var view: Node3D = p.get_view_node() # should return Visual/ViewRoot for local owner
+	if not is_instance_valid(view):
+		return
+
+	# Exponential decay toward 0
+	var a := 1.0 - pow(0.001, delta * view_catchup_speed)
+	_view_error_pos = _view_error_pos.lerp(Vector3.ZERO, a)
+	_view_error_yaw = lerp_angle(_view_error_yaw, 0.0, a)
+
+	# Apply error in GLOBAL space (robust under rotation changes)
+	view.global_position = p.global_position + _view_error_pos
+
+	# If your camera uses yaw from the body and you want yaw smoothing too:
+	# (only do this if your view node is meant to rotate independently)
+	# var r := view.global_rotation
+	# r.y = p.global_rotation.y + _view_error_yaw
+	# view.global_rotation = r
