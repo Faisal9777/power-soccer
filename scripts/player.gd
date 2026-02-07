@@ -80,6 +80,7 @@ var _tackle_phasing: bool = false
 
 @export var mouse_sens: float = 0.008
 @onready var aim_pivot: Node3D = $AimPivot
+@onready var visual : Node3D = $Visual
 @export var min_pitch := deg_to_rad(-60)
 @export var max_pitch := deg_to_rad( 60)
 # --- Aiming/orbit state (client-local) ---
@@ -89,6 +90,7 @@ var _tackle_phasing: bool = false
 @export var aim_pitch_max := deg_to_rad( 80)
 # --- Generic: keep air momentum (used by abilities like Grapple) ---
 var _air_momentum_keep_left := 0.0
+
 
 func start_air_momentum_keep(seconds: float) -> void:
 	_air_momentum_keep_left = maxf(_air_momentum_keep_left, seconds)
@@ -276,7 +278,7 @@ func attach_camera(c: Camera3D, j: Node) -> void:
 	joystick = j
 	cam = c
 	if cam and _is_local_owner():
-		_mark_self_layer_recursive(self)  # ✅ move my visuals to SELF layer only
+		_mark_self_layer_recursive(visual)  # ✅ move my visuals to SELF layer only
 		cam.current = true
 		cam.near = max(cam.near, 0.12)
 
@@ -305,12 +307,17 @@ func get_snapshot() -> Dictionary:
 		}
 	return snapshot
 func apply_snapshot(snap: Dictionary) -> void:
+	velocity = snap["vel"]
 	var yaw := snap["yaw"] as float
 	var pitch := snap["pitch"] as float
 	_is_frozen = snap["is_frozen"]
 	_apply_facing_absolute(yaw, pitch)
 	global_position = snap["pos"]
 
+func get_view_node() -> Node:
+	if cam:
+		return visual
+	return null
 
 #func get_input_data() -> Dictionary:
 	#var mvx : float = 0.0

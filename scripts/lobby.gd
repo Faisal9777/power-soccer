@@ -541,6 +541,7 @@ func _rpc_set_roster(snapshot: Array) -> void:
 		}
 
 	print("ROSTERRRRRR")
+	print("new update yea")
 	GameState.roster = dict
 	print(GameState.roster)
 	_refresh_ui()

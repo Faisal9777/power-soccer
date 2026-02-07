@@ -102,6 +102,7 @@ func process_input_dictionary(msg: int, value : Dictionary) -> void:
 
 
 func _ready() -> void:
+	print("update is new yea")
 	_network_endpoint = get_parent()
 	if GameState.is_dedicated_server():
 		_is_also_player = false
