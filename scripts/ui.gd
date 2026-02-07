@@ -1,5 +1,10 @@
 # UI.gd  (attach to: CanvasLayer/UI)
 extends Control
+signal ui_layout_ready
+var _layout_ready: bool = false
+
+func is_layout_ready() -> bool:
+	return _layout_ready
 
 # Reference design resolution you layouted against
 @export var design_size: Vector2 = Vector2(1280.0, 720.0)
@@ -61,3 +66,6 @@ func _rescale_all() -> void:
 		if knob:
 			knob.pivot_offset = knob.size * 0.5
 			knob.position = _joy_stick.size * 0.5
+		
+		_layout_ready = true
+		ui_layout_ready.emit()

@@ -1450,3 +1450,15 @@ func _apply_saved_layout_to_world_ui() -> void:
 		var n := cl.get_node_or_null(NodePath(key_str))
 		if n != null and n is CanvasItem:
 			_apply_layout_state_to_item(n as CanvasItem, saved[k])
+	_debug_print_world_ui_sizes("after apply_saved_layout")
+
+func _debug_print_world_ui_sizes(tag: String = "") -> void:
+	var vp := get_viewport().get_visible_rect().size
+	print("[WorldUI]", tag, " viewport_w=", vp.x, " viewport_h=", vp.y)
+
+	var ui := get_node_or_null(^"CanvasLayer/UI")
+	if ui is Control:
+		var c := ui as Control
+		print("[WorldUI]", tag,
+			" ui_w=", c.size.x, " ui_h=", c.size.y,
+			" ui_global_rect=", c.get_global_rect())

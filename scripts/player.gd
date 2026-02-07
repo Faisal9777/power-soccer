@@ -610,6 +610,8 @@ func simulate_server(delta: float) -> void:
 
 	_pre_move_vel = velocity
 	_handle_tackle_input_server(delta)
+	
+
 	_handle_action_server(input_dir, delta)
 	_update_stamina_server(delta)
 	_update_latched_ball_server(delta)
@@ -1042,6 +1044,10 @@ func _start_tackle_server() -> void:
 	_enter_tackle_phasing()
 	_tackle_steal_left = tackle_steal_window
 	_tackle_has_stolen = false
+	print("TACKLE START pid=", owner_peer_id,
+	" tackle_active=", tackle_active,
+	" steal_left=", _tackle_steal_left,
+	" cd=", _cooldowns["tackle"])
 
 func _update_tackle_server(delta: float) -> void:
 	# keep the ball glued while latched (server-side tick snap)
@@ -1064,6 +1070,11 @@ func _update_tackle_server(delta: float) -> void:
 	move_and_slide()
 
 	tackle_time_left -= delta
+	if int(Time.get_ticks_msec() / 200) % 5 == 0: # roughly throttled
+		print("TACKLE TICK pid=", owner_peer_id,
+			" tackle_active=", tackle_active,
+			" ball_latched=", ball_latched)
+
 	if tackle_time_left <= 0.0 or Vector3(velocity.x,0.0,velocity.z).length() < 0.1:
 		_end_tackle_server()
 
@@ -1103,6 +1114,12 @@ func _latch_ball_server(ball: RigidBody3D) -> void:
 	if _is_latch_touching_layer(latch_stuck_layer, ball.global_position):
 		_latch_stuck = true
 		_latch_stuck_player_pos = global_position
+	print("LATCHED BALL! pid=", owner_peer_id,
+	" ball=", ball.name,
+	" ball_latched=", ball_latched,
+	" freeze=", ball.freeze,
+	" ball_layer=", ball.collision_layer,
+	" ball_mask=", ball.collision_mask)
 
 func _ball_within_latch_range(ball: Node3D) -> bool:
 	if ball == null or !is_instance_valid(ball):
@@ -1460,6 +1477,10 @@ func _on_kick_area_body_exited(body: Node) -> void:
 
 
 func _on_tackle_field_body_entered(body: Node) -> void:
+	print("TACKLE FIELD ENTER: ", body.name, " type=", body.get_class(),
+	" tackle_active=", tackle_active,
+	" groups_ball=", body.is_in_group("ball"))
+
 	if !multiplayer.is_server():
 		return
 
@@ -1499,8 +1520,15 @@ func _on_tackle_field_body_entered(body: Node) -> void:
 	if rb == null or !rb.is_in_group("ball"):
 		return
 
-	if (tackle_active or latch_mode_active) and _ball_within_latch_range(rb):
+	if tackle_active:
+		print("TACKLE FIELD SAW BALL -> attempting latch. ball=", rb.name)
+
 		_latch_ball_server(rb)
+	elif latch_mode_active and _ball_within_latch_range(rb):
+		print("TACKLE FIELD SAW BALL -> attempting latch. ball=", rb.name)
+
+		_latch_ball_server(rb)
+
 
 func _player_layer_mask() -> int:
 	# characters_layer_bit is a layer number (1..32). You said player layer is 2.

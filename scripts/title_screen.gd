@@ -436,16 +436,7 @@ func _create_graphics_settings_ui() -> Control:
 	tab_layout.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	tab_layout.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	tabs.add_child(tab_layout)
-	# --- Layout preview area (SubViewport) ---
-	var svc := SubViewportContainer.new()
-	svc.mouse_filter = Control.MOUSE_FILTER_STOP
-	svc.gui_input.connect(_on_layout_preview_gui_input)
 
-	# store refs for drag helpers
-	_layout_svc = svc
-
-	svc.set_anchors_preset(Control.PRESET_FULL_RECT)
-	svc.stretch = true
 	var base_w := int(ProjectSettings.get_setting("display/window/size/viewport_width"))
 	var base_h := int(ProjectSettings.get_setting("display/window/size/viewport_height"))
 
@@ -455,7 +446,34 @@ func _create_graphics_settings_ui() -> Control:
 	ar.stretch_mode = AspectRatioContainer.STRETCH_FIT
 	tab_layout.add_child(ar)
 
-	ar.add_child(svc)
+	# ✅ Frame that will be resized by AspectRatioContainer to the "real preview" size
+	var preview_frame := PanelContainer.new()
+	preview_frame.name = "PreviewFrame"
+	preview_frame.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	preview_frame.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	preview_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE  # don't block input to svc
+	ar.add_child(preview_frame)
+
+	# ✅ Red border style (no padding so border matches exact area)
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0, 0, 0, 0)      # transparent background
+	sb.border_color = Color(1, 0, 0, 1)  # red
+	sb.border_width_left = 3
+	sb.border_width_top = 3
+	sb.border_width_right = 3
+	sb.border_width_bottom = 3
+	preview_frame.add_theme_stylebox_override("panel", sb)
+
+	# --- Layout preview area (SubViewportContainer) ---
+	var svc := SubViewportContainer.new()
+	svc.name = "LayoutSVC"
+	svc.mouse_filter = Control.MOUSE_FILTER_STOP
+	svc.gui_input.connect(_on_layout_preview_gui_input)
+	_layout_svc = svc
+
+	svc.set_anchors_preset(Control.PRESET_FULL_RECT)
+	preview_frame.add_child(svc)
+
 
 
 	var sv := SubViewport.new()
@@ -467,6 +485,11 @@ func _create_graphics_settings_ui() -> Control:
 	sv.gui_disable_input = true
 	sv.transparent_bg = true
 	sv.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	sv.size = Vector2i(base_w, base_h)
+	sv.size_2d_override = Vector2i(base_w, base_h)
+	sv.size_2d_override_stretch = true
+	svc.stretch = true
+
 	svc.add_child(sv)
 
 	# Keep SubViewport size matched to the blue area
@@ -476,8 +499,11 @@ func _create_graphics_settings_ui() -> Control:
 		sv.size = Vector2i(max(1, base_ww), max(1, base_hh))
 
 	_sync_sv_size.call()
-	svc.resized.connect(_sync_sv_size)
-
+	_layout_debug_print_sizes("after _sync_sv_size")
+	svc.resized.connect(func():
+		#_sync_sv_size.call()
+		_layout_debug_print_sizes("svc.resized")
+)
 	# Spawn CanvasLayer branch from World inside the SubViewport (no separate scene needed)
 	if world_scene_for_layout:
 		var wd := world_scene_for_layout.instantiate()
@@ -579,15 +605,23 @@ func _create_graphics_settings_ui() -> Control:
 func _apply_graphics_settings(fullscreen: bool, vsync: bool, quality: int, tex_quality: int, scale_3d: float) -> void:
 	Settings.set_and_save(fullscreen, vsync, quality, tex_quality, scale_3d)
 
+func _layout_virtual_size() -> Vector2:
+	if _layout_sv == null:
+		return Vector2.ONE
+	# If you use 2D override (you do), THAT is the coordinate space your UI uses.
+	if _layout_sv.size_2d_override != Vector2i.ZERO and _layout_sv.size_2d_override_stretch:
+		return Vector2(_layout_sv.size_2d_override)
+	return Vector2(_layout_sv.size)
+
 func _layout_svc_to_vp(p: Vector2) -> Vector2:
-	# Convert mouse pos from SubViewportContainer space to SubViewport space
 	if _layout_svc == null or _layout_sv == null:
 		return p
 	if _layout_svc.size.x <= 0.0 or _layout_svc.size.y <= 0.0:
 		return p
 
-	var sx := float(_layout_sv.size.x) / float(_layout_svc.size.x)
-	var sy := float(_layout_sv.size.y) / float(_layout_svc.size.y)
+	var virt := _layout_virtual_size()
+	var sx := virt.x / _layout_svc.size.x
+	var sy := virt.y / _layout_svc.size.y
 	return Vector2(p.x * sx, p.y * sy)
 
 func _layout_rebuild_candidates() -> void:
@@ -689,6 +723,7 @@ func _layout_pick_at(vp_pos: Vector2) -> CanvasItem:
 	return null
 
 func _on_layout_preview_gui_input(event: InputEvent) -> void:
+	
 	if _layout_svc == null:
 		return
 
@@ -802,6 +837,7 @@ func _layout_finalize_defaults() -> void:
 		_layout_working = _layout_defaults.duplicate(true)
 
 	_layout_apply_positions(_layout_working)
+	_layout_debug_print_sizes("after finalize/apply")
 
 
 func _layout_capture_defaults() -> void:
@@ -824,3 +860,24 @@ func _layout_apply_positions(dict: Dictionary) -> void:
 		var k := _layout_key(item)
 		if dict.has(k):
 			_layout_apply_state(item, dict[k])
+
+func _layout_debug_print_sizes(tag: String = "") -> void:
+	if _layout_svc:
+		print("[LayoutPreview]", tag,
+			" svc_w=", _layout_svc.size.x, " svc_h=", _layout_svc.size.y)
+
+	if _layout_sv:
+		print("[LayoutPreview]", tag,
+			" sv_w=", _layout_sv.size.x, " sv_h=", _layout_sv.size.y)
+
+	if _layout_canvas:
+		var ui := _layout_canvas.get_node_or_null(^"UI")
+		if ui is Control:
+			var c := ui as Control
+			print("[LayoutPreview]", tag,
+				" world_ui_w=", c.size.x, " world_ui_h=", c.size.y,
+				" world_ui_global_rect=", c.get_global_rect())
+	if _layout_svc and _layout_sv:
+		var virt := _layout_virtual_size()
+		print("[LayoutPreview]", tag, " virt=", virt, " svc=", _layout_svc.size,
+			" scale=", Vector2(virt.x/_layout_svc.size.x, virt.y/_layout_svc.size.y))
