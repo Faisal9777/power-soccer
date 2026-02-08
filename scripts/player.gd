@@ -81,6 +81,7 @@ var _tackle_phasing: bool = false
 @export var mouse_sens: float = 0.008
 @onready var aim_pivot: Node3D = $AimPivot
 @onready var visual : Node3D = $Visual
+@onready var visual2 : Node3D = $Visual2
 @export var min_pitch := deg_to_rad(-60)
 @export var max_pitch := deg_to_rad( 60)
 # --- Aiming/orbit state (client-local) ---
@@ -278,9 +279,11 @@ func attach_camera(c: Camera3D, j: Node) -> void:
 	joystick = j
 	cam = c
 	if cam and _is_local_owner():
-		_mark_self_layer_recursive(visual)  # ✅ move my visuals to SELF layer only
+		_mark_self_layer_recursive(self)  # ✅ move my visuals to SELF layer only
 		cam.current = true
 		cam.near = max(cam.near, 0.12)
+	
+	
 
 # Aim the camera at a world position.
 # yaw_only=true keeps the camera level (no pitch); set false to let it tilt up/down.
@@ -316,8 +319,12 @@ func apply_snapshot(snap: Dictionary) -> void:
 
 func get_view_node() -> Node:
 	if cam:
-		return visual
+		return visual2
+		#return visual
 	return null
+
+func get_visual_node() -> Node:
+	return aim_pivot
 
 #func get_input_data() -> Dictionary:
 	#var mvx : float = 0.0

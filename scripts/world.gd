@@ -116,6 +116,7 @@ func _ready() -> void:
 	if not multiplayer.is_server():
 		net = WorldClientScript.new()
 		_initialize_multiplayer("NetClient", net)
+		net.init($LocalViewProxy)
 	if multiplayer.is_server():
 		out_bounds.body_entered.connect(_on_ball_out_of_bounds)
 	if OS.has_feature("mobile"):
@@ -692,7 +693,7 @@ func _server_setup3() -> void:
 	var red_spawns  := get_node(TEAM_RED_PATH)   as Node3D
 	var ball_spawn  := get_node(BALL_SPAWN_PATH) as Node3D
 	net.start_init(_players, ingame, blue_spawns, red_spawns, ball_spawn,
-	ball_scene, GameState.match_len_sec, GameState.goal_limit, GameState.roster)
+	ball_scene, GameState.match_len_sec, GameState.goal_limit, GameState.roster, ball_scene.get_path(), joystick_path)
 	
 @rpc("authority", "reliable", "call_local")
 func _begin_next_initialization(roster : Dictionary) -> void:
@@ -1223,26 +1224,28 @@ func _rpc_attach_cam(player_path: NodePath, _unused_joystick_path: NodePath, bal
 			#var world := get_node_or_null("/root/World")
 			#if world:
 				#joystick = world.find_child("JoyStick", true, false) as Control
-	# Resolve camera
-	var cam: Camera3D = get_node_or_null("/root/World/Scene/Camera3D") as Camera3D
-	if cam == null:
-		cam = p.get_node_or_null("Camera3D") as Camera3D
-	if cam == null:
-		return
-
-	# Wire camera (existing)
-	cam.current = true
-	if cam.has_method("set_target"): cam.call_deferred("set_target", p)
-	if cam.has_method("activate"):   cam.call_deferred("activate")
-	if cam.has_method("set_ball"):   cam.call_deferred("set_ball", ball_path)
-
-	# NEW: give the camera its joystick
-	if joystick and cam.has_method("set_joystick"):
-		cam.call_deferred("set_joystick", joystick)
-
-	# Hand joystick to player (as you already do)
-	if p.has_method("attach_camera"):
-		p.call_deferred("attach_camera", cam, joystick)
+	
+	
+	## Resolve camera
+	#var cam: Camera3D = get_node_or_null("/root/World/Scene/Camera3D") as Camera3D
+	#if cam == null:
+		#cam = p.get_node_or_null("Camera3D") as Camera3D
+	#if cam == null:
+		#return
+#
+	## Wire camera (existing)
+	#cam.current = true
+	#if cam.has_method("set_target"): cam.call_deferred("set_target", p)
+	#if cam.has_method("activate"):   cam.call_deferred("activate")
+	#if cam.has_method("set_ball"):   cam.call_deferred("set_ball", ball_path)
+#
+	## NEW: give the camera its joystick
+	#if joystick and cam.has_method("set_joystick"):
+		#cam.call_deferred("set_joystick", joystick)
+#
+	## Hand joystick to player (as you already do)
+	#if p.has_method("attach_camera"):
+		#p.call_deferred("attach_camera", cam, joystick)
 
 
 func _focus_camera_on_player(p: Node, peer_id: int) -> void:

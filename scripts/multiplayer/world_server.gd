@@ -19,7 +19,9 @@ func start_init(players: Dictionary,
 	ball_scene: Node3D,
 	match_len_sec: int,
 	goal_limit: int,
-	roster: Dictionary) -> void:
+	roster: Dictionary,
+	ball_path : NodePath, 
+	joystick_path : NodePath) -> void:
 	_players = players
 	var _game_server = GameServer.new()
 	# Give Game everything it needs *before* it's added (so _ready can safely use them)
@@ -33,10 +35,11 @@ func start_init(players: Dictionary,
 	ingame.set_roster(GameState.roster)
 	if _is_also_player:
 		_peers_ready += 1
-		
+		_camera_setup(ball_path, joystick_path)
+	print("ball path: ", ball_scene.get_path())
 	#_debug_data(roster, ingame, ball_scene, blue_spawns, red_spawns)
 	var data := {"roster" : roster, "state_path": ingame.get_path(), "ball_path" : ball_scene.get_path(),
-	"blue_path" : blue_spawns.get_path(), "red_path" : red_spawns.get_path()}
+	"blue_path" : blue_spawns.get_path(), "red_path" : red_spawns.get_path(), "joystick_path": joystick_path}
 	_network_endpoint.rpc("receive_network_input_dictionary", NetCodes.Msg.INIT_BEGIN, data)
 
 func process_input(cmd: Dictionary, peer_id: int) -> void:
@@ -100,6 +103,8 @@ func process_input_dictionary(msg: int, value : Dictionary) -> void:
 		if _peers_ready == GameState.roster.size():
 			_network_endpoint.start_game()
 
+func get_node_track() -> Node3D:
+	return
 
 func _ready() -> void:
 	print("update is new yea")
@@ -197,6 +202,29 @@ func _build_player_paths() -> Dictionary:
 		var p: Node = _players[peer_id]
 		paths[peer_id] = p.get_path()  # NodePath
 	return paths
+
+func _camera_setup(ball_path : NodePath, joystick_path : NodePath) -> void:
+	var cam: Camera3D = get_node_or_null("/root/World/Scene/Camera3D") as Camera3D
+	var p := _players[multiplayer.get_unique_id()] 
+	if cam == null:
+		cam = p.get_node_or_null("Camera3D") as Camera3D
+	if cam == null:
+		return
+
+	# Wire camera (existing)
+	cam.current = true
+	if cam.has_method("set_target"): cam.call_deferred("set_target", p)
+	if cam.has_method("activate"):   cam.call_deferred("activate")
+	if cam.has_method("set_ball"):   cam.call_deferred("set_ball", ball_path)
+	
+	var joystick : Node3D = get_node(joystick_path) 
+	# NEW: give the camera its joystick
+	if joystick and cam.has_method("set_joystick"):
+		cam.call_deferred("set_joystick", joystick)
+
+	# Hand joystick to player (as you already do)
+	if p.has_method("attach_camera"):
+		p.call_deferred("attach_camera", cam, joystick)
 
 #func _update_local_player_states(delta : float) -> void:
 	#for peer_id in _players_input.keys():

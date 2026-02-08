@@ -48,6 +48,7 @@ func _cycle_ability(cur: String) -> String:
 
 func _ready() -> void:
 	# --- Build the Tree columns + per-row buttons ---
+	print("YOU ARE SEEING THE NEW UPDATEE")
 	_setup_player_tree()
 	# Tree signal (per-row button)
 	player_list.button_clicked.connect(_on_tree_button_clicked)
