@@ -11,18 +11,21 @@ var GameClient := load("res://scripts/multiplayer/game_client.gd")
 # How far "behind" we render remote players for smooth interpolation (ms)
 @export var remote_interp_delay_ms: int = 120
 @export var remote_buffer_max: int = 10
-@export var visual_catchup_speed := 18.0
-var _visual_offset := Vector3.ZERO
+@export var catchup_speed := 18.0
+@export var deadzone := 0.02
+@export var snap_dist := 2.5
 
-var _view_error_pos: Vector3 = Vector3.ZERO
-var _view_error_yaw: float = 0.0
-@export var view_catchup_speed := 18.0
-@export var teleport_snap_dist := 2.5  # meters; snap if correction is huge
+var proxy : Node3D 
+var anchor: Node3D
+
+var _err: Vector3 = Vector3.ZERO
+var _t_prev: Transform3D
+var _t_curr: Transform3D
+var _have := false
 
 # --- assigned/managed externally ---
 # You can set this from your World script when players spawn.
 var _players: Dictionary[int, Node] = {}  # peer_id -> Player node
-var _visual_nodes : Array 
 # --- local prediction/reconciliation ---
 var _pending_inputs: Array[Dictionary] = []   # only for LOCAL player
 var _next_input_seq: int = -1
@@ -55,6 +58,8 @@ func process_input_dictionary(msg : int, value : Dictionary) -> void:
 		game.initialize(roster, _network_endpoint, value.get("state_path"), 
 		ball_path, blue_path, red_path)
 		_resolve_players_from_roster()
+		_view_proxy_setup()
+		_camera_setup(ball_path, value.get("joystick_path"))
 		_network_endpoint.rpc("receive_network_input_dictionary", NetCodes.Msg.INIT_DONE, {})
 	if msg == NetCodes.Msg.GAME_BEGIN:
 		_network_endpoint.start_game()
@@ -76,6 +81,12 @@ func process_snapshots(snapshots: Dictionary, server_id: int) -> void:
 
 func receive_network_input(snapshots: Dictionary, server_id: int) -> void:
 	_store_snapshots(snapshots)
+
+func get_node_track() -> Node3D:
+	return _players[multiplayer.get_unique_id()].get_visual_node()
+
+func init(p : Node3D) -> void:
+	proxy = p
 
 
 func _ready() -> void:
@@ -108,13 +119,8 @@ func _physics_process(delta: float) -> void:
 	#print("me =", me, "  valid? ", is_instance_valid(me))
 	if not is_instance_valid(me):
 		return
-
-	# 1) Reconcile (if snapshot exists)
-	if not _latest_local_snapshot.is_empty():
-		var snap := _latest_local_snapshot
-		_latest_local_snapshot = {}
-		#_reconcile_local(me, snap, delta)
-		_reconcile_local_best_practice(me, snap)
+	
+	_reconcile_player(me)
 
 	# 2) Local prediction + send input
 	var cmd: Dictionary = {}
@@ -130,12 +136,7 @@ func _physics_process(delta: float) -> void:
 	var stored := cmd.duplicate(true)
 	_pending_inputs.append(stored)
 
-	if me.has_method("update_player_states"):
-		me.update_player_states(stored, delta)
-	else:
-		print("ERROR: me has no update_player_states(input, delta)")
-		return
-
+	_predict_position(me, stored, delta)
 	if not multiplayer.is_server():
 		if is_instance_valid(_network_endpoint):
 			#print("Sending input seq=", int(stored.get("seq", -1)), " to server_peer_id=", server_peer_id)
@@ -190,6 +191,8 @@ func _process(_delta: float) -> void:
 		if not p:
 			print("client error")
 		p.global_transform = xa.interpolate_with(xb, alpha)
+
+
 
 # ---------- Snapshot storage ----------
 func _store_snapshots(snapshots: Dictionary) -> void:
@@ -262,9 +265,6 @@ func _reconcile_local(p: Node, snap: Dictionary, delta : float) -> void:
 
 
 func _reconcile_local_best_practice(p: Node3D, snap: Dictionary) -> void:
-	# --- A) capture the CURRENT VIEW (what camera should keep seeing) ---
-	var old_view_pos := p.global_position + _view_error_pos
-	var old_view_yaw := p.rotation.y + _view_error_yaw
 
 	# --- B) apply authoritative snap (server state) ---
 	if p.has_method("apply_snapshot"):
@@ -286,18 +286,48 @@ func _reconcile_local_best_practice(p: Node3D, snap: Dictionary) -> void:
 	# --- D) replay remaining inputs using FIXED dt (determinism) ---
 	for cmd in _pending_inputs:
 		p.update_player_states(cmd, _fixed_dt)
+	_calculate_error_after_reconcile()
 
-	# --- E) set error so the VIEW stays continuous (no snapback) ---
-	var new_pred_pos := p.global_position
-	var new_pred_yaw := p.rotation.y
+func _calculate_error_after_reconcile() -> void:
 
-	_view_error_pos = old_view_pos - new_pred_pos
-	_view_error_yaw = wrapf(old_view_yaw - new_pred_yaw, -PI, PI)
+	# Call ONCE per reconcile event, after apply snapshot + replay
+	if not _have: return
 
-	# Optional: if correction is enormous, snap view too (prevents “rubber band tail”)
-	if _view_error_pos.length() > teleport_snap_dist:
-		_view_error_pos = Vector3.ZERO
-		_view_error_yaw = 0.0
+	var base := anchor.global_transform
+	var corr := proxy.global_position - base.origin
+	var d := corr.length()
+
+	if d < deadzone:
+		return
+	if d > snap_dist:
+		_err = Vector3.ZERO
+	else:
+	
+		_err += corr
+
+func _update_visual_position() -> void:
+	# Call from netcode _physics_process
+	if not _have: return
+	_t_prev = _t_curr
+	_t_curr = anchor.global_transform
+
+func _reconcile_player(me : Node) -> void:
+
+	# 1) Reconcile (if snapshot exists)
+	if not _latest_local_snapshot.is_empty():
+		var snap := _latest_local_snapshot
+		_latest_local_snapshot = {}
+		#_reconcile_local(me, snap, delta)
+		_reconcile_local_best_practice(me, snap)
+
+func _predict_position(me : Node, stored : Dictionary, delta : float) -> void:
+
+	if me.has_method("update_player_states"):
+		me.update_player_states(stored, delta)
+	else:
+		print("ERROR: me has no update_player_states(input, delta)")
+		return
+	_update_visual_position()
 
 # ---------- Helpers ----------
 #func _snap_to_xform(snap: Dictionary, fallback_node: Node) -> Transform3D:
@@ -341,51 +371,52 @@ func _resolve_players_from_roster() -> void:
 		if node != null:
 			_players[k] = node
 
-func _calculate_offset_for_local_visual(peer_id : int, snap : Dictionary) -> void:
-	var p := _players[peer_id]
-	var new_pos : Vector3 = snap["pos"]
-	var old_pos : Vector3 = p.global_position
-	# 3) compute the correction delta in GLOBAL space
-	var delta_global := old_pos - new_pos
-
-	# 4) convert that delta into PLAYER-LOCAL space and accumulate it
-	#    (so it behaves correctly even if player rotates)
-	var delta_local : Vector3  = p.global_transform.basis.inverse() * delta_global
-	_visual_offset += delta_local
-
-func _smooth_local_visual(delta : float) -> void:
-	if not _players.has(multiplayer.get_unique_id()):
+func _camera_setup(ball_path : NodePath, joystick_path : NodePath) -> void:
+	var cam: Camera3D = get_node_or_null("/root/World/Scene/Camera3D") as Camera3D
+	var p := _players[multiplayer.get_unique_id()] 
+	if cam == null:
+		cam = p.get_node_or_null("Camera3D") as Camera3D
+	if cam == null:
 		return
-	# Smoothly remove the local offset back to 0
-	var a := 1.0 - pow(0.001, delta * visual_catchup_speed)
-	_visual_offset = _visual_offset.lerp(Vector3.ZERO, a)
-
-	# Apply ONLY the local offset to the visual
-	var visual : Node = _players[multiplayer.get_unique_id()].get_view_node()
+	# Wire camera (existing)
+	cam.current = true
 	
-	visual.position = _visual_offset
+	if cam.has_method("set_target"): cam.call_deferred("set_target", proxy)
+	if cam.has_method("activate"):   cam.call_deferred("activate")
+	if cam.has_method("set_ball"):   cam.call_deferred("set_ball", ball_path)
+	
+	var joystick : Node3D = get_node(joystick_path) 
+	# NEW: give the camera its joystick
+	if joystick and cam.has_method("set_joystick"):
+		cam.call_deferred("set_joystick", joystick)
+
+	# Hand joystick to player (as you already do)
+	if p.has_method("attach_camera"):
+		p.call_deferred("attach_camera", cam, joystick)
+
+func _view_proxy_setup() -> void:
+	anchor = _players[multiplayer.get_unique_id()].get_visual_node()
+
+	if not is_instance_valid(anchor) or not is_instance_valid(proxy):
+		_have = false
+		return
+	_t_prev = anchor.global_transform
+	_t_curr = anchor.global_transform
+	_have = true
 
 func _smooth_local_view(delta: float) -> void:
-	if not _players.has(_my_id):
+	if not _players.has(multiplayer.get_unique_id()):
 		return
-	var p: Node3D = _players[_my_id]
-	if not is_instance_valid(p):
-		return
+	var p:= _players[multiplayer.get_unique_id()]
 
-	var view: Node3D = p.get_view_node() # should return Visual/ViewRoot for local owner
-	if not is_instance_valid(view):
-		return
+	# Call from netcode _process. This is the ONLY writer of proxy transform.
+	if not _have: return
 
-	# Exponential decay toward 0
-	var a := 1.0 - pow(0.001, delta * view_catchup_speed)
-	_view_error_pos = _view_error_pos.lerp(Vector3.ZERO, a)
-	_view_error_yaw = lerp_angle(_view_error_yaw, 0.0, a)
+	var frac := Engine.get_physics_interpolation_fraction()
+	var base := _t_prev.interpolate_with(_t_curr, frac)
 
-	# Apply error in GLOBAL space (robust under rotation changes)
-	view.global_position = p.global_position + _view_error_pos
+	var a := 1.0 - pow(0.001, delta * catchup_speed)
+	_err = _err.lerp(Vector3.ZERO, a)
 
-	# If your camera uses yaw from the body and you want yaw smoothing too:
-	# (only do this if your view node is meant to rotate independently)
-	# var r := view.global_rotation
-	# r.y = p.global_rotation.y + _view_error_yaw
-	# view.global_rotation = r
+	base.origin += _err
+	proxy.global_transform = base

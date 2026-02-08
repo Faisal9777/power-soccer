@@ -1227,3 +1227,5 @@ mesh = SubResource("BoxMesh_wse8f")
 
 [node name="Decal" type="Decal" parent="Teleporters/TelePad_A2ENTRY"]
 texture_albedo = ExtResource("40_8u370")
+
+[node name="LocalViewProxy" type="Node3D" parent="."]

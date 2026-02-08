@@ -86,8 +86,8 @@ func _set_active(on: bool) -> void:
 	set_process_input(on)
 	set_process_unhandled_input(on)
 
-func set_target(player: Node3D) -> void:
-	_target = player
+func set_target(t: Node3D) -> void:
+	_target = t
 
 func set_ball(ball_path: NodePath) -> void:
 	var ball := get_node(ball_path)
@@ -182,68 +182,116 @@ func consume_facing_delta() -> Dictionary:
 # ----------------------------
 # Camera follow / collision / FP/TP logic
 # ----------------------------
-func _physics_process(delta: float) -> void:
-	if _target == null:
+#func _physics_process(delta: float) -> void:
+	#if _target == null:
+		#return
+#
+	## --- FOCUS MODE: look at the ball from player's head ---
+	#if _aim_mode and is_instance_valid(_target_ball):
+		#var focus := _target.global_transform.origin + Vector3(0.0, height, 0.0)
+		#global_transform.origin = focus
+		#look_at(_target_ball.global_transform.origin, Vector3.UP)
+		#return
+#
+	#var t_player := _target.global_transform
+	#var focus    := t_player.origin + Vector3(0.0, height, 0.0)
+#
+	#var pivot := _target.get_node_or_null("AimPivot") as Node3D
+	#var t_piv: Transform3D = pivot.global_transform if is_instance_valid(pivot) else t_player
+#
+	#var fwd_3d := (-t_piv.basis.z).normalized()
+	#var fwd_xz := Vector3(fwd_3d.x, 0.0, fwd_3d.z)
+	#if fwd_xz.length_squared() < 1e-6:
+		#fwd_xz = Vector3.FORWARD
+	#else:
+		#fwd_xz = fwd_xz.normalized()
+#
+	## ===== First-person =====
+	#if distance <= 0.05:
+		#global_transform.origin = focus
+		#look_at(focus + fwd_3d, Vector3.UP)
+		#return
+#
+	## ===== Third-person =====
+	#var desired_pos := focus - fwd_xz * distance
+#
+	## Wall avoidance, ignoring own player mesh
+	#var space := get_world_3d().direct_space_state
+	#var q := PhysicsRayQueryParameters3D.create(focus, desired_pos)
+	#q.collision_mask = collision_mask
+	#q.hit_from_inside = true
+#
+	#var hit := space.intersect_ray(q)
+#
+	#if not hit.is_empty():
+		#var collider: Object = hit.get("collider")
+		#var self_hit := false
+#
+		#if collider is Node3D:
+			#var col_node: Node3D = collider as Node3D
+			#if col_node == _target or _target.is_ancestor_of(col_node):
+				#self_hit = true
+#
+		#if self_hit:
+			#q.exclude = [collider]
+			#hit = space.intersect_ray(q)
+#
+	#if not hit.is_empty():
+		#var hit_pos: Vector3 = hit.position
+		#var back_dir: Vector3 = (focus - hit_pos).normalized()
+		#desired_pos = hit_pos + back_dir * collision_padding
+#
+	#var t := 1.0 - exp(-follow_speed * delta)
+	#global_transform.origin = global_transform.origin.lerp(desired_pos, t)
+	#look_at(focus + fwd_3d, Vector3.UP)
+
+func _process(delta: float) -> void:
+	if not is_instance_valid(_target):
 		return
 
-	# --- FOCUS MODE: look at the ball from player's head ---
+	var t_target := _target.global_transform
+	var focus := t_target.origin + Vector3(0.0, height, 0.0)
+
+	# Focus mode: look at ball from focus point
 	if _aim_mode and is_instance_valid(_target_ball):
-		var focus := _target.global_transform.origin + Vector3(0.0, height, 0.0)
-		global_transform.origin = focus
-		look_at(_target_ball.global_transform.origin, Vector3.UP)
+		global_position = focus
+		look_at(_target_ball.global_position, Vector3.UP)
 		return
 
-	var t_player := _target.global_transform
-	var focus    := t_player.origin + Vector3(0.0, height, 0.0)
-
-	var pivot := _target.get_node_or_null("AimPivot") as Node3D
-	var t_piv: Transform3D = pivot.global_transform if is_instance_valid(pivot) else t_player
-
-	var fwd_3d := (-t_piv.basis.z).normalized()
+	# Use aim direction if your proxy includes it; otherwise just use forward
+	# (Optionally: store forward basis in the proxy if you want.)
+	var fwd_3d := -t_target.basis.z
 	var fwd_xz := Vector3(fwd_3d.x, 0.0, fwd_3d.z)
 	if fwd_xz.length_squared() < 1e-6:
 		fwd_xz = Vector3.FORWARD
 	else:
 		fwd_xz = fwd_xz.normalized()
 
-	# ===== First-person =====
+	# First-person
 	if distance <= 0.05:
-		global_transform.origin = focus
-		look_at(focus + fwd_3d, Vector3.UP)
+		global_position = focus
+		look_at(focus + fwd_3d.normalized(), Vector3.UP)
 		return
 
-	# ===== Third-person =====
+	# Third-person desired position
 	var desired_pos := focus - fwd_xz * distance
 
-	# Wall avoidance, ignoring own player mesh
+	# Wall avoidance ray
 	var space := get_world_3d().direct_space_state
 	var q := PhysicsRayQueryParameters3D.create(focus, desired_pos)
 	q.collision_mask = collision_mask
 	q.hit_from_inside = true
 
 	var hit := space.intersect_ray(q)
-
-	if not hit.is_empty():
-		var collider: Object = hit.get("collider")
-		var self_hit := false
-
-		if collider is Node3D:
-			var col_node: Node3D = collider as Node3D
-			if col_node == _target or _target.is_ancestor_of(col_node):
-				self_hit = true
-
-		if self_hit:
-			q.exclude = [collider]
-			hit = space.intersect_ray(q)
-
 	if not hit.is_empty():
 		var hit_pos: Vector3 = hit.position
 		var back_dir: Vector3 = (focus - hit_pos).normalized()
 		desired_pos = hit_pos + back_dir * collision_padding
 
+	# Smooth camera rig movement
 	var t := 1.0 - exp(-follow_speed * delta)
-	global_transform.origin = global_transform.origin.lerp(desired_pos, t)
-	look_at(focus + fwd_3d, Vector3.UP)
+	global_position = global_position.lerp(desired_pos, t)
+	look_at(focus + fwd_3d.normalized(), Vector3.UP)
 
 # ----------------------------
 # FP/TP helpers (called from Game/World/UI)
