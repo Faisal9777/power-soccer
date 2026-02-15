@@ -230,9 +230,6 @@ func _physics_process(delta: float) -> void:
 		
 		
 func _physics_process_server(delta: float) -> void:
-	for k in GameState.roster.keys():
-		var p_path :NodePath= GameState.roster[k]["player_path"]
-		var p := get_node(p_path)
 	if state.time_left_ms == 0:
 		_process_game_end()
 	if state.is_paused and state.countdown_ms == 0:

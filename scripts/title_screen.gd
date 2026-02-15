@@ -78,7 +78,7 @@ func _ready() -> void:
 	# Convenience default for local tests
 	if ip_line.text.strip_edges() == "":
 		ip_line.text = "127.0.0.1"
-		ip_line.text = "140.245.210.219"
+		#ip_line.text = "140.245.210.219"
 
 func _prompt_for_player_name() -> void:
 	var win := Window.new()

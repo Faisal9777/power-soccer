@@ -93,6 +93,8 @@ func _ready() -> void:
 	_my_id = multiplayer.get_unique_id()
 	var hz := float(ProjectSettings.get_setting("physics/common/physics_ticks_per_second"))
 	_fixed_dt = 1.0 / max(1.0, hz)
+	Network.connection_failed.connect(_on_connection_failed)
+	Network.server_disconnected.connect(_on_server_disconnected)
 
 
 # ---------- Main loop ----------
@@ -170,6 +172,8 @@ func _process(_delta: float) -> void:
 			buf.pop_front()
 
 		var p := _players[peer_id]
+		if not p:
+			return
 
 		if buf.size() == 1:
 			# Not enough points to interpolate; just snap to the only sample we have.
@@ -420,3 +424,11 @@ func _smooth_local_view(delta: float) -> void:
 
 	base.origin += _err
 	proxy.global_transform = base
+
+func _on_server_disconnected() -> void:
+	if get_tree():
+		get_tree().change_scene_to_file("res://scenes/title_screen.tscn")
+
+func _on_connection_failed() -> void:
+	if get_tree():
+		get_tree().change_scene_to_file("res://scenes/title_screen.tscn")

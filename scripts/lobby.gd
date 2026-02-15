@@ -734,9 +734,13 @@ func _on_peer_left(id: int) -> void:
 
 func _on_connection_failed() -> void:
 	status_label.text = "Connection failed"
+	return
+	#get_tree().change_scene_to_file("res://scenes/title_screen.tscn")
 
 func _on_server_disconnected() -> void:
 	status_label.text = "Server disconnected"
+	return
+	#get_tree().change_scene_to_file("res://scenes/title_screen.tscn")
 func _required_team_size() -> int:
 	# Rely on the variable, not the UI node. 
 	# The variable is synced via _rpc_set_team_size already.

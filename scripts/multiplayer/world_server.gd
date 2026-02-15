@@ -111,6 +111,8 @@ func _ready() -> void:
 	_network_endpoint = get_parent()
 	if GameState.is_dedicated_server():
 		_is_also_player = false
+	Network.all_peers_left.connect(_on_all_peers_left)
+	Network.peer_left.connect(_on_peer_left)
 	#_network_endpoint.build_game_controller()
 	#_network_endpoint.build_game_updater(GameState.roster)
 	#print("about to tell the cclient to start game init")
@@ -128,25 +130,6 @@ func _physics_process(delta: float) -> void:
 	while _input_accum >= step:
 		_input_accum -= step
 		_broadcast_snapshots()
-
-# WorldServer.gd (server side)
-#@export var SNAPSHOT_HZ: float = 5.0   # debug: 5 snapshots/sec (big delay)
-#var _snap_accum: float = 0.0
-#
-#func _physics_process(delta: float) -> void:
-	#_input_accum += delta
-	#var step: float = 1.0 / NET_INPUT_HZ
-	#while _input_accum >= step:
-		#_input_accum -= step
-		## input tick stuff (apply inputs, etc.)
-		## _send_local_input() if you do that here
-#
-	## snapshots on a slower clock
-	#_snap_accum += delta
-	#var snap_step := 1.0 / SNAPSHOT_HZ
-	#while _snap_accum >= snap_step:
-		#_snap_accum -= snap_step
-		#_broadcast_snapshots()
 
 func _broadcast_snapshots() -> void:
 	var snapshots := {}
@@ -254,6 +237,13 @@ func _update_local_player_states(delta : float) -> void:
 
 		# If you want, you can add a timeout safety here later.
 		player.update_player_states(cmd, delta)
+
+func _on_peer_left(id : int) -> void:
+	pass
+
+func _on_all_peers_left() -> void:
+	get_tree().change_scene_to_file("res://scenes/Lobby.tscn")
+		
 
 func _debug_data(roster: Dictionary, ingame: Node, ball_scene: Node, blue_spawns: Node, red_spawns: Node) -> void:
 	print("--- BUILD DATA DEBUG ---")

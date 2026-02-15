@@ -51,6 +51,11 @@ func reset_lobby() -> void:
 	pending_spawn_ids.clear()
 	_next_on_tie = Team.BLUE
 
+func clear() -> void:
+	roster.clear()
+	pending_spawn_ids.clear()
+	_next_on_tie = Team.BLUE
+
 func _counts_by_team() -> Dictionary:
 	var counts := { Team.BLUE: 0, Team.RED: 0 }
 	for id in roster.keys():

@@ -69,6 +69,7 @@ signal server_started
 signal joined_server
 signal peer_joined(id: int)
 signal peer_left(id: int)
+signal all_peers_left
 signal connection_failed
 signal server_disconnected
 
@@ -85,13 +86,14 @@ func host() -> void:
 	if err != OK:
 		push_error("Host failed: %s" % err)
 		return
-
 	multiplayer.multiplayer_peer = enet
 
 	# Hook once per hosting session
 	if !_signals_hooked_server:
 		multiplayer.peer_connected.connect(_on_peer_connected)
 		multiplayer.peer_disconnected.connect(_on_peer_disconnected)
+		#multiplayer.server_disconnected.connect(_on_server_disconnected)
+		#multiplayer.connection_failed.connect(_on_connection_failed)
 		_signals_hooked_server = true
 
 	print("Server started on port ", PORT)
@@ -115,27 +117,41 @@ func join(ip: String) -> void:
 			print("Joined ", ip, ":", PORT)
 			joined_server.emit()
 		)
-		multiplayer.connection_failed.connect(func ():
-			push_error("Connection failed")
-			connection_failed.emit()
-		)
-		multiplayer.server_disconnected.connect(func ():
-			push_error("Server disconnected")
-			server_disconnected.emit()
+		multiplayer.connection_failed.connect(_on_connection_failed)
+		multiplayer.server_disconnected.connect(_on_server_disconnected
 		)
 		_signals_hooked_client = true
 
 func _on_peer_connected(id: int) -> void:
+	if not multiplayer.is_server():
+		return
 	peer_joined.emit(id)
 
 func _on_peer_disconnected(id: int) -> void:
+	if not multiplayer.is_server():
+		return
 	peer_left.emit(id)
+	
+	if multiplayer.get_peers().size() == 0 and GameState.is_dedicated:
+		all_peers_left.emit()
+		GameState.clear()
+
+func _on_connection_failed() -> void:
+	connection_failed.emit()
+
+func _on_server_disconnected() -> void:
+	
+	server_disconnected.emit()
+
+func clear() -> void:
+	close_connection()
+	get_tree().change_scene_to_file("res://scenes/title_screen.tscn")
 
 func close_connection() -> void:
+	GameState.clear()
 	var peer := multiplayer.multiplayer_peer
 	if peer == null:
 		return
 	if peer is ENetMultiplayerPeer:
 		(peer as ENetMultiplayerPeer).close()  # close transport
 	multiplayer.multiplayer_peer = null
-	# leave hooks as-is; they’re on the MultiplayerAPI, safe to reuse next time
