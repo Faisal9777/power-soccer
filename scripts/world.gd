@@ -425,6 +425,7 @@ func _on_pause_exit() -> void:
 		Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 	# Quit or go to title:
 	# get_tree().quit()
+	Network.close_connection()
 	get_tree().change_scene_to_file("res://scenes/title_screen.tscn")
 
 func _open_graphics_settings() -> void:
@@ -838,6 +839,7 @@ func _physics_process(delta: float) -> void:
 	#if  Input.is_action_just_pressed("tackle"): print("tackle input was detected in physics process")
 	#var inputs := _gather_input()
 	#_send_local_input(inputs)
+	#_perf_tick(delta)
 	_update_inputs() 
 	_input_accum += delta
 	var step: float = 1.0 / NET_INPUT_HZ
@@ -1545,3 +1547,25 @@ func _all_players_positions() -> void:
 			continue
 		print("player ", p.name)
 		print("position: ", p.global_position)
+
+var _perf_acc := 0.0
+var _perf_frames := 0
+
+func _perf_tick(delta: float) -> void:
+	_perf_acc += delta
+	_perf_frames += 1
+
+	if _perf_acc >= 1.0:
+		var phys_s := float(Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS))
+		var proc_s := float(Performance.get_monitor(Performance.TIME_PROCESS))
+		var phys_ms := phys_s * 1000.0
+		var proc_ms := proc_s * 1000.0
+		var avg_delta : float= _perf_acc / max(1, _perf_frames)
+
+		print("SERVER PERF | phys_ms=", phys_ms,
+			" proc_ms=", proc_ms,
+			" physics_fps≈", _perf_frames,
+			" avg_delta=", avg_delta)
+
+		_perf_acc = 0.0
+		_perf_frames = 0
