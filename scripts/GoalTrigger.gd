@@ -5,7 +5,6 @@ enum Team { BLUE, PURPLE }
 
 @export var score_for: Team = Team.PURPLE        # Goal_A -> Purple; Goal_B -> Blue
 @export var score_zone_path: NodePath = NodePath("ScoreZone")
-@export var scoreboard_path: NodePath = NodePath("../../CanvasLayer/UI/Scoreboard")
 @export var cooldown_sec: float = 1.0            # ignore re-triggers for a moment
 @export var require_forward_entry: bool = true   # only count if ball comes from field side
 @export var ball_path: NodePath
@@ -16,7 +15,6 @@ enum Team { BLUE, PURPLE }
 @onready var _spawn: Marker3D = get_node(ball_spawn_path)
 @onready var _ball: RigidBody3D = get_node_or_null(ball_path)
 @onready var _zone: Area3D     = get_node(score_zone_path)
-@onready var _board: Node      = get_node(scoreboard_path)
 
 var _locked: bool = false
 
@@ -36,24 +34,3 @@ func _on_body_entered(body: Node) -> void:
 		var vel: Vector3 = (body as RigidBody3D).linear_velocity
 		if goal_forward.dot(vel) <= 0.0:
 			return  # ball is moving out of the goal; ignore
-
-	#_score()
-
-func _score() -> void:
-	_locked = true
-
-	if score_for == Team.BLUE:
-		_board.add_left(1)   # Blue scores
-	else:
-		_board.add_right(1)  # Purple scores
-
-	# Reset the ball if assigned
-	if _ball:
-		_ball.global_transform.origin = _spawn.global_transform.origin
-		_ball.linear_velocity = Vector3.ZERO
-		_ball.angular_velocity = Vector3.ZERO
-		if ball_reset_impulse != Vector3.ZERO:
-			_ball.apply_impulse(ball_reset_impulse)
-
-	await get_tree().create_timer(cooldown_sec).timeout
-	_locked = false

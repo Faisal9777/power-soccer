@@ -13,9 +13,10 @@ var lobby_leader_id: int = 0
 signal lobby_leader_changed(id: int)
 # { peer_id: { "name": String, "ready": bool, "team": int(Team) } }
 var roster: Dictionary = {}
+var game_results: Dictionary = {}
 var pending_spawn_ids: Array[int] = []
-var match_len_sec = 180
-var goal_limit = 50
+var match_len_sec = 500
+var goal_limit = 10
 # --- tie-alternation state ---
 var _next_on_tie: int = Team.BLUE
 func get_team(peer_id: int) -> int:

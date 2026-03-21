@@ -1,10 +1,10 @@
 [gd_scene load_steps=5 format=3 uid="uid://m5et0rw3tfxl"]
 
-[ext_resource type="Script" uid="uid://duso4qhjj8m14" path="res://scripts/win_screen.gd" id="1_xro01"]
+[ext_resource type="Script" uid="uid://bpxjwt0o0hd37" path="res://scripts/win_screen.gd" id="1_xro01"]
 [ext_resource type="Texture2D" uid="uid://bhlg1ylaa8m1o" path="res://Texture/DefeatPng.png" id="2_xro01"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_j4jwh"]
-bg_color = Color(0.011087578, 0.01108758, 0.011087572, 1)
+bg_color = Color(0.0110876, 0.0110876, 0.0110876, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_uuemd"]
 bg_color = Color(0, 0, 0, 1)

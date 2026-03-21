@@ -1,0 +1,67 @@
+[gd_scene load_steps=4 format=3 uid="uid://c0w5xbcny5354"]
+
+[ext_resource type="Texture2D" uid="uid://dqkvq4xpukk1o" path="res://UI/images/ChatGPT Image Mar 6, 2026, 01_06_12 PM.png" id="1_svufa"]
+[ext_resource type="Texture2D" uid="uid://dr841yb3rtrqq" path="res://UI/images/image-from-rawpixel-id-6328799-png.png" id="2_niche"]
+[ext_resource type="Script" uid="uid://rp7jc7va0vrx" path="res://UI/loading/spinner.gd" id="3_g5el8"]
+
+[node name="LoadingOverlay" type="CanvasLayer"]
+layer = 100
+visible = false
+
+[node name="Background" type="TextureRect" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("1_svufa")
+expand_mode = 3
+stretch_mode = 6
+
+[node name="Blocker" type="ColorRect" parent="."]
+anchors_preset = -1
+anchor_top = 0.8
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -53.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.74902)
+
+[node name="BottomUI" type="VBoxContainer" parent="."]
+anchors_preset = -1
+anchor_top = 0.64
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -37.0
+offset_top = 6.0
+offset_right = 38.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_constants/separation = 25
+alignment = 1
+
+[node name="Title" type="Label" parent="BottomUI"]
+layout_mode = 2
+text = "Loading"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="SpinnerHolder" type="Control" parent="BottomUI"]
+custom_minimum_size = Vector2(80, 80)
+layout_mode = 2
+size_flags_horizontal = 4
+size_flags_vertical = 4
+
+[node name="Spinner" type="Node2D" parent="BottomUI/SpinnerHolder"]
+position = Vector2(40, 40)
+script = ExtResource("3_g5el8")
+
+[node name="Sprite2D" type="Sprite2D" parent="BottomUI/SpinnerHolder/Spinner"]
+scale = Vector2(0.1, 0.1)
+texture = ExtResource("2_niche")
+
+[node name="ReadyCount" type="Label" parent="BottomUI"]
+visible = false
+layout_mode = 2
+horizontal_alignment = 1

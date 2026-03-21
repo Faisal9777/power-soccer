@@ -113,6 +113,7 @@ func build_game_controller() -> void:
 	_initalize_game_controller()
 
 func _ready() -> void:
+	LoadingUI.show_loading()
 	if not multiplayer.is_server():
 		net = WorldClientScript.new()
 		_initialize_multiplayer("NetClient", net)
@@ -136,12 +137,15 @@ func _ready() -> void:
 	
 	_setup_team_position()
 	# If you didn't set the spawner in the editor, do it here:
-	var spawner := players_root.get_node_or_null("MultiplayerSpawner")
+	var spawner : Node
+	if players_root:
+		spawner = players_root.get_node_or_null("MultiplayerSpawner")
 	if spawner == null:
 		spawner = MultiplayerSpawner.new()
 		spawner.name = "MultiplayerSpawner"
-		spawner.spawn_path = players_root.get_path()
 		players_root.add_child(spawner)
+		spawner.spawn_path = players_root.get_path()
+		
 
 	# Register ALL player-type scenes that might be spawned
 	if player_scene:
@@ -188,11 +192,14 @@ func set_game(game : Node) -> void:
 	add_child(_game)
 
 func start_game() -> void:
+	
 	var start_data = {"ball_scene" : BALL_PATH,
 	"spawns_blue": TEAM_BLUE_PATH,
 	"spawns_red": TEAM_RED_PATH
 	}
+	
 	_game.start_game()
+	LoadingUI.hide_loading()
 
 
 # Returns [overlay: Control, panel: Panel]
@@ -813,8 +820,8 @@ func _create_ball_spawner() -> void:
 	if ball_spawner == null:
 		ball_spawner = MultiplayerSpawner.new()
 		ball_spawner.name = "MultiplayerSpawner"
-		ball_spawner.spawn_path = ball_root.get_path()
 		ball_root.add_child(ball_spawner)
+		ball_spawner.spawn_path = ball_root.get_path()
 
 	# register the ball scene so the spawner knows how to recreate it on clients
 	if ball_packed:

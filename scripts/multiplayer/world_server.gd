@@ -102,12 +102,12 @@ func process_input_dictionary(msg: int, value : Dictionary) -> void:
 		#print("_peers_ready: ", _peers_ready)
 		if _peers_ready == GameState.roster.size():
 			_network_endpoint.start_game()
+			_network_endpoint.rpc("receive_network_input_dictionary", NetCodes.Msg.GAME_BEGIN, {})
 
 func get_node_track() -> Node3D:
 	return
 
 func _ready() -> void:
-	print("update is new yea")
 	_network_endpoint = get_parent()
 	if GameState.is_dedicated_server():
 		_is_also_player = false

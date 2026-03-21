@@ -1,7 +1,7 @@
-[gd_scene load_steps=5 format=3 uid="uid://ymx4qo3ehpc6"]
+[gd_scene load_steps=5 format=3 uid="uid://pla076kf4l1h"]
 
-[ext_resource type="Script" uid="uid://bpxjwt0o0hd37" path="res://scripts/win_screen.gd" id="1_t3pix"]
-[ext_resource type="Texture2D" uid="uid://d0noboxhki6le" path="res://Texture/W (1).png" id="2_uuemd"]
+[ext_resource type="Script" uid="uid://bpxjwt0o0hd37" path="res://scripts/win_screen.gd" id="1_rbe8a"]
+[ext_resource type="Texture2D" uid="uid://d0noboxhki6le" path="res://Texture/W (1).png" id="2_xnhaf"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_j4jwh"]
 bg_color = Color(0.0110876, 0.0110876, 0.0110876, 1)
@@ -18,7 +18,7 @@ anchor_right = 0.5
 anchor_bottom = 0.5
 grow_horizontal = 2
 grow_vertical = 2
-script = ExtResource("1_t3pix")
+script = ExtResource("1_rbe8a")
 _next = NodePath("Panel/VBoxContainer/HBoxContainer/NextButton")
 _countdown_label = NodePath("Panel/VBoxContainer/HBoxContainer/CountDownLabel")
 
@@ -49,7 +49,8 @@ alignment = 1
 z_index = 1
 layout_mode = 2
 theme_override_styles/normal = SubResource("StyleBoxFlat_j4jwh")
-text = "YOU WIN!"
+text = "TIE!"
+horizontal_alignment = 1
 
 [node name="HBoxContainer" type="HBoxContainer" parent="Panel/VBoxContainer"]
 z_index = 1
@@ -79,5 +80,5 @@ offset_bottom = 324.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-texture = ExtResource("2_uuemd")
+texture = ExtResource("2_xnhaf")
 stretch_mode = 5

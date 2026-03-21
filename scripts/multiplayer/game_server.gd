@@ -7,8 +7,8 @@ signal match_ended(winner:int) # -1 draw, 0 blue, 1 red
 @export var lose_scene_path: String = "res://scenes/DefeatScene.tscn"
 @onready var state: Node = get_node("../ingame_state") as Node
 
-@onready var _blue_zone: Area3D = get_node("Teams/TeamBlue/Goal_A/ScoreZone")
-@onready var _red_zone:  Area3D = get_node("Teams/TeamRed/Goal_B/ScoreZone")
+@onready var _blue_zone: Area3D #= get_node("Teams/TeamBlue/Goal_A/ScoreZone")
+@onready var _red_zone:  Area3D #= get_node("Teams/TeamRed/Goal_B/ScoreZone")
 var _goal_lock := false  # prevents double-trigger spam
 var match_config := {
 	"duration_sec": 180.0,         # 3 minutes
@@ -385,6 +385,9 @@ func _process_game_end() -> void:
 	if state.blue_score > state.red_score:
 		blue_scene = win_scene_path
 		red_scene = lose_scene_path
+	elif state.blue_score == state.red_score:
+		blue_scene = Scenes.TIE
+		red_scene = Scenes.TIE
 	else:
 		blue_scene = lose_scene_path
 		red_scene = win_scene_path

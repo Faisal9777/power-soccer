@@ -81,7 +81,6 @@ var _tackle_phasing: bool = false
 @export var mouse_sens: float = 0.008
 @onready var aim_pivot: Node3D = $AimPivot
 @onready var visual : Node3D = $Visual
-@onready var visual2 : Node3D = $Visual2
 @export var min_pitch := deg_to_rad(-60)
 @export var max_pitch := deg_to_rad( 60)
 # --- Aiming/orbit state (client-local) ---
@@ -224,7 +223,7 @@ var assist_pass_cd_ui: float = 0.0   # replicated to owner for UI
 var cam: Camera3D = null  # local-only reference
 var _ui_charge := 0.0  # client-only visual charge
 @onready var name_tag: Label3D = $NameTag if has_node("NameTag") else null
-@onready var ground_ray: RayCast3D = $GroundRay
+@onready var ground_ray: RayCast3D #= $GroundRay
 @onready var kick_area: Area3D = $KickArea
 @onready var tackle_field: Area3D = $TackleField
 @onready var ball_latch_anchor: Node3D = Node3D.new()
@@ -317,11 +316,6 @@ func apply_snapshot(snap: Dictionary) -> void:
 	_apply_facing_absolute(yaw, pitch)
 	global_position = snap["pos"]
 
-func get_view_node() -> Node:
-	if cam:
-		return visual2
-		#return visual
-	return null
 
 func get_visual_node() -> Node:
 	return aim_pivot

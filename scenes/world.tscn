@@ -235,6 +235,7 @@ player_scene = ExtResource("2_4kbfs")
 bot_player_scene = ExtResource("3_f17e3")
 ball_packed = ExtResource("4_x2olw")
 joystick_path = NodePath("CanvasLayer/UI/JoyStick")
+metadata/_edit_group_ = true
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
 environment = SubResource("Environment_2tuav")
@@ -531,7 +532,6 @@ joystick_path = NodePath("../../CanvasLayer/UI/JoyStick")
 [node name="Goal_A" type="Node3D" parent="Teams/TeamBlue"]
 transform = Transform3D(2.5, 0, 0, 0, 2, 0, 0, 0, 2, 0, -0.5, -117)
 script = ExtResource("8_e75v4")
-scoreboard_path = NodePath("")
 ball_spawn_path = NodePath("../../../BallSpawn")
 
 [node name="GoalBody" type="StaticBody3D" parent="Teams/TeamBlue/Goal_A"]
@@ -628,7 +628,6 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, -109)
 transform = Transform3D(-2.5, 0, -3.01992e-07, 0, 2, 0, 3.77489e-07, 0, -2, 0, -0.5, 116)
 script = ExtResource("8_e75v4")
 score_for = 0
-scoreboard_path = NodePath("")
 ball_spawn_path = NodePath("../../../BallSpawn")
 
 [node name="GoalBody" type="StaticBody3D" parent="Teams/TeamRed/Goal_B"]
