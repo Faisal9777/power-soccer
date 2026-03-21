@@ -6,21 +6,47 @@ var _tree: Tree
 var _game_data_holder : Node
 var _sc_popup : Control
 enum Team { BLUE, RED }
+var _lobby_scene_path := NodePath('')
+var _back_btn: Button
+var _status: Label
 
 const TEAM_NAME := { Team.BLUE: "BLUE", Team.RED: "RED" }
 
-# ---- Fake data (replace later) ----
-# snapshot = [{id, name, team, goals, assists, saves}, ...]
-var _fake_stats := [
-	{"id": 1, "name": "Ayaan",  "team": Team.BLUE, "goals": 3, "assists": 1, "saves": 0},
-	{"id": 2, "name": "Fardin", "team": Team.BLUE, "goals": 1, "assists": 2, "saves": 1},
-	{"id": 3, "name": "Nabil", "team": Team.BLUE, "goals": 0, "assists": 1, "saves": 3},
-	{"id": 4, "name": "Rafi",   "team": Team.RED,  "goals": 2, "assists": 0, "saves": 1},
-	{"id": 5, "name": "Ahsan",   "team": Team.RED,  "goals": 1, "assists": 3, "saves": 0},
-	{"id": 6, "name": "Hamza",  "team": Team.RED,  "goals": 0, "assists": 1, "saves": 2},
-]
+func _add_back_to_lobby_ui() -> void:
+	_back_btn = Button.new()
+	_back_btn.text = "Back to Lobby"
+	add_child(_back_btn)
+
+	# Bottom-center with padding
+	_back_btn.custom_minimum_size = Vector2(240, 44)
+	_back_btn.anchor_left = 0.5
+	_back_btn.anchor_right = 0.5
+	_back_btn.anchor_top = 1.0
+	_back_btn.anchor_bottom = 1.0
+	_back_btn.offset_left = -120
+	_back_btn.offset_right = 120
+	_back_btn.offset_top = -60
+	_back_btn.offset_bottom = -16
+
+	_status = Label.new()
+	_status.text = ""
+	add_child(_status)
+	_status.anchor_left = 0.5
+	_status.anchor_right = 0.5
+	_status.anchor_top = 1.0
+	_status.anchor_bottom = 1.0
+	_status.offset_left = -200
+	_status.offset_right = 200
+	_status.offset_top = -95
+	_status.offset_bottom = -70
+	_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+
+	if not _back_btn.pressed.is_connected(_on_back_pressed):
+		_back_btn.pressed.connect(_on_back_pressed)
 
 func _ready() -> void:
+	_add_back_to_lobby_ui()
+	var result = _get_stats_in_array(GameState.game_results)
 	# Resolve the Tree node (via exported path, or auto-find by name)
 	_tree = get_node_or_null(tree_path) as Tree
 	if _tree == null:
@@ -36,7 +62,8 @@ func _ready() -> void:
 
 	_setup_columns()
 	# Render the fake data now
-	set_stats(_fake_stats)
+	set_stats(result)
+
 
 func set_game_data_holder(holder: Node, sc_popup : Control) -> void:
 
@@ -132,3 +159,9 @@ func _get_stats_in_array(game: Dictionary) -> Array[Dictionary]:
 	# (Optional) stable ordering by id
 	stats.sort_custom(func(a, b): return int(a["id"]) < int(b["id"]))
 	return stats
+
+func _on_back_pressed() -> void:
+	_back_btn.disabled = true
+	_status.text = "Waiting for other players..."
+
+	get_tree().call_deferred("change_scene_to_file", Scenes.LOBBY)

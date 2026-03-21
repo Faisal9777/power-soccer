@@ -21,6 +21,7 @@ config/icon="res://icon.svg"
 Network="*res://scripts/Network.gd"
 GameState="*res://scripts/GameState.gd"
 Settings="*res://scripts/settings.gd"
+LoadingUI="*res://scripts/autoload/loading_ui.gd"
 
 [display]
 

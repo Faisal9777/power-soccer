@@ -50,8 +50,6 @@ func _ready() -> void:
 	# --- Build the Tree columns + per-row buttons ---
 	print("YOU ARE SEEING THE NEW UPDATEE")
 	_setup_player_tree()
-	# Tree signal (per-row button)
-	player_list.button_clicked.connect(_on_tree_button_clicked)
 
 	# --- (Optional but useful) Layout so the list expands properly ---
 	var root_ctrl := self as Control
@@ -171,7 +169,11 @@ func _ready() -> void:
 		_update_start_enabled()
 	)
 
-
+	print("before refereshing: ", GameState.roster)
+	
+	for pid in GameState.roster.keys():
+		var rec: Dictionary = GameState.roster[pid]
+		print("pid=", pid, " team=", rec.get("team", null))
 
 	# --- First paint ---
 	_refresh_ui()
@@ -493,7 +495,7 @@ func _rpc_submit_name(name: String) -> void:
 	_ensure_leader_exists()   # ✅ IMPORTANT
 	_broadcast_roster()
 
-@rpc("any_peer")
+@rpc("any_peer", "call_local")
 func _rpc_set_ready(peer_id: int, ready: bool) -> void:
 	if !GameState.is_host: return
 	var from := multiplayer.get_remote_sender_id()
@@ -615,7 +617,8 @@ func _try_start_match() -> void:
 		var need := _required_team_size()
 		print("Need exactly %d players per team for %dv%d before starting." % [need, need])
 		return
-
+	for pid in GameState.roster.keys():
+		GameState.roster[pid]["ready"] = false
 	rpc("_rpc_start_match", WORLD_SCENE)
 
 

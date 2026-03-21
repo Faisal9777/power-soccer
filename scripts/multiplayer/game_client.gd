@@ -235,14 +235,12 @@ func _position_players() -> void:
 
 
 func start_game() -> void:
-	#var ball_scene : Node3D = get_node(snapshots["ball_scene"])
-	#var spawns_blue : Node3D = get_node(snapshots["spawns_blue"])
-	#var spawns_red : Node3D = get_node(snapshots["spawns_red"])
 	_position_players2()
 
 func end_game(value : Dictionary) -> void:
 	var duration := value.get("duration", 3) as int
 	var scene := value.get("scene", NodePath("")) as NodePath
+	GameState.game_results = state.game_data
 	_end_match("End!", duration, scene)
 
 func _toggle_player_process(toggle : bool) -> void:
