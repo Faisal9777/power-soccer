@@ -22,6 +22,7 @@ Network="*res://scripts/Network.gd"
 GameState="*res://scripts/GameState.gd"
 Settings="*res://scripts/settings.gd"
 LoadingUI="*res://scripts/autoload/loading_ui.gd"
+NetworkDiscovery="*res://network_discovery.gd"
 
 [display]
 
