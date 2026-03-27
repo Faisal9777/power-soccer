@@ -76,7 +76,13 @@ signal server_disconnected
 var _signals_hooked_server := false
 var _signals_hooked_client := false
 
-func host() -> void:
+var udp := PacketPeerUDP.new()
+var is_host := false
+
+var server_info = {}
+
+
+func host(info : Dictionary) -> void:
 	if multiplayer.multiplayer_peer is ENetMultiplayerPeer and multiplayer.is_server():
 		server_started.emit()
 		return
@@ -95,9 +101,17 @@ func host() -> void:
 		#multiplayer.server_disconnected.connect(_on_server_disconnected)
 		#multiplayer.connection_failed.connect(_on_connection_failed)
 		_signals_hooked_server = true
-
+	
+	udp.set_broadcast_enabled(true)
+	udp.bind(0)
+	is_host = true
+	server_info = info
+	
 	print("Server started on port ", PORT)
 	server_started.emit()
+
+func change_state(state_info : String):
+	server_info.state = state_info
 
 func join(ip: String) -> void:
 	if multiplayer.multiplayer_peer is ENetMultiplayerPeer:
@@ -121,6 +135,18 @@ func join(ip: String) -> void:
 		multiplayer.server_disconnected.connect(_on_server_disconnected
 		)
 		_signals_hooked_client = true
+
+func _process(delta):
+	if is_host:
+		_broadcast()
+
+
+func _broadcast():
+	server_info["last_seen"] = Time.get_unix_time_from_system()
+	var json = JSON.stringify(server_info)
+	udp.set_dest_address(NetConfig.BROADCAST_IP, NetConfig.DISCOVERY_PORT)
+	udp.put_packet(json.to_utf8_buffer())
+
 
 func _on_peer_connected(id: int) -> void:
 	if not multiplayer.is_server():
@@ -155,3 +181,5 @@ func close_connection() -> void:
 	if peer is ENetMultiplayerPeer:
 		(peer as ENetMultiplayerPeer).close()  # close transport
 	multiplayer.multiplayer_peer = null
+	is_host = false
+	udp.close()

@@ -75,14 +75,6 @@ text = "Find Server"
 layout_mode = 2
 text = "Create Server"
 
-[node name="HBox" type="HBoxContainer" parent="MultiplayerPopup/VBox"]
+[node name="CreateLanButton" type="Button" parent="MultiplayerPopup/VBox"]
 layout_mode = 2
-
-[node name="IpLine" type="LineEdit" parent="MultiplayerPopup/VBox/HBox"]
-layout_mode = 2
-placeholder_text = "Enter IP (e.g. 192.168.0.42)"
-
-[node name="ConnectButton" type="Button" parent="MultiplayerPopup/VBox/HBox"]
-layout_mode = 2
-text = "Enter IP
-"
+text = "Create LAN Server"

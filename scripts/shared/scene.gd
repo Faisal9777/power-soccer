@@ -11,3 +11,5 @@ const DEFEAT  := "res://scenes/defeat.tscn"
 const TIE  := "res://scenes/TieScene.tscn"
 
 const LOADING_OVERLAY := "res://UI/loading/LoadingOverlay.tscn"
+const SERVER_LIST := "res://scenes/ServerList.tscn"
+const SERVER_ENTRY := "res://scenes/ServerEntry.tscn"

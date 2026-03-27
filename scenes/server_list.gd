@@ -1,0 +1,94 @@
+extends Control
+
+# Reference to the VBoxContainer
+@onready var server_list = $ScrollContainer/ServerListContainer
+const C = preload("res://scripts/shared/scene.gd")
+var known_servers := {}
+var cleanup_timer := 0.0
+
+func _ready():
+	#_populate_server_list()
+	Network.joined_server.connect(_on_joined_server)
+	NetworkDiscovery.server_found.connect(_on_server_found)
+	NetworkDiscovery.start_discovery()
+
+func _on_server_found(data):
+	if not data.has("ip") or not data.has("port"):
+		return  # invalid packet
+
+
+	var key = str(data.ip) + ":" + str(data.port)
+	var last_seen = data["last_seen"]
+	# Server is fresh
+	if known_servers.has(key):
+		# Update last_seen for existing entry
+		known_servers[key]["data"]["last_seen"] = last_seen
+	else:
+		# Add new server
+		var entry = preload(C.SERVER_ENTRY).instantiate()
+		server_list.add_child(entry)
+		await entry.ready
+		entry.setup(data)
+	   
+		# Optional: connect join button
+		entry.join_button.pressed.connect(_on_connect_button_pressed.bind(data.ip))
+
+
+		# Store in known_servers
+		known_servers[key] = {
+			"data": data,
+			"entry": entry
+		}
+		print("Added new server:", key)
+
+func _check_server_status():
+	var now = Time.get_unix_time_from_system()
+	var to_remove := []
+
+
+	# Step 1: Find stale servers
+	for key in known_servers.keys():
+		var server_data = known_servers[key]["data"]
+		var last_seen = server_data["last_seen"]
+
+
+		if now - last_seen > 5:  # 5 seconds threshold
+			to_remove.append(key)
+
+
+	# Step 2: Remove them safely
+	for key in to_remove:
+		_remove_server(key)
+
+
+func _remove_server(key):
+	if not known_servers.has(key):
+		return
+
+
+	var entry = known_servers[key]["entry"]
+
+
+	if is_instance_valid(entry):
+		entry.queue_free()  # remove UI
+
+
+	known_servers.erase(key)  # remove from dictionary
+
+
+	print("Removed stale server:", key)
+
+
+func _on_connect_button_pressed(ip) -> void:
+	GameState.is_host = false
+	GameState.reset_lobby()
+	GameState.player_name = Settings.player_name
+	GameState.id = randi()
+	GameState.roster[GameState.id] = {"name": GameState.player_name, "ready": false}
+
+	# Use the typed IP here:
+	Network.join(ip)
+
+
+func _on_joined_server() -> void:
+	get_tree().change_scene_to_file(C.LOBBY)

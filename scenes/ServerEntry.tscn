@@ -1,0 +1,44 @@
+[gd_scene load_steps=3 format=3 uid="uid://caxetbdf0uwpr"]
+
+[ext_resource type="Script" uid="uid://cixk2fitgtdis" path="res://scenes/server_entry.gd" id="1_7l45w"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_l5w3b"]
+bg_color = Color(0.164706, 0.164706, 0.164706, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[node name="ServerEntry" type="PanelContainer"]
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("StyleBoxFlat_l5w3b")
+script = ExtResource("1_7l45w")
+
+[node name="MarginContainer" type="MarginContainer" parent="."]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 6
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 6
+
+[node name="HBoxContainer" type="HBoxContainer" parent="MarginContainer"]
+layout_mode = 2
+theme_override_constants/separation = 20
+
+[node name="NameLabel" type="Label" parent="MarginContainer/HBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Server Name"
+
+[node name="PlayersLabel" type="Label" parent="MarginContainer/HBoxContainer"]
+layout_mode = 2
+text = "0/0"
+
+[node name="PingLabel" type="Label" parent="MarginContainer/HBoxContainer"]
+layout_mode = 2
+text = "0 ms"
+
+[node name="JoinButton" type="Button" parent="MarginContainer/HBoxContainer"]
+custom_minimum_size = Vector2(80, 0)
+layout_mode = 2
+text = "Join"
