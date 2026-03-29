@@ -172,7 +172,7 @@ func _on_create_server() -> void:
 	print("Hosting on UDP 24565, LAN IP =", lan)
 	# Register host in roster (peer 1) with ready=false
 	GameState.roster[1] = {"name": GameState.player_name, "ready": false}
-
+	
 	get_tree().change_scene_to_file(LOBBY_SCENE)
 
 func _on_create_cloud_server() -> void:

@@ -14,6 +14,7 @@ signal lobby_leader_changed(id: int)
 # { peer_id: { "name": String, "ready": bool, "team": int(Team) } }
 var roster: Dictionary = {}
 var game_results: Dictionary = {}
+var lobby_data := {"lobby_size" : 0, "players_connected" : 0}
 var pending_spawn_ids: Array[int] = []
 var match_len_sec = 500
 var goal_limit = 10

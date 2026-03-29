@@ -7,38 +7,39 @@ var known_servers := {}
 var cleanup_timer := 0.0
 
 func _ready():
+	print("server llist is now active")
 	#_populate_server_list()
 	Network.joined_server.connect(_on_joined_server)
-	NetworkDiscovery.server_found.connect(_on_server_found)
-	NetworkDiscovery.start_discovery()
+	Network.server_found.connect(_on_server_found)
+	Network.start_discovery()
 
 func _on_server_found(data):
 	if not data.has("ip") or not data.has("port"):
 		return  # invalid packet
 
 
-	var key = str(data.ip) + ":" + str(data.port)
+	var key = str(data.id)
 	var last_seen = data["last_seen"]
+	#print("data: ", data)
+	#print("known_servers: ", known_servers)
 	# Server is fresh
 	if known_servers.has(key):
 		# Update last_seen for existing entry
-		known_servers[key]["data"]["last_seen"] = last_seen
+		known_servers[key]["last_seen"] = last_seen
+		known_servers[key]["entry"].update_status(data)
 	else:
 		# Add new server
 		var entry = preload(C.SERVER_ENTRY).instantiate()
+		# Store in known_servers
+		known_servers[key] = {
+			"last_seen": last_seen,
+			"entry": entry
+		}
 		server_list.add_child(entry)
-		await entry.ready
 		entry.setup(data)
 	   
 		# Optional: connect join button
 		entry.join_button.pressed.connect(_on_connect_button_pressed.bind(data.ip))
-
-
-		# Store in known_servers
-		known_servers[key] = {
-			"data": data,
-			"entry": entry
-		}
 		print("Added new server:", key)
 
 func _check_server_status():
@@ -48,8 +49,7 @@ func _check_server_status():
 
 	# Step 1: Find stale servers
 	for key in known_servers.keys():
-		var server_data = known_servers[key]["data"]
-		var last_seen = server_data["last_seen"]
+		var last_seen = known_servers[key]["last_seen"]
 
 
 		if now - last_seen > 5:  # 5 seconds threshold

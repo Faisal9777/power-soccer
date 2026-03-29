@@ -229,12 +229,12 @@ _surfaces = [{
 
 [node name="World" type="Node3D" node_paths=PackedStringArray("pause_btn", "score_btn")]
 script = ExtResource("1_rup4s")
-pause_btn = NodePath("CanvasLayer/UI/PauseButton")
-score_btn = NodePath("CanvasLayer/UI/ScoreButton")
 player_scene = ExtResource("2_4kbfs")
 bot_player_scene = ExtResource("3_f17e3")
 ball_packed = ExtResource("4_x2olw")
 joystick_path = NodePath("CanvasLayer/UI/JoyStick")
+pause_btn = NodePath("CanvasLayer/UI/PauseButton")
+score_btn = NodePath("CanvasLayer/UI/ScoreButton")
 metadata/_edit_group_ = true
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
