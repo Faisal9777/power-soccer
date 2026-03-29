@@ -17,11 +17,14 @@ func _process(delta):
 
 
 		var data = JSON.parse_string(packet.get_string_from_utf8())
-	   
-		if data.error != OK:
-			print("Failed to parse JSON from broadcast:", data.error_string)
+
+		if data == null:
+			print("Invalid JSON (null)")
 			continue
-	   
+
+		if typeof(data) != TYPE_DICTIONARY:
+			print("Unexpected JSON format:", data)
+			continue
 		if data:
 			data["ip"] = ip
 			emit_signal("server_found", data)
