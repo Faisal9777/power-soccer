@@ -14,7 +14,7 @@ signal lobby_leader_changed(id: int)
 # { peer_id: { "name": String, "ready": bool, "team": int(Team) } }
 var roster: Dictionary = {}
 var game_results: Dictionary = {}
-var lobby_data := {"lobby_size" : 0, "players_connected" : 0}
+var lobby_size := 0
 var pending_spawn_ids: Array[int] = []
 var match_len_sec = 500
 var goal_limit = 10
@@ -84,6 +84,12 @@ func get_player_name(id: int) -> String:
 	if player_name != "":
 		return player_name
 	return "Player %d" % id
+
+func get_lobby_size() -> int:
+	return lobby_size
+
+func get_players_connected() -> int:
+	return roster.size()
 
 func set_player_name_for(id: int, name: String) -> void:
 	var rec: Dictionary = roster.get(id, {})

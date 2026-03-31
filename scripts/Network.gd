@@ -2,7 +2,7 @@ extends Node
 
 const PORT := 24565
 
-signal server_started
+signal server_started(info)
 signal server_found(server_info)
 signal joined_server
 signal peer_joined(id: int)
@@ -19,7 +19,6 @@ var udp_broadcast := PacketPeerUDP.new()
 var udp_discovery := PacketPeerUDP.new()
 
 var is_host := false
-var server_info = {}
 
 const C = preload("res://scripts/shared/scene.gd")
 
@@ -47,16 +46,10 @@ func host(info: Dictionary) -> void:
 	var id := Crypto.new().generate_random_bytes(16).hex_encode()
 	info["id"] = id
 	# Start broadcasting
-	_start_broadcast(info)
 
 	is_host = true
 	print("Server started on port ", PORT)
-	server_started.emit()
-
-
-func change_state(state_info: String):
-	server_info.state = state_info
-
+	server_started.emit(info)
 
 # =========================
 # JOIN
@@ -89,10 +82,10 @@ func join(ip: String) -> void:
 # DISCOVERY (CLIENT)
 # =========================
 func start_discovery() -> void:
-	print("starting discovery")
+	print("starting discovery2")
 	var err := udp_discovery.bind(NetConfig.DISCOVERY_PORT)
 	if err != OK:
-		push_error("Discovery bind failed: %s" % err)
+		print("Discovery bind failed: %s" % err)
 		return
 
 	udp_discovery.set_broadcast_enabled(true)
@@ -124,18 +117,12 @@ func _poll_discovery():
 # =========================
 # BROADCAST (SERVER)
 # =========================
-func _start_broadcast(info: Dictionary):
+func enable_broadcast():
 	udp_broadcast.set_broadcast_enabled(true)
 	udp_broadcast.bind(0) # random port
-	server_info = info
-	server_info["port"] = PORT
 
 
-func _broadcast():
-	server_info["last_seen"] = Time.get_unix_time_from_system()
-	server_info["lobby_size"] = GameState.lobby_data["lobby_size"]
-	server_info["players_connected"] = GameState.lobby_data["players_connected"]
-
+func broadcast(server_info):
 	var json = JSON.stringify(server_info)
 	udp_broadcast.set_dest_address(NetConfig.BROADCAST_IP, NetConfig.DISCOVERY_PORT)
 	udp_broadcast.put_packet(json.to_utf8_buffer())
@@ -145,9 +132,7 @@ func _broadcast():
 # PROCESS LOOP
 # =========================
 func _process(delta):
-	if is_host:
-		_broadcast()
-	else:
+	if not is_host:
 		_poll_discovery()
 
 
@@ -169,7 +154,6 @@ func _on_peer_disconnected(id: int) -> void:
 	if multiplayer.get_peers().size() == 0 and GameState.is_dedicated:
 		all_peers_left.emit()
 
-	GameState.clear()
 
 
 # =========================
@@ -200,7 +184,3 @@ func close_connection() -> void:
 
 	multiplayer.multiplayer_peer = null
 	is_host = false
-
-	# 🔥 Close BOTH sockets
-	udp_broadcast.close()
-	udp_discovery.close()

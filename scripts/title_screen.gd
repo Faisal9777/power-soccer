@@ -166,6 +166,7 @@ func _on_create_server() -> void:
 	GameState.roster[1] = {"name": GameState.player_name, "ready": false, "team": GameState.Team.BLUE} # team optional
 	
 	server_info.name = GameState.player_name
+	server_info['current_scene'] = C.LOBBY
 	
 	Network.host(server_info)
 	var lan := get_lan_ip()
