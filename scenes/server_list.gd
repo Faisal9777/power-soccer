@@ -7,13 +7,17 @@ var known_servers := {}
 var cleanup_timer := 0.0
 
 func _ready():
-	print("server llist is now active")
 	#_populate_server_list()
 	Network.joined_server.connect(_on_joined_server)
 	Network.server_found.connect(_on_server_found)
 	Network.start_discovery()
 
+func _process(delta : float):
+	if Input.is_action_pressed("debug"):
+		Network.join("127.0.0.1")
+
 func _on_server_found(data):
+	
 	if not data.has("ip") or not data.has("port"):
 		return  # invalid packet
 
@@ -87,6 +91,7 @@ func _on_connect_button_pressed(ip) -> void:
 	GameState.roster[GameState.id] = {"name": GameState.player_name, "ready": false}
 
 	# Use the typed IP here:
+	Network.stop_discovery()
 	Network.join(ip)
 
 

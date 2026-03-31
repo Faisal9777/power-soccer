@@ -47,7 +47,7 @@ func _cycle_ability(cur: String) -> String:
 
 
 func _ready() -> void:
-	GameState.lobby_data["lobby_size"] = _team_size*2
+	GameState.lobby_size = _team_size*2
 	# --- Build the Tree columns + per-row buttons ---
 	print("YOU ARE SEEING THE NEW UPDATEE")
 	_setup_player_tree()
@@ -159,7 +159,6 @@ func _ready() -> void:
 
 		if multiplayer.is_server() and GameState.roster.has(id):
 			GameState.roster.erase(id)
-
 			_ensure_leader_exists()   # ✅ leader might have left
 			_broadcast_roster()
 
@@ -197,7 +196,6 @@ func _on_peer_connected(pid: int) -> void:
 		# Optionally pre-create an entry to avoid has() failure later
 		if !GameState.roster.has(pid):
 			GameState.roster[pid] = {"name": "Player %d" % pid, "ready": false}
-			GameState.lobby_data["players_connected"] += 1
 		# (Then either wait for their _rpc_submit_name, or actively request it)
 
 # -------------------- Tree setup / UI --------------------
@@ -789,7 +787,7 @@ func _rpc_set_team_size(size: int) -> void:
 		var idx := match_size_opt.get_item_index(_team_size)
 		if idx != -1:
 			match_size_opt.select(idx)
-	GameState.lobby_data["lobby_size"] = _team_size*2
+	GameState.lobby_size = _team_size*2
 	# Only host manages bots
 	if GameState.is_host and fill_bots_check and fill_bots_check.button_pressed:
 		_update_bots_for_team_size()
