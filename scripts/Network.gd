@@ -67,12 +67,8 @@ func join(ip: String) -> void:
 		return
 
 	multiplayer.multiplayer_peer = enet
-
+	multiplayer.connected_to_server.connect(_on_connection_successful)
 	if !_signals_hooked_client:
-		multiplayer.connected_to_server.connect(func():
-			print("Joined ", ip, ":", PORT)
-			joined_server.emit()
-		)
 		multiplayer.connection_failed.connect(_on_connection_failed)
 		multiplayer.server_disconnected.connect(_on_server_disconnected)
 		_signals_hooked_client = true
@@ -165,6 +161,9 @@ func _on_connection_failed() -> void:
 
 func _on_server_disconnected() -> void:
 	server_disconnected.emit()
+
+func _on_connection_successful() -> void:
+	joined_server.emit()
 
 
 # =========================
