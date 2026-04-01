@@ -21,7 +21,7 @@ var server_info := {"name" : "", 'state': "lobby"}
 const LOBBY_SCENE := "res://scenes/Lobby.tscn"
 
 func _ready() -> void:
-	
+	GameState.player_name = Settings.player_name
 	var args := OS.get_cmdline_args()
 
 	# Dedicated headless server mode

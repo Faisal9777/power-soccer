@@ -8,9 +8,9 @@ var cleanup_timer := 0.0
 
 func _ready():
 	#_populate_server_list()
-	Network.joined_server.connect(_on_joined_server)
-	Network.server_found.connect(_on_server_found)
-	Network.start_discovery()
+	Session.joined_server.connect(_on_joined_server)
+	Session.server_found.connect(_on_server_found)
+	Session.start_discovery()
 
 func _process(delta : float):
 	if Input.is_action_pressed("debug"):
@@ -44,7 +44,6 @@ func _on_server_found(data):
 	   
 		# Optional: connect join button
 		entry.join_button.pressed.connect(_on_connect_button_pressed.bind(data.ip))
-		print("Added new server:", key)
 
 func _check_server_status():
 	var now = Time.get_unix_time_from_system()
@@ -84,16 +83,17 @@ func _remove_server(key):
 
 
 func _on_connect_button_pressed(ip) -> void:
-	GameState.is_host = false
 	GameState.reset_lobby()
-	GameState.player_name = Settings.player_name
-	GameState.id = randi()
-	GameState.roster[GameState.id] = {"name": GameState.player_name, "ready": false}
 
 	# Use the typed IP here:
-	Network.stop_discovery()
-	Network.join(ip)
+	Session.stop_discovery()
+	Session.join(ip)
 
 
 func _on_joined_server() -> void:
+	var payload := {"name" : Settings.player_name, "id" : multiplayer.get_unique_id()}
+	Session.on_roster_updated.connect(_on_roster_updated)
+	Session.rpc_id(1, "_srv_register_player", payload)
+
+func _on_roster_updated() -> void:
 	get_tree().change_scene_to_file(C.LOBBY)
