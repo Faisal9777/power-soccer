@@ -3,14 +3,20 @@ extends Control
 # Reference to the VBoxContainer
 @onready var server_list = $ScrollContainer/ServerListContainer
 const C = preload("res://scripts/shared/scene.gd")
+const SCRIPT_PATHS = preload("res://scripts/shared/script_path.gd")
 var known_servers := {}
 var cleanup_timer := 0.0
+var session_node : Node
 
 func _ready():
+	session_node = preload(SCRIPT_PATHS.CLIENT_SESSION).new()
+	# Add to /root so it survives scene changes
+	get_tree().root.add_child(session_node)
+	session_node.set_name("Session")  # optional, easy access
 	#_populate_server_list()
-	Session.joined_server.connect(_on_joined_server)
-	Session.server_found.connect(_on_server_found)
-	Session.start_discovery()
+	session_node.joined_server.connect(_on_joined_server)
+	session_node.server_found.connect(_on_server_found)
+	session_node.start_discovery()
 
 func _process(delta : float):
 	if Input.is_action_pressed("debug"):
@@ -86,14 +92,11 @@ func _on_connect_button_pressed(ip) -> void:
 	GameState.reset_lobby()
 
 	# Use the typed IP here:
-	Session.stop_discovery()
-	Session.join(ip)
+	session_node.stop_discovery()
+	session_node.joined_server.connect(_on_joined_server)
+	session_node.join(ip)
 
 
 func _on_joined_server() -> void:
-	var payload := {"name" : Settings.player_name, "id" : multiplayer.get_unique_id()}
-	Session.on_roster_updated.connect(_on_roster_updated)
-	Session.rpc_id(1, "_srv_register_player", payload)
-
-func _on_roster_updated() -> void:
+	print("server_list _on_joined_server")
 	get_tree().change_scene_to_file(C.LOBBY)

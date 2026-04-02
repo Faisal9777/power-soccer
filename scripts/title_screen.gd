@@ -15,6 +15,7 @@ extends Control
 # (Optional) add a Label under the popup to show status and point this path to it.
 @onready var status_label: Label = $MultiplayerPopup/VBox/Label if has_node("MultiplayerPopup/VBox/Label") else null
 const C = preload("res://scripts/shared/scene.gd")
+const SCRIPT_PATHS = preload("res://scripts/shared/script_path.gd")
 var _gfx_ui: Control = null
 var server_info := {"name" : "", 'state': "lobby"}
 
@@ -167,8 +168,11 @@ func _on_create_server() -> void:
 	
 	server_info.name = GameState.player_name
 	server_info['current_scene'] = C.LOBBY
-	
-	Network.host(server_info)
+	var session_node = preload(SCRIPT_PATHS.SERVER_SESSION).new()
+	# Add to /root so it survives scene changes
+	get_tree().root.add_child(session_node)
+	session_node.set_name("Session")  # optional, easy access
+	session_node.host(server_info)
 	var lan := get_lan_ip()
 	print("Hosting on UDP 24565, LAN IP =", lan)
 	# Register host in roster (peer 1) with ready=false
