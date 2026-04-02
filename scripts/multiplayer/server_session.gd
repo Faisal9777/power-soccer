@@ -1,4 +1,5 @@
 extends Node
+class_name ServerSession
 
 signal on_roster_updated
 signal joined_server
@@ -17,17 +18,8 @@ func set_current_scene(scene : String):
 func change_state(state_info: String):
 	server_info.state = state_info
 
-func stop_discovery():
-	Network.stop_discovery()
-
-func start_discovery():
-	Network.start_discovery()
-
-func join(ip):
-	if GameState.lobby_size > GameState.get_players_connected():
-		Network.joined_server.connect(_on_joined_server)
-		Network.server_found.connect(_on_server_found)
-		Network.join(ip)
+func host(server_info):
+	Network.host(server_info)
 
 func _ready():
 	Network.server_started.connect(_on_hosting_started)
@@ -62,6 +54,7 @@ func _on_peer_connected(id):
 
 @rpc("any_peer")
 func _srv_register_player(payload : Dictionary):
+	print("_srv_register_player")
 	if not multiplayer.is_server():
 		return
 
@@ -69,8 +62,3 @@ func _srv_register_player(payload : Dictionary):
 
 	GameState.roster[id]["name"] = payload.get('name', "Unknown")
 	rpc_id(id, "_cl_sync_roster", GameState.roster)
-
-@rpc("call_local")
-func _cl_sync_roster(roster):
-	GameState.roster = roster
-	on_roster_updated.emit()

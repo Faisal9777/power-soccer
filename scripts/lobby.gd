@@ -396,6 +396,7 @@ func _submit_name_to_host() -> void:
 	rpc_id(1, "_rpc_submit_name", GameState.player_name)
 
 func _on_ready_toggle() -> void:
+	
 	var new_ready := !_my_ready()
 	_set_my_ready_local(new_ready)
 	ready_btn.text = "Unready" if new_ready else "Ready"
