@@ -23,7 +23,7 @@ GameState="*res://scripts/GameState.gd"
 Settings="*res://scripts/settings.gd"
 LoadingUI="*res://scripts/autoload/loading_ui.gd"
 NetworkDiscovery="*res://network_discovery.gd"
-Session="*res://scripts/multiplayer/server_session.gd"
+SessionManager="*res://scripts/autoload/session_manager.gd"
 
 [display]
 

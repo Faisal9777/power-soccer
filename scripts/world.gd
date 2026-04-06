@@ -906,9 +906,7 @@ func _process(delta: float) -> void:
 		_all_players_positions()
 	if Input.is_action_just_pressed("host_key"):
 		if multiplayer.multiplayer_peer is ENetMultiplayerPeer and multiplayer.is_server():
-			print("Already hosting (ENet)")
-		else:
-			Network.host()              # start hosting
+			print("Already hosting (ENet)")        # start hosting
 	#var fps := Engine.get_frames_per_second()
 	##if fmod(fps, 10.0) < 0.001:
 		##print(int(round(fps)))
@@ -917,8 +915,7 @@ func _process(delta: float) -> void:
 	if Input.is_action_just_pressed("join_key"):
 		if multiplayer.multiplayer_peer is ENetMultiplayerPeer:
 			print("Already connected (ENet)")
-		else:
-			Network.join("127.0.0.1")
+	
 	if Input.is_action_just_pressed("debug_third") and is_instance_valid(_game):
 		_game._rpc_set_goal_camera_third_person()  # direct local call
 

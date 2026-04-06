@@ -11,4 +11,6 @@ enum Msg {
 	SET_PLAYERS   = 4,
 	GAME_BEGIN       = 5,
 	GAME_END       = 6,
+	REGISTER_PEER = 7,
+	ROSTER_DATA = 8
 }
