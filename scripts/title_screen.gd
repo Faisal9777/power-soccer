@@ -29,8 +29,8 @@ func _ready() -> void:
 	if "--server" in args:
 		GameState.is_host = true
 		GameState.is_dedicated = true
-		
-		Network.host(server_info)  # your ENet create_server()
+		var session = SessionManager.get_or_create_session(SCRIPT_PATHS.SERVER_SESSION)
+		session.host(server_info)
 
 		# go straight to lobby; no UI, no camera
 		get_tree().change_scene_to_file(LOBBY_SCENE)
@@ -149,12 +149,12 @@ func _open_multiplayer_screen() -> void:
 	btn_find.grab_focus()
 
 # ---------------- Multiplayer ----------------
-
 func _on_find_server() -> void:
 	_set_connect_ui_enabled(true)
 	get_tree().change_scene_to_file(C.SERVER_LIST)
 
 func _on_create_server() -> void:
+	print('_on_create_server')
 	# Identity
 	GameState.reset_lobby()
 	if GameState.player_name == "" or GameState.player_name == "Player":
@@ -168,10 +168,7 @@ func _on_create_server() -> void:
 	
 	server_info.name = GameState.player_name
 	server_info['current_scene'] = C.LOBBY
-	var session_node = preload(SCRIPT_PATHS.SERVER_SESSION).new()
-	# Add to /root so it survives scene changes
-	get_tree().root.add_child(session_node)
-	session_node.set_name("Session")  # optional, easy access
+	var session_node = SessionManager.get_or_create_session(SCRIPT_PATHS.SERVER_SESSION)
 	session_node.host(server_info)
 	var lan := get_lan_ip()
 	print("Hosting on UDP 24565, LAN IP =", lan)
@@ -181,7 +178,10 @@ func _on_create_server() -> void:
 	get_tree().change_scene_to_file(LOBBY_SCENE)
 
 func _on_create_cloud_server() -> void:
-	print('todo')
+	print('_on_create_cloud_server')
+	var session_node = SessionManager.get_or_create_session(SCRIPT_PATHS.CLIENT_SESSION)
+	session_node.server_joined.connect(_on_joined_server)
+	session_node.host_cloud_server(server_info)
 
 
 #func _on_connect_to_ip() -> void:
@@ -204,10 +204,10 @@ func get_lan_ip() -> String:
 		if not addr.begins_with("127.") and not addr.begins_with("169.254.") and not is_ipv6:
 			return addr
 	return ""
-#
-#func _on_joined_server() -> void:
-	#_set_status("Connected! Entering lobby…")
-	#get_tree().change_scene_to_file(LOBBY_SCENE)
+
+func _on_joined_server() -> void:
+	_set_status("Connected! Entering lobby…")
+	get_tree().change_scene_to_file(LOBBY_SCENE)
 
 func _on_connection_failed() -> void:
 	_set_status("Connection failed. Check IP/port and try again.")

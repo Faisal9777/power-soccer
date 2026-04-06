@@ -1,7 +1,5 @@
 extends Node
 
-const PORT := 24565
-
 signal server_started(info)
 signal server_found(server_info)
 signal joined_server
@@ -29,9 +27,9 @@ func host(info: Dictionary) -> void:
 	if multiplayer.multiplayer_peer is ENetMultiplayerPeer and multiplayer.is_server():
 		server_started.emit()
 		return
-
+	var port := info.get("port", 0) as int
 	var enet := ENetMultiplayerPeer.new()
-	var err := enet.create_server(PORT, 16)
+	var err := enet.create_server(port, 16)
 
 	if err != OK:
 		push_error("Host failed: %s" % err)
@@ -48,19 +46,21 @@ func host(info: Dictionary) -> void:
 	# Start broadcasting
 
 	is_host = true
-	print("Server started on port ", PORT)
+	print("Server started on port ", port)
 	server_started.emit(info)
+
+
 
 # =========================
 # JOIN
 # =========================
-func join(ip: String) -> void:
+func join(ip: String, port: int) -> void:
 	if multiplayer.multiplayer_peer is ENetMultiplayerPeer:
 		push_warning("Already connected/hosting.")
 		return
 
 	var enet := ENetMultiplayerPeer.new()
-	var err := enet.create_client(ip, PORT)
+	var err := enet.create_client(ip, port)
 
 	if err != OK:
 		push_error("Join failed: %s" % err)

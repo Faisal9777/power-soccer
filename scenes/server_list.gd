@@ -9,10 +9,7 @@ var cleanup_timer := 0.0
 var session_node : Node
 
 func _ready():
-	session_node = preload(SCRIPT_PATHS.CLIENT_SESSION).new()
-	# Add to /root so it survives scene changes
-	get_tree().root.add_child(session_node)
-	session_node.set_name("Session")  # optional, easy access
+	session_node = SessionManager.get_or_create_session(SCRIPT_PATHS.CLIENT_SESSION)
 	#_populate_server_list()
 	session_node.joined_server.connect(_on_joined_server)
 	session_node.server_found.connect(_on_server_found)
@@ -20,7 +17,7 @@ func _ready():
 
 func _process(delta : float):
 	if Input.is_action_pressed("debug"):
-		Network.join("127.0.0.1")
+		Network.join("127.0.0.1", 24565)
 
 func _on_server_found(data):
 	
@@ -30,7 +27,7 @@ func _on_server_found(data):
 
 	var key = str(data.id)
 	var last_seen = data["last_seen"]
-	#print("data: ", data)
+	#print("data: ", data) 
 	#print("known_servers: ", known_servers)
 	# Server is fresh
 	if known_servers.has(key):
@@ -49,7 +46,7 @@ func _on_server_found(data):
 		entry.setup(data)
 	   
 		# Optional: connect join button
-		entry.join_button.pressed.connect(_on_connect_button_pressed.bind(data.ip))
+		entry.join_button.pressed.connect(_on_connect_button_pressed.bind(data))
 
 func _check_server_status():
 	var now = Time.get_unix_time_from_system()
@@ -88,15 +85,14 @@ func _remove_server(key):
 	print("Removed stale server:", key)
 
 
-func _on_connect_button_pressed(ip) -> void:
+func _on_connect_button_pressed(data) -> void:
 	GameState.reset_lobby()
 
 	# Use the typed IP here:
 	session_node.stop_discovery()
 	session_node.joined_server.connect(_on_joined_server)
-	session_node.join(ip)
+	session_node.join(data)
 
 
 func _on_joined_server() -> void:
-	print("server_list _on_joined_server")
 	get_tree().change_scene_to_file(C.LOBBY)
