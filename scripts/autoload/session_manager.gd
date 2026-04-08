@@ -7,7 +7,15 @@ var session_node: Node = null
 var sync_node: Node = null
 const SCRIPT_PATH := preload("res://scripts/shared/script_path.gd")
 
-func get_or_create_session(session_path: String) -> Node:
+func create_lan_server_session(session_path: String) -> Node:
+	var transport_method = LanBroadcastTransport.new()
+	return _create_server_session(session_path, transport_method)
+
+func create_cloud_server_session(session_path: String) -> Node:
+	var transport_method = CloudHeartbeatTransport.new("")
+	return _create_server_session(session_path, transport_method)
+
+func create_client_session(session_path: String) -> Node:
 	session_node = _create_node(session_path, SESSION_NAME)
 	return session_node
 
@@ -38,8 +46,12 @@ func _create_node(node_path: String, node_name : String) -> Node:
 
 	var node = script.new()
 	node.name = node_name
-
 	root.add_child(node)
 
 	print("Session created at:", node.get_path())
 	return node
+
+func _create_server_session(session_path: String, transport_method) -> Node:
+	session_node = _create_node(session_path, SESSION_NAME)
+	session_node.setup(transport_method)
+	return session_node

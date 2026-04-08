@@ -164,4 +164,4 @@ func _on_back_pressed() -> void:
 	_back_btn.disabled = true
 	_status.text = "Waiting for other players..."
 
-	get_tree().call_deferred("change_scene_to_file", Scenes.LOBBY)
+	SessionManager.session_node.change_state(_lobby_scene_path)

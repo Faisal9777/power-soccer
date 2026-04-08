@@ -29,11 +29,8 @@ func _ready() -> void:
 	if "--server" in args:
 		GameState.is_host = true
 		GameState.is_dedicated = true
-		var session = SessionManager.get_or_create_session(SCRIPT_PATHS.SERVER_SESSION)
-		session.host(server_info)
-
-		# go straight to lobby; no UI, no camera
-		get_tree().change_scene_to_file(LOBBY_SCENE)
+		var session = SessionManager.create_cloud_server_session(SCRIPT_PATHS.SERVER_SESSION)
+		session.host(server_info, C.LOBBY)
 		return
 
 	# -------- normal client flow below --------
@@ -168,20 +165,16 @@ func _on_create_server() -> void:
 	
 	server_info.name = GameState.player_name
 	server_info['current_scene'] = C.LOBBY
-	var session_node = SessionManager.get_or_create_session(SCRIPT_PATHS.SERVER_SESSION)
-	session_node.host(server_info)
 	var lan := get_lan_ip()
 	print("Hosting on UDP 24565, LAN IP =", lan)
 	# Register host in roster (peer 1) with ready=false
 	GameState.roster[1] = {"name": GameState.player_name, "ready": false}
-	
-	get_tree().change_scene_to_file(LOBBY_SCENE)
+	var session_node = SessionManager.create_lan_server_session(SCRIPT_PATHS.SERVER_SESSION)
+	session_node.host(server_info, C.LOBBY)
 
 func _on_create_cloud_server() -> void:
-	print('_on_create_cloud_server')
-	var session_node = SessionManager.get_or_create_session(SCRIPT_PATHS.CLIENT_SESSION)
-	session_node.server_joined.connect(_on_joined_server)
-	session_node.host_cloud_server(server_info)
+	print('request a backend for a server to host')
+
 
 
 #func _on_connect_to_ip() -> void:

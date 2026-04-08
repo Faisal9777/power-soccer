@@ -15,6 +15,9 @@ func start_discovery():
 	Network.server_found.connect(_on_server_found)
 	Network.start_discovery()
 
+func change_state(state_info: String):
+	get_tree().change_scene_to_file(state_info)
+
 func host_cloud_server(server_info):
 	http_request = HTTPRequest.new()
 	add_child(http_request)

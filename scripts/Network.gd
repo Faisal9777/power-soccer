@@ -111,20 +111,6 @@ func _poll_discovery():
 
 
 # =========================
-# BROADCAST (SERVER)
-# =========================
-func enable_broadcast():
-	udp_broadcast.set_broadcast_enabled(true)
-	udp_broadcast.bind(0) # random port
-
-
-func broadcast(server_info):
-	var json = JSON.stringify(server_info)
-	udp_broadcast.set_dest_address(NetConfig.BROADCAST_IP, NetConfig.DISCOVERY_PORT)
-	udp_broadcast.put_packet(json.to_utf8_buffer())
-
-
-# =========================
 # PROCESS LOOP
 # =========================
 func _process(delta):
