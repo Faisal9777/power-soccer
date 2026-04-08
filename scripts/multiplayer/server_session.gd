@@ -5,7 +5,9 @@ signal on_roster_updated
 signal joined_server
 signal server_found(info)
 
+var _transport_method : IAnnounceTransport
 var current_scene = ""
+var scene_after_server = ""
 var server_info = {}
 var can_broadcast := false
 var sync : Node
@@ -17,8 +19,15 @@ func set_current_scene(scene : String):
 
 func change_state(state_info: String):
 	server_info.state = state_info
+	if state_info == C.LOBBY:
+		toggle_broadcast(true)
+		get_tree().change_scene_to_file(state_info)
 
-func host(server_info):
+func setup(transport_method):
+	_transport_method = transport_method
+
+func host(server_info, scene):
+	scene_after_server = scene
 	server_info["port"] = PORT
 	Network.host(server_info)
 
@@ -26,12 +35,18 @@ func handle_data(msg, data):
 	if msg == NetCodes.Msg.REGISTER_PEER:
 		_srv_register_player(data)
 
+func disable_broadcast():
+	can_broadcast = false
+
+func toggle_broadcast(trigger):
+	can_broadcast = trigger
+
 func _ready():
 	Network.server_started.connect(_on_hosting_started)
 	Network.peer_joined.connect(_on_peer_connected)
 
 func _process(delta : float):
-	if current_scene == C.LOBBY and can_broadcast:
+	if can_broadcast:
 		_broadcast()
 
 func _broadcast():
@@ -39,15 +54,15 @@ func _broadcast():
 	server_info["lobby_size"] = GameState.get_lobby_size()
 	server_info["players_connected"] = GameState.get_players_connected()
 	server_info['port'] = PORT
-	Network.broadcast(server_info)
+	_transport_method.send(server_info)
 
 
 func _on_hosting_started(info):
-	Network.enable_broadcast()
 	server_info = info
 	current_scene = server_info["current_scene"]
 	can_broadcast = true
 	sync = SessionManager.create_network_sync()
+	get_tree().change_scene_to_file(scene_after_server)
 
 
 func _on_joined_server():

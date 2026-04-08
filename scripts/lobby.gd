@@ -8,7 +8,6 @@ extends Control
 @onready var ready_btn: Button = $PanelContainer/VBoxContainer/HBoxContainer/ReadyButton
 @onready var match_size_opt: OptionButton = $PanelContainer/VBoxContainer/HBoxContainer/MatchSizeOption
 @onready var fill_bots_check: CheckButton = $PanelContainer/VBoxContainer/HBoxContainer/FillBotsCheck
-
 const MIN_TEAM_SIZE := 1
 const MAX_TEAM_SIZE := 10
 
@@ -620,6 +619,7 @@ func _try_start_match() -> void:
 		return
 	for pid in GameState.roster.keys():
 		GameState.roster[pid]["ready"] = false
+	SessionManager.session_node.disable_broadcast()
 	rpc("_rpc_start_match", WORLD_SCENE)
 
 
