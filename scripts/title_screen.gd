@@ -29,6 +29,7 @@ func _ready() -> void:
 	if "--server" in args:
 		GameState.is_host = true
 		GameState.is_dedicated = true
+		Configuration.load_config()
 		var session = SessionManager.create_cloud_server_session(SCRIPT_PATHS.SERVER_SESSION)
 		session.host(server_info, C.LOBBY)
 		return
@@ -174,7 +175,6 @@ func _on_create_server() -> void:
 
 func _on_create_cloud_server() -> void:
 	print('request a backend for a server to host')
-
 
 
 #func _on_connect_to_ip() -> void:

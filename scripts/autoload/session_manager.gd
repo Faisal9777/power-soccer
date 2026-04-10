@@ -12,7 +12,8 @@ func create_lan_server_session(session_path: String) -> Node:
 	return _create_server_session(session_path, transport_method)
 
 func create_cloud_server_session(session_path: String) -> Node:
-	var transport_method = CloudHeartbeatTransport.new("")
+	var endpoint = Configuration.get_value("heartbeat_endpoint")
+	var transport_method = CloudHeartbeatTransport.new(endpoint)
 	return _create_server_session(session_path, transport_method)
 
 func create_client_session(session_path: String) -> Node:

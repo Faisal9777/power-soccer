@@ -11,7 +11,6 @@ var session_node : Node
 func _ready():
 	session_node = SessionManager.create_client_session(SCRIPT_PATHS.CLIENT_SESSION)
 	#_populate_server_list()
-	session_node.joined_server.connect(_on_joined_server)
 	session_node.server_found.connect(_on_server_found)
 	session_node.start_discovery()
 
@@ -90,9 +89,4 @@ func _on_connect_button_pressed(data) -> void:
 
 	# Use the typed IP here:
 	session_node.stop_discovery()
-	session_node.joined_server.connect(_on_joined_server)
 	session_node.join(data)
-
-
-func _on_joined_server() -> void:
-	get_tree().change_scene_to_file(C.LOBBY)

@@ -82,4 +82,5 @@ func _srv_register_player(payload : Dictionary):
 	var id = payload.get("id", 0)
 
 	GameState.roster[id]["name"] = payload.get('name', "Unknown")
-	sync.send_data_id(id, NetCodes.Msg.ROSTER_DATA, GameState.roster)
+	var server_info := {"roster":GameState.roster, "scene": C.LOBBY}
+	sync.send_data_id(id, NetCodes.Msg.ROSTER_DATA, server_info)
