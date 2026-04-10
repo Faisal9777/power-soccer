@@ -3,9 +3,9 @@ class_name ClientSession
 
 signal joined_server
 signal server_found(info)
-const CLOUD_URL = "IP:3000"
 var http_request: HTTPRequest
 var sync : Node
+var ENDPOINTS = preload("res://scripts/shared/endpoints.gd")
 
 func stop_discovery():
 	Network.stop_discovery()
@@ -21,7 +21,8 @@ func change_state(state_info: String):
 func host_cloud_server(server_info):
 	http_request = HTTPRequest.new()
 	add_child(http_request)
-	var url = CLOUD_URL + "/create-lobby"
+	
+	var url = Configuration.get_value("cloud_server_endpoint") + ENDPOINTS.CREATE_LOBBY
 	
 	var headers = ["Content-Type: application/json"]
 	var body = "{}" # can send player info later
@@ -52,11 +53,10 @@ func _on_server_found(info):
 
 func _on_joined_server():
 	sync = SessionManager.create_network_sync()
-	print("sending payload to the server")
 	var payload := {"name" : Settings.player_name, "id" : multiplayer.get_unique_id()}
 	sync.send_data_id(1, NetCodes.Msg.REGISTER_PEER, payload)
 
-func _cl_sync_roster(roster):
-	print("game state has been recieved from the server")
-	GameState.roster = roster
-	joined_server.emit()
+func _cl_sync_roster(server_info):
+	
+	GameState.roster = server_info["roster"]
+	get_tree().change_scene_to_file(server_info["scene"])

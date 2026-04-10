@@ -24,6 +24,7 @@ Settings="*res://scripts/settings.gd"
 LoadingUI="*res://scripts/autoload/loading_ui.gd"
 NetworkDiscovery="*res://network_discovery.gd"
 SessionManager="*res://scripts/autoload/session_manager.gd"
+Configuration="*res://configuration.gd"
 
 [display]
 
