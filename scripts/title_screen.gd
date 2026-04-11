@@ -17,7 +17,6 @@ extends Control
 const C = preload("res://scripts/shared/scene.gd")
 const SCRIPT_PATHS = preload("res://scripts/shared/script_path.gd")
 var _gfx_ui: Control = null
-var server_info := {"name" : "", 'state': "lobby"}
 
 const LOBBY_SCENE := "res://scenes/Lobby.tscn"
 
@@ -30,8 +29,10 @@ func _ready() -> void:
 		GameState.is_host = true
 		GameState.is_dedicated = true
 		Configuration.load_config()
-		var session = SessionManager.create_cloud_server_session(SCRIPT_PATHS.SERVER_SESSION)
-		session.host(server_info, C.LOBBY)
+		var id = _get_arg_value("id", args)
+		var port = _get_arg_value("port", args)
+		var session = SessionManager.create_cloud_server_session(SCRIPT_PATHS.SERVER_SESSION, id, port)
+		session.host(Settings.player_name, C.LOBBY)
 		return
 
 	# -------- normal client flow below --------
@@ -74,6 +75,11 @@ func _ready() -> void:
 	Network.connection_failed.connect(_on_connection_failed)
 	Network.server_disconnected.connect(_on_server_disconnected)
 
+func _get_arg_value(flag: String, args: Array) -> String:
+	var idx = args.find(flag)
+	if idx != -1 and idx + 1 < args.size():
+		return args[idx + 1]
+	return ""
 
 func _prompt_for_player_name() -> void:
 	var win := Window.new()
@@ -164,14 +170,13 @@ func _on_create_server() -> void:
 	GameState.id = 1
 	GameState.roster[1] = {"name": GameState.player_name, "ready": false, "team": GameState.Team.BLUE} # team optional
 	
-	server_info.name = GameState.player_name
-	server_info['current_scene'] = C.LOBBY
 	var lan := get_lan_ip()
 	print("Hosting on UDP 24565, LAN IP =", lan)
 	# Register host in roster (peer 1) with ready=false
 	GameState.roster[1] = {"name": GameState.player_name, "ready": false}
-	var session_node = SessionManager.create_lan_server_session(SCRIPT_PATHS.SERVER_SESSION)
-	session_node.host(server_info, C.LOBBY)
+	var id := Crypto.new().generate_random_bytes(16).hex_encode()
+	var session_node = SessionManager.create_lan_server_session(SCRIPT_PATHS.SERVER_SESSION, id)
+	session_node.host(GameState.player_name, C.LOBBY)
 
 func _on_create_cloud_server() -> void:
 	print('request a backend for a server to host')
