@@ -1,5 +1,5 @@
 {
   "env": "prod",
-  "heartbeat_endpoint": "https://api.mybackend.com/heartbeat",
+  "heartbeat_endpoint": "140.245.210.219:3000/heartbeat",
   "cloud_server_endpoint": "140.245.210.219:3000"
 }

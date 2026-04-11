@@ -16,10 +16,3 @@ func setup(data):
 
 func update_status(data):
 	setup(data)
-
-func _ready():
-	join_button.pressed.connect(_on_join_pressed)
-
-func _on_join_pressed():
-	print("Joining:", server_data.name)
-	# Later: emit signal instead of print

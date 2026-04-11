@@ -1,6 +1,6 @@
 extends Node
 
-signal server_started(info)
+signal server_started
 signal server_found(server_info)
 signal joined_server
 signal peer_joined(id: int)
@@ -41,13 +41,11 @@ func host(info: Dictionary) -> void:
 		multiplayer.peer_connected.connect(_on_peer_connected)
 		multiplayer.peer_disconnected.connect(_on_peer_disconnected)
 		_signals_hooked_server = true
-	var id := Crypto.new().generate_random_bytes(16).hex_encode()
-	info["id"] = id
 	# Start broadcasting
 
 	is_host = true
 	print("Server started on port ", port)
-	server_started.emit(info)
+	server_started.emit()
 
 
 

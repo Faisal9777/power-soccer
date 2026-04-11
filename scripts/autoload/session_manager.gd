@@ -6,15 +6,16 @@ const SYNC_NAME = "Sync"
 var session_node: Node = null
 var sync_node: Node = null
 const SCRIPT_PATH := preload("res://scripts/shared/script_path.gd")
+const LAN_PORT := 24565
 
-func create_lan_server_session(session_path: String) -> Node:
+func create_lan_server_session(session_path: String, id) -> Node:
 	var transport_method = LanBroadcastTransport.new()
-	return _create_server_session(session_path, transport_method)
+	return _create_server_session(session_path, transport_method, id, LAN_PORT)
 
-func create_cloud_server_session(session_path: String) -> Node:
+func create_cloud_server_session(session_path: String, id, port) -> Node:
 	var endpoint = Configuration.get_value("heartbeat_endpoint")
 	var transport_method = CloudHeartbeatTransport.new(endpoint)
-	return _create_server_session(session_path, transport_method)
+	return _create_server_session(session_path, transport_method, id, port)
 
 func create_client_session(session_path: String) -> Node:
 	session_node = _create_node(session_path, SESSION_NAME)
@@ -52,7 +53,7 @@ func _create_node(node_path: String, node_name : String) -> Node:
 	print("Session created at:", node.get_path())
 	return node
 
-func _create_server_session(session_path: String, transport_method) -> Node:
+func _create_server_session(session_path: String, transport_method, id, port) -> Node:
 	session_node = _create_node(session_path, SESSION_NAME)
-	session_node.setup(transport_method)
+	session_node.setup(transport_method, id, port)
 	return session_node

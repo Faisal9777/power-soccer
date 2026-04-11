@@ -25,20 +25,18 @@ func _on_server_found(data):
 
 
 	var key = str(data.id)
-	var last_seen = data["last_seen"]
 	#print("data: ", data) 
 	#print("known_servers: ", known_servers)
 	# Server is fresh
 	if known_servers.has(key):
-		# Update last_seen for existing entry
-		known_servers[key]["last_seen"] = last_seen
 		known_servers[key]["entry"].update_status(data)
+		known_servers[key]["last_seen"] = Time.get_unix_time_from_system()
 	else:
 		# Add new server
 		var entry = preload(C.SERVER_ENTRY).instantiate()
 		# Store in known_servers
 		known_servers[key] = {
-			"last_seen": last_seen,
+			"last_seen": Time.get_unix_time_from_system(),
 			"entry": entry
 		}
 		server_list.add_child(entry)

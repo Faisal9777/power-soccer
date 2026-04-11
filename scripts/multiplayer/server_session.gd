@@ -12,7 +12,6 @@ var server_info = {}
 var can_broadcast := false
 var sync : Node
 const C = preload("res://scripts/shared/scene.gd")
-const PORT := 24565
 
 func set_current_scene(scene : String):
 	current_scene = scene
@@ -23,12 +22,15 @@ func change_state(state_info: String):
 		toggle_broadcast(true)
 		get_tree().change_scene_to_file(state_info)
 
-func setup(transport_method):
+func setup(transport_method, id, port):
 	_transport_method = transport_method
+	server_info = {"id" : id, "port" : port}
 
-func host(server_info, scene):
+func host(server_name, scene):
 	scene_after_server = scene
-	server_info["port"] = PORT
+	server_info["server_name"] = server_name
+	Network.peer_joined.connect(_on_peer_connected)
+	Network.server_started.connect(_on_hosting_started)
 	Network.host(server_info)
 
 func handle_data(msg, data):
@@ -41,25 +43,17 @@ func disable_broadcast():
 func toggle_broadcast(trigger):
 	can_broadcast = trigger
 
-func _ready():
-	Network.server_started.connect(_on_hosting_started)
-	Network.peer_joined.connect(_on_peer_connected)
-
 func _process(delta : float):
 	if can_broadcast:
 		_broadcast()
 
 func _broadcast():
-	server_info["last_seen"] = Time.get_unix_time_from_system()
 	server_info["lobby_size"] = GameState.get_lobby_size()
 	server_info["players_connected"] = GameState.get_players_connected()
-	server_info['port'] = PORT
 	_transport_method.send(server_info)
 
 
-func _on_hosting_started(info):
-	server_info = info
-	current_scene = server_info["current_scene"]
+func _on_hosting_started():
 	can_broadcast = true
 	sync = SessionManager.create_network_sync()
 	get_tree().change_scene_to_file(scene_after_server)
