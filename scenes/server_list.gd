@@ -9,7 +9,7 @@ var cleanup_timer := 0.0
 var session_node : Node
 
 func _ready():
-	session_node = SessionManager.create_client_session(SCRIPT_PATHS.CLIENT_SESSION)
+	session_node = await SessionManager.create_client_session(SCRIPT_PATHS.CLIENT_SESSION)
 	#_populate_server_list()
 	session_node.server_found.connect(_on_server_found)
 	session_node.start_discovery()

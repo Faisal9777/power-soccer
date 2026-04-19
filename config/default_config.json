@@ -1,5 +1,6 @@
 {
   "env": "prod",
-  "heartbeat_endpoint": "140.245.210.219:3000/heartbeat",
-  "cloud_server_endpoint": "140.245.210.219:3000"
+  "heartbeat_endpoint": "http://140.245.210.219:3000/heartbeat",
+  "cloud_server_endpoint": "http://140.245.210.219:3000",
+  "discovery": "http://140.245.210.219:3000/lobbies"
 }

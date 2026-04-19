@@ -2,7 +2,7 @@ extends Node
 
 signal server_started
 signal server_found(server_info)
-signal joined_server
+signal joined_server(network_sync)
 signal peer_joined(id: int)
 signal peer_left(id: int)
 signal all_peers_left
@@ -147,7 +147,8 @@ func _on_server_disconnected() -> void:
 	server_disconnected.emit()
 
 func _on_connection_successful() -> void:
-	joined_server.emit()
+	var sync = await SessionManager.create_network_sync()
+	joined_server.emit(sync)
 
 
 # =========================
