@@ -28,10 +28,10 @@ func _ready() -> void:
 	if "--server" in args:
 		GameState.is_host = true
 		GameState.is_dedicated = true
-		Configuration.load_config()
-		var id = _get_arg_value("id", args)
-		var port = _get_arg_value("port", args)
-		var session = SessionManager.create_cloud_server_session(SCRIPT_PATHS.SERVER_SESSION, id, port)
+		Config.load_config()
+		var id = _get_arg_value("--id", args)
+		var port = _get_arg_value("--port", args)
+		var session = await SessionManager.create_cloud_server_session(SCRIPT_PATHS.SERVER_SESSION, id, port)
 		session.host(Settings.player_name, C.LOBBY)
 		return
 
@@ -175,11 +175,13 @@ func _on_create_server() -> void:
 	# Register host in roster (peer 1) with ready=false
 	GameState.roster[1] = {"name": GameState.player_name, "ready": false}
 	var id := Crypto.new().generate_random_bytes(16).hex_encode()
-	var session_node = SessionManager.create_lan_server_session(SCRIPT_PATHS.SERVER_SESSION, id)
+	var session_node = await SessionManager.create_lan_server_session(SCRIPT_PATHS.SERVER_SESSION, id)
 	session_node.host(GameState.player_name, C.LOBBY)
 
 func _on_create_cloud_server() -> void:
 	print('request a backend for a server to host')
+	var session_node = await SessionManager.create_client_session(SCRIPT_PATHS.CLIENT_SESSION)
+	session_node.host_cloud_server()
 
 
 #func _on_connect_to_ip() -> void:

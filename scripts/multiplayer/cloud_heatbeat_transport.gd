@@ -2,16 +2,14 @@
 class_name CloudHeartbeatTransport
 extends IAnnounceTransport
 
-var http := HTTPRequest.new()
-var endpoint := ""
+var _http_service : HttpService
+var _endpoint := ""
 
-func _init(_endpoint: String):
-	endpoint = _endpoint
-
-func attach_to_node(node: Node):
-	node.add_child(http)
+func _init(endpoint: String, http_service):
+	_endpoint = endpoint
+	_http_service = http_service
 
 func send(payload: Dictionary) -> void:
 	var json = JSON.stringify(payload)
 	var headers = ["Content-Type: application/json"]
-	http.request(endpoint, headers, HTTPClient.METHOD_POST, json)
+	_http_service.post(_endpoint, headers, json)

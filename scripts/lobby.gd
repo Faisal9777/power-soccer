@@ -74,7 +74,7 @@ func _ready() -> void:
 	# --- Debug info ---
 	print("[lobby] whoami=", multiplayer.get_unique_id(),
 		" is_host=", GameState.is_host,
-		" is_dedicated=", GameState.is_dedicated_server(),
+		" is_dedicated2=", GameState.is_dedicated_server(),
 		" path=", get_path())
 
 	# --- Ensure host exists and has a team (listen-server only) ---

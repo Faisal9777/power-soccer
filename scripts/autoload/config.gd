@@ -1,5 +1,4 @@
 extends Node
-class_name Config
 
 var data: Dictionary = {}
 
