@@ -28,7 +28,7 @@ func setup(transport_method, id, port):
 
 func host(server_name, scene):
 	scene_after_server = scene
-	server_info["server_name"] = server_name
+	server_info["name"] = server_name
 	Network.peer_joined.connect(_on_peer_connected)
 	Network.server_started.connect(_on_hosting_started)
 	Network.host(server_info)

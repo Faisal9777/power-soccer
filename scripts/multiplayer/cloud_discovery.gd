@@ -4,28 +4,29 @@ class_name CloudDiscovery
 signal lobbies_received(lobbies: Array)
 signal discovery_failed(error: String)
 
+var can_search = false
 var endpoint: String
 var http_service: HttpService
 
 func _init(base_endpoint: String, node):
 	endpoint = base_endpoint
 	http_service = HttpService.new(node)
-
-
-func _init(base_endpoint: String, node):
-	endpoint = base_endpoint
-	http_service = HttpService.new(node)
-
-func _init(base_endpoint: String, node):
-	endpoint = base_endpoint
-	http_service = HttpService.new(node)
-
-
-func find_lobbies():
-	
-	http_service.http_get(endpoint, [])
 	http_service.request_completed.connect(_on_request_completed)
 
+func start_search(wait_time):
+	can_search = true
+	var timer = Timer.new()
+	timer.wait_time = 2.0
+	timer.autostart = wait_time
+	timer.timeout.connect(_find_data)
+	add_child(timer)
+
+func stop_search():
+	can_search = false
+
+func _find_data():
+	if can_search:
+		http_service.http_get(endpoint, [])
 
 func _on_request_completed(result, response_code, headers, body):
 	if response_code != 200:

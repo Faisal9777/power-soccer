@@ -19,6 +19,7 @@ func create_cloud_server_session(session_path: String, id, port) -> Node:
 
 func create_client_session(session_path: String) -> Node:
 	var endpoint = _get_endpoint("discovery")
+	print("the endpoint during client session creation; ", endpoint)
 	var discovery = CloudDiscovery.new(endpoint, self)
 	session_node = await _create_node(session_path, SESSION_NAME)
 	session_node.setup(discovery)
