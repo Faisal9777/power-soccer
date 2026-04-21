@@ -5,20 +5,23 @@ signal joined_server
 signal server_found(info)
 
 var cloud_discovery : CloudDiscovery
+var can_discover = false
 var http_service : HttpService
 var sync : Node
 var ENDPOINTS = preload("res://scripts/shared/endpoints.gd")
 
 func setup(discovery):
 	cloud_discovery = discovery
+	add_child(discovery)
 
 func stop_discovery():
 	Network.stop_discovery()
-	cloud_discovery.stop_discovery()
+	cloud_discovery.stop_search()
 
 func start_discovery():
 	cloud_discovery.lobbies_received.connect(_on_lobbies_found)
-	cloud_discovery.start_discovery()
+	cloud_discovery.discovery_failed.connect(_on_discovery_failed)
+	cloud_discovery.start_search(2.0)
 	Network.server_found.connect(_on_server_found)
 	Network.start_discovery()
 
@@ -49,7 +52,6 @@ func handle_data(msg, data):
 		_cl_sync_roster(data)
 
 func _on_request_completed(result, response_code, headers, body):
-	print("request completed")
 	if response_code != 200:
 		print("Failed")
 		return
@@ -60,6 +62,9 @@ func _on_request_completed(result, response_code, headers, body):
 
 func _on_server_found(info):
 	server_found.emit(info)
+
+func _on_discovery_failed(info):
+	print("discoveryy failed with: ", info)
 
 func _on_lobbies_found(lobbies):
 	for lobby in lobbies:

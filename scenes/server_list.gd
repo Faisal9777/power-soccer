@@ -19,11 +19,11 @@ func _process(delta : float):
 		Network.join("127.0.0.1", 24565)
 
 func _on_server_found(data):
-	
+	print("the server was found with data; ", data)
 	if not data.has("ip") or not data.has("port"):
 		return  # invalid packet
 
-
+	print("the id of the server after found: ", data)
 	var key = str(data.id)
 	#print("data: ", data) 
 	#print("known_servers: ", known_servers)
