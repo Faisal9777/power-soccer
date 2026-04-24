@@ -179,7 +179,6 @@ func _on_create_server() -> void:
 	session_node.host(GameState.player_name, C.LOBBY)
 
 func _on_create_cloud_server() -> void:
-	print('request a backend for a server to host')
 	var session_node = await SessionManager.create_client_session(SCRIPT_PATHS.CLIENT_SESSION)
 	session_node.host_cloud_server()
 

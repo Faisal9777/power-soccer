@@ -160,7 +160,6 @@ func clear() -> void:
 
 
 func close_connection() -> void:
-	GameState.clear()
 
 	var peer := multiplayer.multiplayer_peer
 	if peer != null and peer is ENetMultiplayerPeer:
