@@ -8,6 +8,8 @@ extends Control
 @onready var ready_btn: Button = $PanelContainer/VBoxContainer/HBoxContainer/ReadyButton
 @onready var match_size_opt: OptionButton = $PanelContainer/VBoxContainer/HBoxContainer/MatchSizeOption
 @onready var fill_bots_check: CheckButton = $PanelContainer/VBoxContainer/HBoxContainer/FillBotsCheck
+
+const C = preload("res://scripts/shared/scene.gd")
 const MIN_TEAM_SIZE := 1
 const MAX_TEAM_SIZE := 10
 
@@ -418,8 +420,7 @@ func _on_leave() -> void:
 		# Tell everyone we're going away; then close.
 		rpc("_rpc_host_is_leaving")
 	GameState.reset_lobby()
-	Network.close_connection()
-	get_tree().change_scene_to_file("res://scenes/title_screen.tscn")
+	SessionManager.exit(C.LOBBY)
 
 func _on_host_gone() -> void:
 	print("[lobby] host disconnected or left")

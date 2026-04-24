@@ -5,6 +5,7 @@ const SYNC_NAME = "Sync"
 
 var session_node: Node = null
 var sync_node: Node = null
+const C = preload("res://scripts/shared/scene.gd")
 const SCRIPT_PATH := preload("res://scripts/shared/script_path.gd")
 const LAN_PORT := 24565
 
@@ -36,6 +37,13 @@ func get_session() -> Node:
 
 func get_network_sync() -> Node:
 	return sync_node
+
+func exit(scene) -> void:
+	if scene == C.LOBBY:
+		GameState.clear()
+		session_node.queue_free()
+		Network.close_connection()
+		get_tree().change_scene_to_file(C.TITLE)
 
 func _create_node(node_path: String, node_name : String) -> Node:
 	var root = get_tree().root
