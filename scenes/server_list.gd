@@ -15,6 +15,7 @@ func _ready():
 	session_node.start_discovery()
 
 func _process(delta : float):
+	_check_server_status()
 	if Input.is_action_pressed("debug"):
 		Network.join("127.0.0.1", 24565)
 
