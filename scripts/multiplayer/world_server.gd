@@ -199,8 +199,8 @@ func _camera_setup(ball_path : NodePath, joystick_path : NodePath) -> void:
 	if cam.has_method("set_target"): cam.call_deferred("set_target", p)
 	if cam.has_method("activate"):   cam.call_deferred("activate")
 	if cam.has_method("set_ball"):   cam.call_deferred("set_ball", ball_path)
-	
-	var joystick : Node3D = get_node(joystick_path) 
+
+	var joystick : Node = get_node("/root/World/CanvasLayer/UI/JoyStick")
 	# NEW: give the camera its joystick
 	if joystick and cam.has_method("set_joystick"):
 		cam.call_deferred("set_joystick", joystick)

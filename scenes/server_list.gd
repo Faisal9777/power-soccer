@@ -13,13 +13,39 @@ func _ready():
 	#_populate_server_list()
 	session_node.server_found.connect(_on_server_found)
 	session_node.start_discovery()
+	scan_network()
 
 func _process(delta : float):
 	if Input.is_action_pressed("debug"):
 		Network.join("127.0.0.1", 24565)
+func get_local_subnet() -> String:
+	var ip = IP.get_local_addresses()
+	
+	for addr in ip:
+		if addr.begins_with("192.168.") or addr.begins_with("10."):
+			var parts = addr.split(".")
+			return parts[0] + "." + parts[1] + "." + parts[2] + "."
+	
+	return ""
+func scan_network():
+	var subnet = get_local_subnet()
+	print("SCAN STARTED. Subnet:", subnet)
+	
+	if subnet == "":
+		print("No valid subnet found")
+		return
+	for i in range(90, 121):   # ✅ 90 → 120
+		var ip = subnet + str(i)
+		print("Scanning:", ip)
+		_try_connect(ip)
+		await get_tree().create_timer(0.02).timeout
+		
+func _try_connect(ip: String):
+	Network.probe({
+		"ip": ip
+	})
 
 func _on_server_found(data):
-	
 	if not data.has("ip") or not data.has("port"):
 		return  # invalid packet
 

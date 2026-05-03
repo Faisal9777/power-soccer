@@ -52,6 +52,7 @@ func _ready() -> void:
 
 
 func set_joystick(n: Control) -> void:
+	print(n)
 	joystick = n
 
 # ----------------------------
@@ -260,21 +261,21 @@ func _process(delta: float) -> void:
 
 	# Use aim direction if your proxy includes it; otherwise just use forward
 	# (Optionally: store forward basis in the proxy if you want.)
-	var fwd_3d := -t_target.basis.z
-	var fwd_xz := Vector3(fwd_3d.x, 0.0, fwd_3d.z)
-	if fwd_xz.length_squared() < 1e-6:
-		fwd_xz = Vector3.FORWARD
-	else:
-		fwd_xz = fwd_xz.normalized()
+	var dir := Vector3(
+		cos(_pitch) * sin(_yaw),
+		sin(_pitch),
+		cos(_pitch) * cos(_yaw)
+	).normalized()
+
 
 	# First-person
 	if distance <= 0.05:
 		global_position = focus
-		look_at(focus + fwd_3d.normalized(), Vector3.UP)
+		look_at(focus + dir, Vector3.UP)
 		return
 
 	# Third-person desired position
-	var desired_pos := focus - fwd_xz * distance
+	var desired_pos := focus - dir * distance
 
 	# Wall avoidance ray
 	var space := get_world_3d().direct_space_state
@@ -291,7 +292,7 @@ func _process(delta: float) -> void:
 	# Smooth camera rig movement
 	var t := 1.0 - exp(-follow_speed * delta)
 	global_position = global_position.lerp(desired_pos, t)
-	look_at(focus + fwd_3d.normalized(), Vector3.UP)
+	look_at(focus + dir, Vector3.UP)
 
 # ----------------------------
 # FP/TP helpers (called from Game/World/UI)

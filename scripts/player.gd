@@ -276,6 +276,7 @@ func apply_net_input(d: Dictionary) -> void:
 
 func attach_camera(c: Camera3D, j: Node) -> void:
 	joystick = j
+	print(joystick)
 	cam = c
 	if cam and _is_local_owner():
 		_mark_self_layer_recursive(self)  # ✅ move my visuals to SELF layer only
@@ -352,14 +353,19 @@ func get_input_data() -> Dictionary:
 	else: 
 		mvx = Input.get_action_strength("move_right") - Input.get_action_strength("move_left")
 		mvz = Input.get_action_strength("move_forward") - Input.get_action_strength("move_back")
-	
+	var cam_yaw := rotation.y
+	if is_instance_valid(cam):
+		var forward = -cam.global_transform.basis.z
+		forward.y = 0
+		forward = forward.normalized()
+		cam_yaw = atan2(forward.x, forward.z)
 	var input := {
-			"mvx": mvx,
-			"mvz": mvz,
-			"yaw": _yaw_abs,
-			"pitch": _pitch_abs,
-			"sprint" : Input.is_action_pressed("sprint"),
-		}
+		"mvx": mvx,
+		"mvz": mvz,
+		"cam_yaw": cam_yaw,   # ✅ FIX
+		"pitch": _pitch_abs,
+		"sprint": Input.is_action_pressed("sprint"),
+	}
 	return input
 
 func update_player_states(input: Dictionary, delta) -> void:
@@ -569,7 +575,13 @@ func _update_arrow_position(delta: float) -> void:
 
 	_show_arrow(is_owner)
 	aim_arrow.global_position = P
-	aim_arrow.look_at(P + vec.normalized(), Vector3.UP)
+	var dir := vec.normalized()
+
+	var up := Vector3.UP
+	if abs(dir.dot(up)) > 0.98:
+		up = Vector3.FORWARD  # fallback when nearly vertical
+
+	aim_arrow.look_at(P + dir, up)
 	aim_arrow.scale = Vector3(1.0, 1.0, maxf(vec.length(), aim_min_len))
 
 func _resolve_ball() -> RigidBody3D:
@@ -626,7 +638,7 @@ func simulate_server(delta: float) -> void:
 		_update_cooldowns(delta)
 		_update_charge_server(delta)
 		apply_gravity(delta)
-		#_face_camera_yaw(delta)
+		_face_camera_yaw(delta)
 		#_update_player_facing_server(delta)
 		#_calculate_arrow_position(delta)
 		var input_dir := _get_input_dir_server()
@@ -863,15 +875,10 @@ func _handle_movement(inp, delta) -> void:
 		_move_server(input_dir, delta, is_sprinting)
 
 func _move_server(input_dir: Vector3, delta: float, is_sprinting : bool) -> void:
-	var mag := 1.0
-	if is_mobile and is_instance_valid(joystick):
-		# 0..1 how hard the stick is pushed
-		mag = clamp(joystick.mag, 0.0, 1.0)
+	var mag = clamp(Vector2(_net["mvx"], _net["mvz"]).length(), 0.0, 1.0)
 
-	# Base speed is picked ONLY from sprint toggle.
-	# Joystick magnitude just scales it down (analog walk).
 	var base_speed := sprint_speed if is_sprinting and _can_perform("sprint", stamina_sprint_drain * delta) else walk_speed
-	var target_speed := base_speed * mag
+	var target_speed = base_speed * mag
 
 # ✅ LATCH slow only on ground (NOT grapple)
 	if ball_latched and is_on_floor():
@@ -881,7 +888,7 @@ func _move_server(input_dir: Vector3, delta: float, is_sprinting : bool) -> void
 	var lateral := velocity
 	lateral.y = 0.0
 
-	var target_vel := input_dir * target_speed
+	var target_vel = input_dir * target_speed
 	var accel := 12.0 if is_on_floor() else 12.0 * air_control
 
 	var no_input := input_dir.length_squared() < 0.0001
@@ -1351,10 +1358,10 @@ func _end_tackle_server() -> void:
 
 func _face_camera_yaw(delta: float) -> void:
 	var target_yaw := float(_net.get("cam_yaw", rotation.y))
+	
 	var cur := rotation
 	cur.y = lerp_angle(cur.y, target_yaw, clamp(turn_speed * delta, 0.0, 1.0))
 	rotation = cur
-
 # Helper: face ball (body yaw + pivot pitch)
 func _face_ball_server() -> void:
 	_resolve_ball()

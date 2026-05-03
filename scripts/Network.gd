@@ -46,8 +46,26 @@ func host(info: Dictionary) -> void:
 	is_host = true
 	print("Server started on port ", port)
 	server_started.emit()
+	udp_discovery.bind(NetConfig.DISCOVERY_PORT)
+	udp_discovery.set_broadcast_enabled(true)
 
-
+func probe(data: Dictionary) -> void:
+	var ip: String = data.get("ip", "")
+	
+	if ip == "":
+		print("❌ Invalid probe data:", data)
+		return
+	
+	print("📡 Probing:", ip)
+	
+	var msg := {
+		"type": "DISCOVER"
+	}
+	
+	var json := JSON.stringify(msg)
+	
+	udp_discovery.set_dest_address(ip, NetConfig.DISCOVERY_PORT)
+	udp_discovery.put_packet(json.to_utf8_buffer())
 
 # =========================
 # JOIN
@@ -82,8 +100,8 @@ func start_discovery() -> void:
 		print("Discovery bind failed: %s" % err)
 		return
 
+	udp_discovery.bind(NetConfig.DISCOVERY_PORT)
 	udp_discovery.set_broadcast_enabled(true)
-
 
 func stop_discovery():
 	udp_discovery.close()
@@ -93,27 +111,41 @@ func _poll_discovery():
 	while udp_discovery.get_available_packet_count() > 0:
 		var packet = udp_discovery.get_packet()
 		var ip = udp_discovery.get_packet_ip()
+		var port = udp_discovery.get_packet_port()
 
 		var parsed = JSON.parse_string(packet.get_string_from_utf8())
 
-		# JSON.parse_string returns Variant (no .error)
 		if typeof(parsed) != TYPE_DICTIONARY:
 			continue
 
-		# ❗ Prevent self-detection (important)
+		# =========================
+		# 🟢 IF WE ARE HOST → RESPOND
+		# =========================
 		if is_host:
+			if parsed.get("type") == "DISCOVER":
+				
+				var response := {
+					"id": multiplayer.get_unique_id(),
+					"name": Settings.player_name,
+					"port": NetConfig.PORT
+				}
+				
+				udp_discovery.set_dest_address(ip, port)
+				udp_discovery.put_packet(JSON.stringify(response).to_utf8_buffer())
+			
 			continue
 
+		# =========================
+		# 🔵 IF CLIENT → RECEIVE SERVER
+		# =========================
 		parsed["ip"] = ip
 		server_found.emit(parsed)
-
 
 # =========================
 # PROCESS LOOP
 # =========================
 func _process(delta):
-	if not is_host:
-		_poll_discovery()
+	_poll_discovery()
 
 
 # =========================

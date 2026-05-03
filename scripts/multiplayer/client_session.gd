@@ -34,6 +34,7 @@ func join(server_info):
 	var port = server_info["port"]
 	Network.joined_server.connect(_on_joined_server)
 	Network.join(ip, port)
+	
 
 func handle_data(msg, data):
 	if msg == NetCodes.Msg.ROSTER_DATA:

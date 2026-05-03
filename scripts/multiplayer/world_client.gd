@@ -2,12 +2,12 @@ extends Node
 var GameClient := load("res://scripts/multiplayer/game_client.gd")
 # --- networking config ---
 @export var server_peer_id: int = 1
-
+var _visual_target: Vector3 = Vector3.ZERO
 # Name of the RPC on your network endpoint that sends a single input command to the server.
 # Change this string to match whatever your server endpoint exposes.
 # (Many people use: "receive_network_input" or "receive_client_input" or "sv_receive_input")
 @export var input_rpc_name: StringName = &"receive_network_input"
-
+@export var visual_deadzone := 0.05  # try 5–10 cm
 # How far "behind" we render remote players for smooth interpolation (ms)
 @export var remote_interp_delay_ms: int = 120
 @export var remote_buffer_max: int = 10
@@ -301,13 +301,13 @@ func _calculate_error_after_reconcile() -> void:
 	var corr := proxy.global_position - base.origin
 	var d := corr.length()
 
-	if d < deadzone:
+	if d < visual_deadzone:
 		return
 	if d > snap_dist:
 		_err = Vector3.ZERO
 	else:
-	
-		_err += corr
+		_err += corr * 0.25   # 0.1–0.3 works well
+		#_err += corr
 
 func _update_visual_position() -> void:
 	# Call from netcode _physics_process
@@ -388,8 +388,8 @@ func _camera_setup(ball_path : NodePath, joystick_path : NodePath) -> void:
 	if cam.has_method("set_target"): cam.call_deferred("set_target", proxy)
 	if cam.has_method("activate"):   cam.call_deferred("activate")
 	if cam.has_method("set_ball"):   cam.call_deferred("set_ball", ball_path)
-	
-	var joystick : Node3D = get_node(joystick_path) 
+
+	var joystick : Node = get_node("/root/World/CanvasLayer/UI/JoyStick") 
 	# NEW: give the camera its joystick
 	if joystick and cam.has_method("set_joystick"):
 		cam.call_deferred("set_joystick", joystick)
@@ -409,22 +409,30 @@ func _view_proxy_setup() -> void:
 	_have = true
 
 func _smooth_local_view(delta: float) -> void:
-	if not _players.has(multiplayer.get_unique_id()):
+	if not _have:
 		return
-	var p:= _players[multiplayer.get_unique_id()]
-
-	# Call from netcode _process. This is the ONLY writer of proxy transform.
-	if not _have: return
 
 	var frac := Engine.get_physics_interpolation_fraction()
 	var base := _t_prev.interpolate_with(_t_curr, frac)
 
-	var a := 1.0 - pow(0.001, delta * catchup_speed)
-	_err = _err.lerp(Vector3.ZERO, a)
+	var raw_target := base.origin
 
-	base.origin += _err
-	proxy.global_transform = base
+	# 🔥 Smooth the TARGET itself (this is the missing piece)
+	var target_lerp := 1.0 - pow(0.001, delta * 8.0)
+	_visual_target = _visual_target.lerp(raw_target, target_lerp)
 
+	var current := proxy.global_transform.origin
+	var dist := current.distance_to(_visual_target)
+
+	if dist < visual_deadzone:
+		return
+
+	var move_lerp := 1.0 - pow(0.001, delta * catchup_speed)
+	var new_pos := current.lerp(_visual_target, move_lerp)
+
+	proxy.global_transform.origin = new_pos
+	proxy.global_transform.basis = base.basis
+	
 func _on_server_disconnected() -> void:
 	if get_tree():
 		get_tree().change_scene_to_file("res://scenes/title_screen.tscn")
