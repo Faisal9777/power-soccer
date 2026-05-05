@@ -33,6 +33,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+mouse_filter = 0
 
 [node name="VBoxContainer" type="VBoxContainer" parent="CenterContainer"]
 layout_mode = 2
@@ -56,25 +57,65 @@ layout_mode = 2
 text = "Multiplayer
 "
 
-[node name="MultiplayerPopup" type="Window" parent="."]
+[node name="MultiplayerPopup1" type="Window" parent="."]
 scaling_3d_scale = 0.25
 title = "Multiplayer"
 size = Vector2i(460, 300)
 visible = false
 popup_window = true
 
-[node name="VBox" type="VBoxContainer" parent="MultiplayerPopup"]
+[node name="VBox" type="VBoxContainer" parent="MultiplayerPopup1"]
 offset_right = 40.0
 offset_bottom = 40.0
 
-[node name="FindServerButton" type="Button" parent="MultiplayerPopup/VBox"]
+[node name="FindServerButton" type="Button" parent="MultiplayerPopup1/VBox"]
 layout_mode = 2
 text = "Find Server"
 
-[node name="CreateServerButton" type="Button" parent="MultiplayerPopup/VBox"]
+[node name="CreateServerButton" type="Button" parent="MultiplayerPopup1/VBox"]
 layout_mode = 2
 text = "Create Server"
 
-[node name="CreateLanButton" type="Button" parent="MultiplayerPopup/VBox"]
+[node name="CreateLanButton" type="Button" parent="MultiplayerPopup1/VBox"]
 layout_mode = 2
 text = "Create LAN Server"
+
+[node name="MultiplayerPopup" type="CanvasLayer" parent="."]
+visible = false
+
+[node name="PanelContainer" type="PanelContainer" parent="MultiplayerPopup"]
+custom_minimum_size = Vector2(460, 300)
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -74.5
+offset_top = -50.5
+offset_right = 74.5
+offset_bottom = 50.5
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="MarginContainer" type="MarginContainer" parent="MultiplayerPopup/PanelContainer"]
+layout_mode = 2
+
+[node name="VBox" type="VBoxContainer" parent="MultiplayerPopup/PanelContainer/MarginContainer"]
+layout_mode = 2
+
+[node name="FindServerButton" type="Button" parent="MultiplayerPopup/PanelContainer/MarginContainer/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+text = "Find Server"
+
+[node name="CreateServerButton" type="Button" parent="MultiplayerPopup/PanelContainer/MarginContainer/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+text = "Create Server"
+
+[node name="CreateLanButton" type="Button" parent="MultiplayerPopup/PanelContainer/MarginContainer/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+text = "Create LAN Server"
+
+[connection signal="gui_input" from="CenterContainer" to="." method="_on_center_container_gui_input"]

@@ -385,9 +385,8 @@ func _camera_setup(ball_path : NodePath, joystick_path : NodePath) -> void:
 	# Wire camera (existing)
 	cam.current = true
 	
-	if cam.has_method("set_target"): cam.call_deferred("set_target", proxy)
+	cam.set_follow(proxy)
 	if cam.has_method("activate"):   cam.call_deferred("activate")
-	if cam.has_method("set_ball"):   cam.call_deferred("set_ball", ball_path)
 	
 	var joystick : Node3D = get_node(joystick_path) 
 	# NEW: give the camera its joystick

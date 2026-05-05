@@ -30,6 +30,7 @@ var _dp_accum: float = 0.0    # pitch delta since last read
 var _self_layer_mask: int
 var _aim_mode: bool = false
 var _target: Node3D
+var _follow_target: Node3D
 var _target_ball: Node3D
 @export var joystick_path :NodePath
 var joystick: Control = null
@@ -41,6 +42,7 @@ var _wheel_step: float = 0.7
 var _captured: bool = true
 var _pending_face_point: Vector3 = Vector3.ZERO
 var _has_pending_face: bool = false
+var _is_frozen := false
 @export var front_is_plus_z: bool = true
 
 func _ready() -> void:
@@ -86,12 +88,19 @@ func _set_active(on: bool) -> void:
 	set_process_input(on)
 	set_process_unhandled_input(on)
 
-func set_target(t: Node3D) -> void:
-	_target = t
+func set_follow(target: Node) -> void:
+	_follow_target = target
 
-func set_ball(ball_path: NodePath) -> void:
-	var ball := get_node(ball_path)
-	_target_ball = ball
+func focus_at(target: Node) -> void:
+	_target = target
+
+func face_at(target_pos: Vector3) -> void:
+	var origin = global_transform.origin
+	var dir = (target_pos - origin).normalized()
+
+	_yaw = atan2(dir.x, dir.z)
+	_pitch = clamp(asin(dir.y), _min_pitch, _max_pitch)
+
 
 # ----------------------------
 # Public toggle for UI/other code
@@ -122,13 +131,6 @@ func _unhandled_input(event: InputEvent) -> void:
 			_captured = true
 			Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 		return
-
-	elif event is InputEventMouseMotion and _captured:
-		var mm := event as InputEventMouseMotion
-		var sy: float = (1.0 if invert_y else -1.0)
-		_yaw -= mm.relative.x * mouse_sens
-		_pitch += mm.relative.y * mouse_sens * sy
-		_pitch = clamp(_pitch, _min_pitch, _max_pitch)
 
 	elif event is InputEventMouseButton and event.pressed:
 		var mb := event as InputEventMouseButton
@@ -179,73 +181,16 @@ func consume_facing_delta() -> Dictionary:
 	_dp_accum = 0.0
 	return {"yaw_delta": dy, "pitch_delta": dp}
 
-# ----------------------------
-# Camera follow / collision / FP/TP logic
-# ----------------------------
-#func _physics_process(delta: float) -> void:
-	#if _target == null:
-		#return
-#
-	## --- FOCUS MODE: look at the ball from player's head ---
-	#if _aim_mode and is_instance_valid(_target_ball):
-		#var focus := _target.global_transform.origin + Vector3(0.0, height, 0.0)
-		#global_transform.origin = focus
-		#look_at(_target_ball.global_transform.origin, Vector3.UP)
-		#return
-#
-	#var t_player := _target.global_transform
-	#var focus    := t_player.origin + Vector3(0.0, height, 0.0)
-#
-	#var pivot := _target.get_node_or_null("AimPivot") as Node3D
-	#var t_piv: Transform3D = pivot.global_transform if is_instance_valid(pivot) else t_player
-#
-	#var fwd_3d := (-t_piv.basis.z).normalized()
-	#var fwd_xz := Vector3(fwd_3d.x, 0.0, fwd_3d.z)
-	#if fwd_xz.length_squared() < 1e-6:
-		#fwd_xz = Vector3.FORWARD
-	#else:
-		#fwd_xz = fwd_xz.normalized()
-#
-	## ===== First-person =====
-	#if distance <= 0.05:
-		#global_transform.origin = focus
-		#look_at(focus + fwd_3d, Vector3.UP)
-		#return
-#
-	## ===== Third-person =====
-	#var desired_pos := focus - fwd_xz * distance
-#
-	## Wall avoidance, ignoring own player mesh
-	#var space := get_world_3d().direct_space_state
-	#var q := PhysicsRayQueryParameters3D.create(focus, desired_pos)
-	#q.collision_mask = collision_mask
-	#q.hit_from_inside = true
-#
-	#var hit := space.intersect_ray(q)
-#
-	#if not hit.is_empty():
-		#var collider: Object = hit.get("collider")
-		#var self_hit := false
-#
-		#if collider is Node3D:
-			#var col_node: Node3D = collider as Node3D
-			#if col_node == _target or _target.is_ancestor_of(col_node):
-				#self_hit = true
-#
-		#if self_hit:
-			#q.exclude = [collider]
-			#hit = space.intersect_ray(q)
-#
-	#if not hit.is_empty():
-		#var hit_pos: Vector3 = hit.position
-		#var back_dir: Vector3 = (focus - hit_pos).normalized()
-		#desired_pos = hit_pos + back_dir * collision_padding
-#
-	#var t := 1.0 - exp(-follow_speed * delta)
-	#global_transform.origin = global_transform.origin.lerp(desired_pos, t)
-	#look_at(focus + fwd_3d, Vector3.UP)
+
+func freeze(trigger) -> void:
+	_is_frozen = trigger
 
 func _process(delta: float) -> void:
+	var look_delta := InputManager.get_mouse_delta()
+	_update_facing(look_delta, delta)
+	
+
+func _process2(delta: float) -> void:
 	if not is_instance_valid(_target):
 		return
 
@@ -293,6 +238,56 @@ func _process(delta: float) -> void:
 	global_position = global_position.lerp(desired_pos, t)
 	look_at(focus + fwd_3d.normalized(), Vector3.UP)
 
+func _update_facing(look_delta, delta) -> void:
+	var sy: float = (1.0 if invert_y else -1.0)
+	_yaw -= look_delta.x * mouse_sens
+	_pitch -= look_delta.y * mouse_sens *sy
+	_pitch = clamp(_pitch, _min_pitch, _max_pitch)
+	_apply_rotation(delta)
+
+func _apply_rotation(delta) -> void:
+	if _is_frozen:
+		return
+
+	# --- 1. POSITION: always follow pivot (player) ---
+	var pivot = _follow_target
+	var focus: Vector3 = (pivot.global_position if is_instance_valid(pivot) else global_position) + Vector3(0.0, height, 0.0)
+
+	# --- 2. ROTATION SOURCE: yaw/pitch ONLY ---
+	
+	# If target exists → update yaw/pitch to face it
+	if is_instance_valid(_target):
+		print("should noot be called")
+		var dir = (_target.global_position - global_position).normalized()
+
+		_yaw = atan2(dir.x, dir.z)
+		_pitch = clamp(asin(dir.y), _min_pitch, _max_pitch)
+
+	# --- 3. Build forward from yaw/pitch ---
+	var cam_basis := Basis(Vector3.UP, _yaw) * Basis(Vector3.RIGHT, _pitch)
+	var fwd_3d := -cam_basis.z
+	var fwd_xz := Vector3(fwd_3d.x, 0.0, fwd_3d.z).normalized()
+
+	# --- 4. Position camera behind pivot ---
+	var desired_pos := focus - fwd_xz * distance
+
+	# --- 5. Wall avoidance ---
+	var space := get_world_3d().direct_space_state
+	var q := PhysicsRayQueryParameters3D.create(focus, desired_pos)
+	q.collision_mask = collision_mask
+	q.hit_from_inside = true
+
+	var hit := space.intersect_ray(q)
+	if not hit.is_empty():
+		var back_dir: Vector3 = (focus - hit.position).normalized()
+		desired_pos = hit.position + back_dir * collision_padding
+
+	# Smooth follow
+	var t := 1.0 - exp(-follow_speed * delta)
+	global_position = global_position.lerp(desired_pos, t)
+
+	# --- 6. Apply rotation (ONLY yaw/pitch) ---
+	look_at(global_position + fwd_3d, Vector3.UP)
 # ----------------------------
 # FP/TP helpers (called from Game/World/UI)
 # ----------------------------

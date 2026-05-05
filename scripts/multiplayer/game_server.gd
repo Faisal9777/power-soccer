@@ -294,7 +294,8 @@ func _position_players2() -> void:
 				p.global_transform = sp.global_transform
 				red_placed += 1
 		# tell that specific client to aim their camera
-		p.focus_at(ball)
+		
+		p.face_at(ball_spawn.global_transform.origin)
 		p.freeze(true)
 
 func _spawn_players_from_roster() -> void:

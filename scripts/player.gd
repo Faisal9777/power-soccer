@@ -277,6 +277,15 @@ func apply_net_input(d: Dictionary) -> void:
 func attach_camera(c: Camera3D, j: Node) -> void:
 	joystick = j
 	cam = c
+	
+	cam.tree_exiting.connect(func():
+		print("camera is being freed! Stack:")
+		print(get_stack())
+	)
+	if cam:
+		print("cam is not null after attached in; ", multiplayer.get_unique_id())
+	else:
+		print("cam is null after attached in; ", multiplayer.get_unique_id())
 	if cam and _is_local_owner():
 		_mark_self_layer_recursive(self)  # ✅ move my visuals to SELF layer only
 		cam.current = true
@@ -1057,6 +1066,8 @@ func get_aim_arrow_position() -> Transform3D:
 
 func freeze(toggle : bool) -> void:
 	_is_frozen = toggle
+	if cam:
+		cam.freeze(toggle)
 
 
 func _debug_red_dot(ball: Node3D,p: Vector3, seconds: float = 1.5, size: float = 0.06) -> void:
@@ -1360,10 +1371,10 @@ func _face_ball_server() -> void:
 	_resolve_ball()
 	if current_ball == null or !is_instance_valid(current_ball):
 		return
-	focus_at(current_ball)
+	face_at(current_ball.global_transform.origin)
 	
-func focus_at(current_ball : Node3D) -> void:
-	var ball_pos: Vector3 = current_ball.global_transform.origin
+func face_at(target_postion : Vector3) -> void:
+	var ball_pos: Vector3 = target_postion
 	var body_pos: Vector3 = global_transform.origin
 	var pivot_pos: Vector3 = (aim_pivot.global_transform.origin if is_instance_valid(aim_pivot) else body_pos)
 
@@ -1385,6 +1396,9 @@ func focus_at(current_ball : Node3D) -> void:
 		var pr := aim_pivot.rotation
 		pr.x = clamp(pitch, min_pitch, max_pitch)
 		aim_pivot.rotation = pr
+	if cam:
+		cam.face_at(target_postion)
+	
 func _update_player_facing_server(delta: float) -> void:
 	if !multiplayer.is_server(): return
 

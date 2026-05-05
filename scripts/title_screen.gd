@@ -7,10 +7,15 @@ extends Control
 @onready var btn_multi: Button = $CenterContainer/VBoxContainer/MultiPlayerButton
 @onready var quit_btn: Button = vb.get_node_or_null("QuitButton")
 
-@onready var popup: Window = $MultiplayerPopup
-@onready var btn_find: Button = $MultiplayerPopup/VBox/FindServerButton
-@onready var btn_create: Button = $MultiplayerPopup/VBox/CreateServerButton
-@onready var btn_lan_create: Button = $MultiplayerPopup/VBox/CreateLanButton
+#@onready var popup: Window = $MultiplayerPopup
+#@onready var btn_find: Button = $MultiplayerPopup/VBox/FindServerButton
+#@onready var btn_create: Button = $MultiplayerPopup/VBox/CreateServerButton
+#@onready var btn_lan_create: Button = $MultiplayerPopup/VBox/CreateLanButton
+
+@onready var popup: CanvasLayer = $MultiplayerPopup
+@onready var btn_find: Button = $MultiplayerPopup/PanelContainer/MarginContainer/VBox/FindServerButton
+@onready var btn_create: Button = $MultiplayerPopup/PanelContainer/MarginContainer/VBox/CreateServerButton
+@onready var btn_lan_create: Button = $MultiplayerPopup/PanelContainer/MarginContainer/VBox/CreateLanButton
 
 # (Optional) add a Label under the popup to show status and point this path to it.
 @onready var status_label: Label = $MultiplayerPopup/VBox/Label if has_node("MultiplayerPopup/VBox/Label") else null
@@ -148,7 +153,8 @@ func _start_game() -> void:
 		get_tree().change_scene_to_file(game_scene_path)
 
 func _open_multiplayer_screen() -> void:
-	popup.popup_centered(Vector2i(460, 300))
+	#popup.popup_centered(Vector2i(460, 300))
+	popup.show()
 	await get_tree().process_frame
 	btn_find.grab_focus()
 
@@ -443,3 +449,8 @@ func _create_graphics_settings_ui() -> Control:
 
 func _apply_graphics_settings(fullscreen: bool, vsync: bool, quality: int, tex_quality: int, scale_3d: float) -> void:
 	Settings.set_and_save(fullscreen, vsync, quality, tex_quality, scale_3d)
+
+
+func _on_center_container_gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.pressed:
+		popup.hide()

@@ -12,6 +12,14 @@ var server_info = {}
 var can_broadcast := false
 var sync : Node
 const C = preload("res://scripts/shared/scene.gd")
+const server_phase = {
+	STARTING = "starting",
+	RUNNING = "running",
+	INGAME = "ingame",
+	STOPPING = "stopping",
+	STOPPED = "stopped",
+	ERROR = "error"
+}
 
 func set_current_scene(scene : String):
 	current_scene = scene
@@ -43,8 +51,15 @@ func disable_broadcast():
 func toggle_broadcast(trigger):
 	can_broadcast = trigger
 
+func start_game() -> void:
+	current_scene = C.WORLD
+
 func _broadcast():
 	if can_broadcast:
+		if current_scene == C.LOBBY:
+			server_info["status"] = server_phase.RUNNING
+		elif current_scene == C.WORLD:
+			server_info["status"] = server_phase.INGAME
 		server_info["lobby_size"] = GameState.get_lobby_size()
 		server_info["players_connected"] = GameState.get_players_connected()
 		_transport_method.send(server_info)
