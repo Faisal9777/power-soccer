@@ -287,7 +287,7 @@ func _position_players2() -> void:
 				red_placed += 1
 		# tell that specific client to aim their camera
 		_init_entry(pid, name, team)
-		p.focus_at(ball)
+		p.face_at(ball.global_transform.origin)
 		p.freeze(true)
 
 func process_data(data : Dictionary, msg : StringName) -> void:

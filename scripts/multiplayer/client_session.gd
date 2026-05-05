@@ -10,6 +10,10 @@ var http_service : HttpService
 var sync : Node
 var ENDPOINTS = preload("res://scripts/shared/endpoints.gd")
 
+const REQUEST_TIMEOUT_MS = 10.0  # seconds
+
+var _timeout_timer: SceneTreeTimer = null
+
 func setup(discovery):
 	cloud_discovery = discovery
 	add_child(discovery)
@@ -29,21 +33,21 @@ func change_state(state_info: String):
 	get_tree().change_scene_to_file(state_info)
 
 func host_cloud_server():
-	http_service = HttpService.new(self)
-	Config.load_config()
-	var url = Config.get_value("cloud_server_endpoint") + ENDPOINTS.CREATE_LOBBY
-	
-	var headers = ["Content-Type: application/json"]
-	var body = "{}" # can send player info later
-	print('the url is: ', url)
-	http_service.request_completed.connect(_on_request_completed)
+	BlockingOverlay.show_overlay("Creating Server...") 
+	http_service = HttpService.new(self) 
+	Config.load_config() 
+	var url = Config.get_value("cloud_server_endpoint") + ENDPOINTS.CREATE_LOBBY 
+	var headers = ["Content-Type: application/json"] 
+	var body = "{}"
+	http_service.request_completed.connect(_on_request_completed) 
 	http_service.post(url, headers, body)
+
+	_timeout_timer = get_tree().create_timer(REQUEST_TIMEOUT_MS)
+	_timeout_timer.timeout.connect(_on_request_timeout)
 
 func join(server_info):
 	var ip = server_info["ip"]
 	var port = server_info["port"]
-	print("the ip is; ", ip)
-	print("the port is; ", port)
 	Network.joined_server.connect(_on_joined_server)
 	Network.join(ip, port)
 
@@ -52,13 +56,24 @@ func handle_data(msg, data):
 		_cl_sync_roster(data)
 
 func _on_request_completed(result, response_code, headers, body):
+	if _timeout_timer:
+		_timeout_timer.timeout.disconnect(_on_request_timeout)
+		_timeout_timer = null
 	if response_code != 200:
+		BlockingOverlay.hide()
 		print("Failed")
 		return
 
 	var json = JSON.parse_string(body.get_string_from_utf8())
 
 	join(json)
+
+func _on_request_timeout() -> void:
+	BlockingOverlay.hide_overlay()
+	http_service.request_completed.disconnect(_on_request_completed)
+	print("Server creation timed out")
+	# show error to user here
+
 
 func _on_server_found(info):
 	server_found.emit(info)
@@ -75,6 +90,6 @@ func _on_joined_server(sync):
 	sync.send_data_id(1, NetCodes.Msg.REGISTER_PEER, payload)
 
 func _cl_sync_roster(server_info):
-	
+	BlockingOverlay.hide()
 	GameState.roster = server_info["roster"]
 	get_tree().change_scene_to_file(server_info["scene"])

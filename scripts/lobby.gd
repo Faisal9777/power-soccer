@@ -620,7 +620,7 @@ func _try_start_match() -> void:
 		return
 	for pid in GameState.roster.keys():
 		GameState.roster[pid]["ready"] = false
-	SessionManager.session_node.disable_broadcast()
+	SessionManager.session_node.start_game()
 	rpc("_rpc_start_match", WORLD_SCENE)
 
 

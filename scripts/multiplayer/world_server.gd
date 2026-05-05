@@ -36,7 +36,6 @@ func start_init(players: Dictionary,
 	if _is_also_player:
 		_peers_ready += 1
 		_camera_setup(ball_path, joystick_path)
-	print("ball path: ", ball_scene.get_path())
 	#_debug_data(roster, ingame, ball_scene, blue_spawns, red_spawns)
 	var data := {"roster" : roster, "state_path": ingame.get_path(), "ball_path" : ball_scene.get_path(),
 	"blue_path" : blue_spawns.get_path(), "red_path" : red_spawns.get_path(), "joystick_path": joystick_path}
@@ -120,6 +119,7 @@ func _ready() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	return
 	if _is_also_player:
 		var p : Node = _players[multiplayer.get_unique_id()]
 		var inp_data := p.get_input_data() as Dictionary
@@ -196,18 +196,16 @@ func _camera_setup(ball_path : NodePath, joystick_path : NodePath) -> void:
 
 	# Wire camera (existing)
 	cam.current = true
-	if cam.has_method("set_target"): cam.call_deferred("set_target", p)
+
+	cam.set_follow(p)
 	if cam.has_method("activate"):   cam.call_deferred("activate")
-	if cam.has_method("set_ball"):   cam.call_deferred("set_ball", ball_path)
 	
 	var joystick : Node3D = get_node(joystick_path) 
 	# NEW: give the camera its joystick
 	if joystick and cam.has_method("set_joystick"):
 		cam.call_deferred("set_joystick", joystick)
+	p.attach_camera(cam, joystick)
 
-	# Hand joystick to player (as you already do)
-	if p.has_method("attach_camera"):
-		p.call_deferred("attach_camera", cam, joystick)
 
 #func _update_local_player_states(delta : float) -> void:
 	#for peer_id in _players_input.keys():
