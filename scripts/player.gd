@@ -865,17 +865,19 @@ func _handle_action_server(input_dir: Vector3, delta: float) -> void:
 
 func _handle_movement(inp, delta) -> void:
 	if _cooldowns["move"] == 0.0:
-		var yaw := rotation.y
+		var yaw := float(inp.get("cam_yaw", inp.get("yaw", rotation.y)))
 		var fwd := Vector3.FORWARD.rotated(Vector3.UP, yaw); fwd.y = 0.0; fwd = fwd.normalized()
 		var right := Vector3.RIGHT.rotated(Vector3.UP, yaw); right.y = 0.0; right = right.normalized()
-		var mvx := float(inp["mvx"])
-		var mvz := float(inp["mvz"])
+		var mvx := float(inp.get("mvx", 0.0))
+		var mvz := float(inp.get("mvz", 0.0))
 		var input_dir := (right * mvx + fwd * mvz).normalized()
-		var is_sprinting : bool = inp.get("sprint")
-		_move_server(input_dir, delta, is_sprinting)
+		var is_sprinting := bool(inp.get("sprint", false))
+		_move_server(input_dir, delta, is_sprinting, inp)
 
-func _move_server(input_dir: Vector3, delta: float, is_sprinting : bool) -> void:
-	var mag = clamp(Vector2(_net["mvx"], _net["mvz"]).length(), 0.0, 1.0)
+func _move_server(input_dir: Vector3, delta: float, is_sprinting : bool, inp: Dictionary = {}) -> void:
+	var mvx := float(inp.get("mvx", _net.get("mvx", 0.0)))
+	var mvz := float(inp.get("mvz", _net.get("mvz", 0.0)))
+	var mag = clamp(Vector2(mvx, mvz).length(), 0.0, 1.0)
 
 	var base_speed := sprint_speed if is_sprinting and _can_perform("sprint", stamina_sprint_drain * delta) else walk_speed
 	var target_speed = base_speed * mag

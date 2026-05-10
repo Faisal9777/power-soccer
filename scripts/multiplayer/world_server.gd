@@ -11,6 +11,7 @@ var _is_also_player := true
 # Input pump
 const NET_INPUT_HZ: float = 30.0
 var last_server_seq:= {}
+var last_received_seq := {}
 func start_init(players: Dictionary,
 	ingame: Node,
 	blue_spawns: Node3D,
@@ -60,13 +61,15 @@ func process_input(cmd: Dictionary, peer_id: int) -> void:
 	if not _players_input.has(peer_id):
 		_players_input[peer_id] = {}   # will store the LATEST cmd (Dictionary)
 		last_server_seq[peer_id] = -1
+		last_received_seq[peer_id] = -1
 
-	var last := int(last_server_seq[peer_id])
+	var last := int(last_received_seq.get(peer_id, -1))
 	if seq <= last:
 		return # old/out-of-order
 
-	# ✅ Missing-seq-proof: keep ONLY the latest cmd; overwrite older
-	last_server_seq[peer_id] = seq
+	# Missing-seq-proof: keep ONLY the latest cmd; overwrite older.
+	# last_server_seq is updated after the command is actually simulated.
+	last_received_seq[peer_id] = seq
 	_players_input[peer_id] = cmd
 
 #func process_input(cmd: Dictionary, peer_id : int) -> void:
@@ -234,9 +237,15 @@ func _update_local_player_states(delta : float) -> void:
 
 		var player: Node = _players[peer_id]
 		var cmd := _players_input[peer_id] as Dictionary
+		var seq := int(cmd.get("seq", -1))
+		var last_applied := int(last_server_seq.get(peer_id, -1))
 
-		# If you want, you can add a timeout safety here later.
-		player.update_player_states(cmd, delta)
+		if seq > last_applied and player.has_method("apply_net_input"):
+			player.apply_net_input(cmd)
+		if player.has_method("update_player_states"):
+			player.update_player_states(cmd, delta)
+		if seq >= 0 and seq > last_applied:
+			last_server_seq[peer_id] = seq
 
 func _on_peer_left(id : int) -> void:
 	pass

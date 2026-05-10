@@ -1,5 +1,8 @@
 extends Control
 
+var _server_config_ui: Control = null
+var _create_mode := ""  # "lan" or "cloud"
+
 @export var game_scene_path: String = "res://scenes/world.tscn"
 
 @onready var vb := $CenterContainer/VBoxContainer
@@ -158,43 +161,10 @@ func _on_find_server() -> void:
 	get_tree().change_scene_to_file(C.SERVER_LIST)
 
 func _on_create_server() -> void:
-	print('_on_create_server')
-	# Identity
-	GameState.reset_lobby()
-	if GameState.player_name == "" or GameState.player_name == "Player":
-		GameState.player_name = "Fardin Eajdani"  # or make dynamic if you add a name field
-	GameState.is_host = true
-
-	# Start ENet server and go to lobby
-	GameState.player_name = Settings.player_name
-	GameState.id = 1
-	GameState.roster[1] = {"name": GameState.player_name, "ready": false, "team": GameState.Team.BLUE} # team optional
-	
-	var lan := get_lan_ip()
-	print("Hosting on UDP 24565, LAN IP =", lan)
-	# Register host in roster (peer 1) with ready=false
-	GameState.roster[1] = {"name": GameState.player_name, "ready": false}
-	var id := Crypto.new().generate_random_bytes(16).hex_encode()
-	var session_node = SessionManager.create_lan_server_session(SCRIPT_PATHS.SERVER_SESSION, id)
-	session_node.host(GameState.player_name, C.LOBBY)
+	_open_server_config("lan")
 
 func _on_create_cloud_server() -> void:
-	print('request a backend for a server to host')
-
-
-#func _on_connect_to_ip() -> void:
-#
-	#GameState.is_host = false
-	#GameState.reset_lobby()
-	#GameState.player_name = Settings.player_name
-	#GameState.id = randi()
-	#GameState.roster[GameState.id] = {"name": GameState.player_name, "ready": false}
-#
-	#_set_status("Connecting to %s…" % ip)
-	#_set_connect_ui_enabled(false)
-#
-	## Use the typed IP here:
-	#Network.join(ip)
+	_open_server_config("cloud")
 
 func get_lan_ip() -> String:
 	for addr in IP.get_local_addresses():  # PackedStringArray of addresses
@@ -442,3 +412,150 @@ func _create_graphics_settings_ui() -> Control:
 
 func _apply_graphics_settings(fullscreen: bool, vsync: bool, quality: int, tex_quality: int, scale_3d: float) -> void:
 	Settings.set_and_save(fullscreen, vsync, quality, tex_quality, scale_3d)
+
+func _open_server_config(mode: String) -> void:
+	_create_mode = mode
+
+	# ✅ Hide main multiplayer popup
+	if popup:
+		popup.hide()
+
+	if _server_config_ui == null:
+		_server_config_ui = _create_server_config_ui()
+		add_child(_server_config_ui)
+
+	_server_config_ui.visible = true
+
+func _create_server_config_ui() -> Control:
+	var root := Control.new()
+	root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	root.visible = false
+
+	# Background dim
+	var dim := ColorRect.new()
+	dim.color = Color(0,0,0,0.6)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	root.add_child(dim)
+
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	root.add_child(center)
+
+	var panel := Panel.new()
+	panel.custom_minimum_size = Vector2i(420, 420)
+	center.add_child(panel)
+
+	var v := VBoxContainer.new()
+	v.set_anchors_preset(Control.PRESET_FULL_RECT)
+	v.offset_left = 16
+	v.offset_right = -16
+	v.offset_top = 16
+	v.offset_bottom = -16
+	v.add_theme_constant_override("separation", 12)
+	panel.add_child(v)
+
+	# --- TITLE ---
+	var title := Label.new()
+	title.text = "Create Server"
+	title.add_theme_font_size_override("font_size", 20)
+	v.add_child(title)
+
+	# --- SERVER NAME ---
+	var name_label := Label.new()
+	name_label.text = "Server Name"
+	v.add_child(name_label)
+
+	var name_input := LineEdit.new()
+	name_input.placeholder_text = "My Server"
+	name_input.text = Settings.player_name + "'s Server"
+	v.add_child(name_input)
+
+	# --- PUBLIC / PRIVATE ---
+	var public_toggle := CheckBox.new()
+	public_toggle.text = "Public Server"
+	public_toggle.button_pressed = true
+	v.add_child(public_toggle)
+
+	# --- PASSWORD TOGGLE ---
+	var password_toggle := CheckBox.new()
+	password_toggle.text = "Enable Password"
+	password_toggle.button_pressed = false
+	v.add_child(password_toggle)
+
+	# --- PASSWORD INPUT ---
+	var password_input := LineEdit.new()
+	password_input.placeholder_text = "Enter password"
+	password_input.secret = true
+	password_input.visible = false
+	v.add_child(password_input)
+
+	# Toggle visibility
+	password_toggle.toggled.connect(func(enabled):
+		password_input.visible = enabled
+	)
+
+	# --- BUTTONS ---
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_END
+	v.add_child(row)
+
+	var cancel := Button.new()
+	cancel.text = "Cancel"
+
+	var create := Button.new()
+	create.text = "Create"
+
+	row.add_child(cancel)
+	row.add_child(create)
+
+	# --- LOGIC ---
+	cancel.pressed.connect(func():
+		root.hide()
+	)
+
+	create.pressed.connect(func():
+		var server_name = name_input.text.strip_edges()
+		if server_name == "":
+			server_name = "My Server"
+
+		var is_public = public_toggle.button_pressed
+		var use_password = password_toggle.button_pressed
+		var password = password_input.text if use_password else ""
+
+		root.hide()
+
+		_create_server_final(server_name, is_public, password)
+	)
+
+	return root
+	
+func _create_server_final(name: String, is_public: bool, password: String) -> void:
+	GameState.reset_lobby()
+	GameState.player_name = Settings.player_name
+	GameState.is_host = true
+
+	GameState.roster[1] = {
+		"name": GameState.player_name,
+		"ready": false
+	}
+
+	var id := Crypto.new().generate_random_bytes(16).hex_encode()
+
+	if _create_mode == "lan":
+		var session = SessionManager.create_lan_server_session(SCRIPT_PATHS.SERVER_SESSION, id)
+		GameState.info.name = name
+		GameState.info.is_lan = true
+		GameState.info.port= 24565
+		GameState.info.max_players  = 10
+		GameState.info.players = 1
+
+		# Attach metadata
+		session.server_info["server_name"] = name
+		session.server_info["is_public"] = is_public
+		session.server_info["has_password"] = password != ""
+		session.server_info["password"] = password
+
+		session.host(name, C.LOBBY)
+
+	elif _create_mode == "cloud":
+		print("TODO: cloud server creation")

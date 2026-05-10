@@ -14,6 +14,9 @@ var _visual_target: Vector3 = Vector3.ZERO
 @export var catchup_speed := 18.0
 @export var deadzone := 0.02
 @export var snap_dist := 2.5
+@export var local_reconcile_deadzone := 0.12
+@export var local_reconcile_blend := 0.35
+@export var local_reconcile_snap_dist := 3.0
 
 var proxy : Node3D 
 var anchor: Node3D
@@ -28,7 +31,7 @@ var _have := false
 var _players: Dictionary[int, Node] = {}  # peer_id -> Player node
 # --- local prediction/reconciliation ---
 var _pending_inputs: Array[Dictionary] = []   # only for LOCAL player
-var _next_input_seq: int = -1
+var _next_input_seq: int = 0
 
 var _latest_local_snapshot: Dictionary = {}   # newest snapshot waiting to reconcile
 var _latest_local_snapshot_id: int = -1       # ordering guard (server_tick or last_server_seq)
@@ -125,11 +128,9 @@ func _physics_process(delta: float) -> void:
 	_reconcile_player(me)
 
 	# 2) Local prediction + send input
-	var cmd: Dictionary = {}
-	if me.has_method("get_input_data"):
-		cmd = me.get_input_data() as Dictionary
-	else:
-		print("ERROR: me has no get_input_data()")
+	var cmd := _gather_local_command(me)
+	if cmd.is_empty():
+		print("ERROR: could not gather local input")
 		return
 
 	cmd["seq"] = _next_input_seq
@@ -138,7 +139,9 @@ func _physics_process(delta: float) -> void:
 	var stored := cmd.duplicate(true)
 	_pending_inputs.append(stored)
 
-	_predict_position(me, stored, delta)
+	if me.has_method("apply_net_input"):
+		me.apply_net_input(stored)
+	_predict_position(me, stored, _fixed_dt)
 	if not multiplayer.is_server():
 		if is_instance_valid(_network_endpoint):
 			#print("Sending input seq=", int(stored.get("seq", -1)), " to server_peer_id=", server_peer_id)
@@ -148,6 +151,8 @@ func _physics_process(delta: float) -> void:
 
 	if _pending_inputs.size() > 256:
 		_pending_inputs = _pending_inputs.slice(_pending_inputs.size() - 256, _pending_inputs.size())
+	if is_instance_valid(_network_endpoint) and _network_endpoint.has_method("_reset_inputs"):
+		_network_endpoint.call("_reset_inputs")
 
 
 func _process(_delta: float) -> void:
@@ -233,11 +238,6 @@ func _store_snapshots(snapshots: Dictionary) -> void:
 				"snap": snap
 			})
 
-			# Optional: update internal state too (animations, etc.) if apply_snapshot exists.
-			# We'll still override transform in interpolation, but internal vars can be useful.
-			if p.has_method("apply_snapshot"):
-				p.apply_snapshot(snap)
-
 			while _remote_buf[peer_id].size() > remote_buffer_max:
 				_remote_buf[peer_id].pop_front()
 
@@ -269,6 +269,7 @@ func _reconcile_local(p: Node, snap: Dictionary, delta : float) -> void:
 
 
 func _reconcile_local_best_practice(p: Node3D, snap: Dictionary) -> void:
+	var predicted_pos := p.global_position
 
 	# --- B) apply authoritative snap (server state) ---
 	if p.has_method("apply_snapshot"):
@@ -289,7 +290,15 @@ func _reconcile_local_best_practice(p: Node3D, snap: Dictionary) -> void:
 
 	# --- D) replay remaining inputs using FIXED dt (determinism) ---
 	for cmd in _pending_inputs:
+		if p.has_method("apply_net_input"):
+			p.apply_net_input(cmd)
 		p.update_player_states(cmd, _fixed_dt)
+	var corrected_pos := p.global_position
+	var reconcile_error := predicted_pos.distance_to(corrected_pos)
+	if reconcile_error <= local_reconcile_deadzone:
+		p.global_position = predicted_pos
+	elif reconcile_error < local_reconcile_snap_dist:
+		p.global_position = predicted_pos.lerp(corrected_pos, clampf(local_reconcile_blend, 0.0, 1.0))
 	_calculate_error_after_reconcile()
 
 func _calculate_error_after_reconcile() -> void:
@@ -332,6 +341,13 @@ func _predict_position(me : Node, stored : Dictionary, delta : float) -> void:
 		print("ERROR: me has no update_player_states(input, delta)")
 		return
 	_update_visual_position()
+
+func _gather_local_command(me: Node) -> Dictionary:
+	if is_instance_valid(_network_endpoint) and _network_endpoint.has_method("_gather_input"):
+		return _network_endpoint.call("_gather_input") as Dictionary
+	if me.has_method("get_input_data"):
+		return me.get_input_data() as Dictionary
+	return {}
 
 # ---------- Helpers ----------
 #func _snap_to_xform(snap: Dictionary, fallback_node: Node) -> Transform3D:
@@ -406,6 +422,8 @@ func _view_proxy_setup() -> void:
 		return
 	_t_prev = anchor.global_transform
 	_t_curr = anchor.global_transform
+	_visual_target = anchor.global_position
+	proxy.global_transform = anchor.global_transform
 	_have = true
 
 func _smooth_local_view(delta: float) -> void:

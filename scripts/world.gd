@@ -848,6 +848,8 @@ func _physics_process(delta: float) -> void:
 	#_send_local_input(inputs)
 	#_perf_tick(delta)
 	_update_inputs() 
+	if not multiplayer.is_server():
+		return
 	_input_accum += delta
 	var step: float = 1.0 / NET_INPUT_HZ
 	while _input_accum >= step:

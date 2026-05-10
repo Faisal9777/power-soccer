@@ -50,8 +50,12 @@ func _process(delta : float):
 func _broadcast():
 	server_info["lobby_size"] = GameState.get_lobby_size()
 	server_info["players_connected"] = GameState.get_players_connected()
-	_transport_method.send(server_info)
 
+	# ✅ ADD THIS
+	server_info["name"] = server_info.get("server_name", "Unnamed Server")
+
+	_transport_method.send(server_info)
+	
 
 func _on_hosting_started():
 	can_broadcast = true

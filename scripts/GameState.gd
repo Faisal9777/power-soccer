@@ -1,5 +1,6 @@
 # GameState.gd
 extends Node
+var info := ServerInfo.new()
 
 enum Team { BLUE = 0, RED = 1 }
 enum Role { GOALKEEPER = 0, MIDFIELDER = 1, FORWARD = 2 }  # ⬅ NEW

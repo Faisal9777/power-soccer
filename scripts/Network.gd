@@ -126,7 +126,9 @@ func _poll_discovery():
 				
 				var response := {
 					"id": multiplayer.get_unique_id(),
-					"name": Settings.player_name,
+					"name": GameState.info.name,
+					"players": GameState.get_players_connected(),
+					"max_players": 10,
 					"port": NetConfig.PORT
 				}
 				
