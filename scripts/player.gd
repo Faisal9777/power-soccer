@@ -850,8 +850,8 @@ func apply_gravity(delta: float) -> void:
 
 func _get_input_dir_server() -> Vector3:
 	var yaw := float(_net.get("cam_yaw", rotation.y))
-	var fwd := Vector3.FORWARD.rotated(Vector3.UP, yaw); fwd.y = 0.0; fwd = fwd.normalized()
-	var right := Vector3.RIGHT.rotated(Vector3.UP, yaw); right.y = 0.0; right = right.normalized()
+	var fwd := Vector3.BACK.rotated(Vector3.UP, yaw)
+	var right := Vector3.LEFT.rotated(Vector3.UP, yaw); right.y = 0.0; right = right.normalized()
 	var mvx := float(_net["mvx"])
 	var mvz := float(_net["mvz"])
 	return (right * mvx + fwd * mvz).normalized()
@@ -866,8 +866,8 @@ func _handle_action_server(input_dir: Vector3, delta: float) -> void:
 func _handle_movement(inp, delta) -> void:
 	if _cooldowns["move"] == 0.0:
 		var yaw := float(inp.get("cam_yaw", inp.get("yaw", rotation.y)))
-		var fwd := Vector3.FORWARD.rotated(Vector3.UP, yaw); fwd.y = 0.0; fwd = fwd.normalized()
-		var right := Vector3.RIGHT.rotated(Vector3.UP, yaw); right.y = 0.0; right = right.normalized()
+		var fwd := Vector3.BACK.rotated(Vector3.UP, yaw)
+		var right := Vector3.LEFT.rotated(Vector3.UP, yaw); right.y = 0.0; right = right.normalized()
 		var mvx := float(inp.get("mvx", 0.0))
 		var mvz := float(inp.get("mvz", 0.0))
 		var input_dir := (right * mvx + fwd * mvz).normalized()
