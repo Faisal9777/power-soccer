@@ -1027,7 +1027,7 @@ collision_mask = 255
 script = ExtResource("13_eo1xk")
 spring_mesh_path = NodePath("SpringMesh")
 top_plate_root_path = NodePath("TopPlateRoot")
-launch_speed = 20.0
+launch_speed = 30.0
 
 [node name="SpringMesh" type="MeshInstance3D" parent="Springs/SpringPad5"]
 mesh = SubResource("ArrayMesh_1jxku")
@@ -1058,7 +1058,7 @@ collision_mask = 255
 script = ExtResource("13_eo1xk")
 spring_mesh_path = NodePath("SpringMesh")
 top_plate_root_path = NodePath("TopPlateRoot")
-launch_speed = 20.0
+launch_speed = 40.0
 
 [node name="SpringMesh" type="MeshInstance3D" parent="Springs/SpringPad6"]
 mesh = SubResource("ArrayMesh_e68xj")

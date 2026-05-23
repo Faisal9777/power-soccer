@@ -3,6 +3,10 @@ class_name Config
 
 var data: Dictionary = {}
 
+func _ready() -> void:
+	if data.is_empty():
+		load_config()
+
 # Call this once at startup
 func load_config() -> void:
 	var default_config := _load_json("res://config/default_config.json")

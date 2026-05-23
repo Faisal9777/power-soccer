@@ -1,0 +1,25 @@
+[Unit]
+Description=Power Soccer Cloud Match Service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=opc
+WorkingDirectory=/home/opc/power-soccer
+Environment=POWER_SOCCER_HOST=0.0.0.0
+Environment=POWER_SOCCER_PORT=3000
+Environment=POWER_SOCCER_TTL_SEC=12
+Environment=POWER_SOCCER_MATCH_START_TIMEOUT_SEC=8
+Environment=POWER_SOCCER_MATCH_PORT_START=24565
+Environment=POWER_SOCCER_MATCH_PORT_END=24650
+Environment=POWER_SOCCER_PUBLIC_HOST=140.245.210.219
+Environment=POWER_SOCCER_SERVER_EXE=/home/opc/power-soccer/power-soccer-server.x86_64
+Environment=POWER_SOCCER_SERVER_WORKDIR=/home/opc/power-soccer
+Environment=POWER_SOCCER_DATA_FILE=/home/opc/power-soccer/data/active_servers.json
+ExecStart=/usr/bin/python3 /home/opc/power-soccer/server.py
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

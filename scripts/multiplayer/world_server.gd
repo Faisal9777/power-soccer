@@ -7,6 +7,9 @@ var _players_input: Dictionary = {}
 var _input_accum: float = 0.0
 var _network_endpoint : Node
 var _peers_ready := 0
+var _expected_ready_peers := 0
+var _ready_peer_ids := {}
+var _game_begin_sent := false
 var _is_also_player := true
 # Input pump
 const NET_INPUT_HZ: float = 30.0
@@ -24,6 +27,10 @@ func start_init(players: Dictionary,
 	ball_path : NodePath, 
 	joystick_path : NodePath) -> void:
 	_players = players
+	_peers_ready = 0
+	_expected_ready_peers = _count_expected_human_peers(roster)
+	_ready_peer_ids.clear()
+	_game_begin_sent = false
 	var _game_server = GameServer.new()
 	# Give Game everything it needs *before* it's added (so _ready can safely use them)
 	_game_server.setup({
@@ -35,13 +42,14 @@ func start_init(players: Dictionary,
 	_network_endpoint.set_game(_game_server)
 	ingame.set_roster(GameState.roster)
 	if _is_also_player:
-		_peers_ready += 1
+		_mark_peer_ready(multiplayer.get_unique_id())
 		_camera_setup(ball_path, joystick_path)
 	print("ball path: ", ball_scene.get_path())
 	#_debug_data(roster, ingame, ball_scene, blue_spawns, red_spawns)
 	var data := {"roster" : roster, "state_path": ingame.get_path(), "ball_path" : ball_scene.get_path(),
 	"blue_path" : blue_spawns.get_path(), "red_path" : red_spawns.get_path(), "joystick_path": joystick_path}
 	_network_endpoint.rpc("receive_network_input_dictionary", NetCodes.Msg.INIT_BEGIN, data)
+	_try_start_game()
 
 func process_input(cmd: Dictionary, peer_id: int) -> void:
 	var seq := int(cmd.get("seq", -1))
@@ -101,11 +109,47 @@ func process_input(cmd: Dictionary, peer_id: int) -> void:
 func process_input_dictionary(msg: int, value : Dictionary) -> void:
 	#print("the msg recieved in receive_network_input_dictionary is: ", msg)
 	if msg == NetCodes.Msg.INIT_DONE:
-		_peers_ready += 1
-		#print("_peers_ready: ", _peers_ready)
-		if _peers_ready == GameState.roster.size():
-			_network_endpoint.start_game()
-			_network_endpoint.rpc("receive_network_input_dictionary", NetCodes.Msg.GAME_BEGIN, {})
+		var sender_id := multiplayer.get_remote_sender_id()
+		if sender_id <= 0:
+			sender_id = int(value.get("peer_id", 0))
+		_mark_peer_ready(sender_id)
+		_try_start_game()
+
+func _count_expected_human_peers(roster: Dictionary) -> int:
+	var count := 0
+	for k in roster.keys():
+		var peer_id := int(k)
+		if GameState.is_dedicated_server() and peer_id == 1:
+			continue
+		var rec: Dictionary = roster.get(k, {})
+		if not bool(rec.get("is_bot", false)):
+			count += 1
+	return count
+
+func _is_bot_peer(peer_id: int) -> bool:
+	var rec: Dictionary = GameState.roster.get(peer_id, {})
+	return bool(rec.get("is_bot", false))
+
+func _mark_peer_ready(peer_id: int) -> void:
+	if peer_id <= 0:
+		return
+	if _is_bot_peer(peer_id):
+		return
+	if _ready_peer_ids.has(peer_id):
+		return
+	_ready_peer_ids[peer_id] = true
+	_peers_ready = _ready_peer_ids.size()
+
+func _try_start_game() -> void:
+	if _game_begin_sent:
+		return
+	if _expected_ready_peers <= 0:
+		return
+	if _peers_ready < _expected_ready_peers:
+		return
+	_game_begin_sent = true
+	_network_endpoint.start_game()
+	_network_endpoint.rpc("receive_network_input_dictionary", NetCodes.Msg.GAME_BEGIN, {})
 
 func get_node_track() -> Node3D:
 	return
@@ -248,9 +292,20 @@ func _update_local_player_states(delta : float) -> void:
 			last_server_seq[peer_id] = seq
 
 func _on_peer_left(id : int) -> void:
-	pass
+	_players_input.erase(id)
+	last_server_seq.erase(id)
+	last_received_seq.erase(id)
+	_ready_peer_ids.erase(id)
+	_peers_ready = _ready_peer_ids.size()
+	if GameState.roster.has(id):
+		GameState.roster.erase(id)
+	_expected_ready_peers = _count_expected_human_peers(GameState.roster)
+	_try_start_game()
 
 func _on_all_peers_left() -> void:
+	if GameState.is_dedicated_server():
+		get_tree().quit()
+		return
 	get_tree().change_scene_to_file("res://scenes/Lobby.tscn")
 		
 

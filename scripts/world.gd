@@ -120,6 +120,8 @@ func _ready() -> void:
 		net.init($LocalViewProxy)
 	if multiplayer.is_server():
 		out_bounds.body_entered.connect(_on_ball_out_of_bounds)
+		if not Network.peer_left.is_connected(_on_peer_left):
+			Network.peer_left.connect(_on_peer_left)
 	if OS.has_feature("mobile"):
 		pause_btn.show()
 		score_btn.show()
@@ -432,6 +434,9 @@ func _on_pause_exit() -> void:
 		Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 	# Quit or go to title:
 	# get_tree().quit()
+	if !multiplayer.is_server() and multiplayer.multiplayer_peer is ENetMultiplayerPeer:
+		rpc_id(1, "_rpc_request_leave_match")
+		await get_tree().create_timer(0.1).timeout
 	Network.close_connection()
 	get_tree().change_scene_to_file("res://scenes/title_screen.tscn")
 
@@ -680,8 +685,11 @@ func _server_setup2(game : Node) -> void:
 	_create_ball_server()
 	var ids: Array[int] = []
 	for k in GameState.roster.keys():
-		ids.append(int(k))   # ensure int
-		_server_begin_match(ids)
+		var pid := int(k)
+		if GameState.is_dedicated_server() and pid == 1:
+			continue
+		ids.append(pid)
+	_server_begin_match(ids)
 	_initalize_game_server(game)
 	rpc("_begin_next_initialization", GameState.roster.duplicate(true))
 
@@ -692,8 +700,11 @@ func _server_setup3() -> void:
 	_create_ball_server()
 	var ids: Array[int] = []
 	for k in GameState.roster.keys():
-		ids.append(int(k))   # ensure int
-		_server_begin_match(ids)
+		var pid := int(k)
+		if GameState.is_dedicated_server() and pid == 1:
+			continue
+		ids.append(pid)
+	_server_begin_match(ids)
 	net = WorldServerScript.new()
 	_initialize_multiplayer("NetServer", net)
 	var ingame := get_node_or_null("ingame_state")
@@ -979,11 +990,24 @@ func on_peer_joined(id: int) -> void:
 
 func _on_peer_left(id: int) -> void:
 	print("Peer left: ", id)
+	if GameState.roster.has(id):
+		GameState.roster.erase(id)
 	if _players.has(id):
 		var p: CharacterBody3D = _players[id]
 		if p:
 			_players.erase(id)
 			p.queue_free()
+
+@rpc("any_peer", "reliable")
+func _rpc_request_leave_match() -> void:
+	if !multiplayer.is_server():
+		return
+
+	var from := multiplayer.get_remote_sender_id()
+	_on_peer_left(from)
+	var peer := multiplayer.multiplayer_peer
+	if peer is ENetMultiplayerPeer:
+		(peer as ENetMultiplayerPeer).disconnect_peer(from)
 
 func _spawn_player_for(id: int) -> void:
 	#print("spawining player for id: ", id)
@@ -1025,8 +1049,9 @@ func _spawn_player_for2(id: int) -> void:
 
 	var scene_to_use: PackedScene = player_scene
 	var rec: Dictionary = GameState.roster.get(id, {})
+	var is_bot := bool(rec.get("is_bot", false))
 
-	if bool(rec.get("is_bot", false)) and bot_player_scene:
+	if is_bot and bot_player_scene:
 		scene_to_use = bot_player_scene
 
 	if scene_to_use == null:
@@ -1053,10 +1078,11 @@ func _spawn_player_for2(id: int) -> void:
 		GameState.roster[id]["player_path"] = p.get_path()
 
 	print("Spawned/registered player for peer ", id,
-		" (bot=", rec.get("is_bot", false),
+		" (bot=", is_bot,
 		") authority=", p.get_multiplayer_authority())
 
-	_notify_client_to_attach_camera(p, id)
+	if not is_bot:
+		_notify_client_to_attach_camera(p, id)
 
 func _spawn_players() -> void:
 	#print("spawining player for id: ", id)

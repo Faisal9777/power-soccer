@@ -296,6 +296,8 @@ func _position_players2() -> void:
 		# tell that specific client to aim their camera
 		p.focus_at(ball)
 		p.freeze(true)
+		if p.has_method("set_spawn_to_current"):
+			p.call_deferred("set_spawn_to_current")
 
 func _spawn_players_from_roster() -> void:
 	# player_scene should be known (from GameState or exported on World)

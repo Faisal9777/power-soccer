@@ -156,13 +156,8 @@ func _ready() -> void:
 			_on_host_gone()
 			return
 
-		if multiplayer.is_server() and GameState.roster.has(id):
-			GameState.roster.erase(id)
-			_ensure_leader_exists()   # ✅ leader might have left
-			_broadcast_roster()
-
-			if fill_bots_check and fill_bots_check.button_pressed:
-				_update_bots_for_team_size()
+		if multiplayer.is_server():
+			_remove_peer_from_lobby(id)
 
 		_refresh_ui()
 		_update_start_enabled()
@@ -417,6 +412,9 @@ func _on_leave() -> void:
 	if GameState.is_host:
 		# Tell everyone we're going away; then close.
 		rpc("_rpc_host_is_leaving")
+	elif multiplayer.multiplayer_peer is ENetMultiplayerPeer:
+		rpc_id(1, "_rpc_request_leave")
+		await get_tree().create_timer(0.1).timeout
 	GameState.reset_lobby()
 	Network.close_connection()
 	get_tree().change_scene_to_file("res://scenes/title_screen.tscn")
@@ -489,6 +487,7 @@ func _rpc_submit_name(name: String) -> void:
 	if !multiplayer.is_server(): return
 
 	var from := multiplayer.get_remote_sender_id()
+	_remove_duplicate_name(name, from)
 	var team := GameState.pick_balanced_team()
 	GameState.roster[from] = {"name": name, "ready": false, "team": team, "ability": "grapple"}
 
@@ -508,6 +507,17 @@ func _rpc_set_ready(peer_id: int, ready: bool) -> void:
 func _rpc_host_is_leaving() -> void:
 	if !GameState.is_host:
 		_on_host_gone()
+
+@rpc("any_peer", "reliable")
+func _rpc_request_leave() -> void:
+	if !multiplayer.is_server():
+		return
+
+	var from := multiplayer.get_remote_sender_id()
+	_remove_peer_from_lobby(from)
+	var peer := multiplayer.multiplayer_peer
+	if peer is ENetMultiplayerPeer:
+		(peer as ENetMultiplayerPeer).disconnect_peer(from)
 
 func _broadcast_roster() -> void:
 	if !GameState.is_host:
@@ -529,6 +539,29 @@ func _broadcast_roster() -> void:
 
 	rpc("_rpc_set_roster", snapshot)
 	_refresh_ui()
+
+func _remove_peer_from_lobby(peer_id: int) -> void:
+	if !multiplayer.is_server():
+		return
+	if GameState.roster.has(peer_id):
+		GameState.roster.erase(peer_id)
+	_ensure_leader_exists()
+
+	if fill_bots_check and fill_bots_check.button_pressed:
+		_update_bots_for_team_size()
+	else:
+		_broadcast_roster()
+
+func _remove_duplicate_name(player_name: String, current_id: int) -> void:
+	if player_name == "":
+		return
+	for key in GameState.roster.keys():
+		var peer_id := int(key)
+		if peer_id == current_id:
+			continue
+		var rec: Dictionary = GameState.roster[key]
+		if String(rec.get("name", "")) == player_name:
+			GameState.roster.erase(key)
 
 @rpc("authority", "call_local", "reliable")
 func _rpc_set_roster(snapshot: Array) -> void:
@@ -819,6 +852,26 @@ func _remove_all_bots() -> void:
 			to_remove.append(int(id))
 	for id in to_remove:
 		GameState.roster.erase(id)
+
+func _bot_role_for_index(bot_index: int, need: int) -> int:
+	if need <= 1:
+		return GameState.Role.MIDFIELDER
+	if bot_index == 0:
+		return GameState.Role.GOALKEEPER
+	if bot_index == 1:
+		return GameState.Role.MIDFIELDER
+	return GameState.Role.FORWARD
+
+func _next_bot_role_for_team(team: int, need: int, bot_ids_blue: Array[int], bot_ids_red: Array[int]) -> int:
+	var bot_count := bot_ids_blue.size() if team == Team.BLUE else bot_ids_red.size()
+	return _bot_role_for_index(bot_count, need)
+
+func _normalize_bot_roles(bot_ids: Array[int], need: int) -> void:
+	for i in range(bot_ids.size()):
+		var bot_id := bot_ids[i]
+		if GameState.roster.has(bot_id):
+			GameState.roster[bot_id]["role"] = _bot_role_for_index(i, need)
+
 func _update_bots_for_team_size() -> void:
 	if !GameState.is_host:
 		return
@@ -866,16 +919,24 @@ func _update_bots_for_team_size() -> void:
 			var new_id := _alloc_bot_id()
 			var bot_index := _current_bot_count() + 1
 			var bot_name := "Bot%d" % bot_index
+			var bot_role := _next_bot_role_for_team(team, need, bot_ids_blue, bot_ids_red)
 			GameState.roster[new_id] = {
 				"name": bot_name,
 				"ready": true,
 				"team": team,
 				"is_bot": true,
-				"role": GameState.Role.MIDFIELDER,  # default; host can change
+				"role": bot_role,
 				"ability": "grapple",
 			}
+			if team == Team.BLUE:
+				bot_ids_blue.append(new_id)
+			else:
+				bot_ids_red.append(new_id)
 
 			counts[team] += 1
+
+	_normalize_bot_roles(bot_ids_blue, need)
+	_normalize_bot_roles(bot_ids_red, need)
 
 	_broadcast_roster()
 	_refresh_ui()

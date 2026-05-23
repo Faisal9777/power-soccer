@@ -50,11 +50,14 @@ func is_in_the_same_team(peer_id: int, team : String) -> bool:
 	return is_team(peer_id, 1)
 func reset_lobby() -> void:
 	is_host = false
+	lobby_leader_id = 0
 	roster.clear()
 	pending_spawn_ids.clear()
 	_next_on_tie = Team.BLUE
 
 func clear() -> void:
+	is_host = false
+	lobby_leader_id = 0
 	roster.clear()
 	pending_spawn_ids.clear()
 	_next_on_tie = Team.BLUE

@@ -70,24 +70,29 @@ func probe(data: Dictionary) -> void:
 # =========================
 # JOIN
 # =========================
-func join(ip: String, port: int) -> void:
+func join(ip: String, port: int) -> bool:
 	if multiplayer.multiplayer_peer is ENetMultiplayerPeer:
-		push_warning("Already connected/hosting.")
-		return
+		if multiplayer.is_server():
+			push_warning("Already hosting.")
+			return false
+		close_connection()
 
 	var enet := ENetMultiplayerPeer.new()
 	var err := enet.create_client(ip, port)
 
 	if err != OK:
 		push_error("Join failed: %s" % err)
-		return
+		connection_failed.emit()
+		return false
 
 	multiplayer.multiplayer_peer = enet
-	multiplayer.connected_to_server.connect(_on_connection_successful)
+	if not multiplayer.connected_to_server.is_connected(_on_connection_successful):
+		multiplayer.connected_to_server.connect(_on_connection_successful)
 	if !_signals_hooked_client:
 		multiplayer.connection_failed.connect(_on_connection_failed)
 		multiplayer.server_disconnected.connect(_on_server_disconnected)
 		_signals_hooked_client = true
+	return true
 
 
 # =========================
@@ -127,8 +132,9 @@ func _poll_discovery():
 				var response := {
 					"id": multiplayer.get_unique_id(),
 					"name": GameState.info.name,
-					"players": GameState.get_players_connected(),
-					"max_players": 10,
+					"players_connected": GameState.get_players_connected(),
+					"lobby_size": GameState.get_lobby_size(),
+					"ping": 0,
 					"port": NetConfig.PORT
 				}
 				

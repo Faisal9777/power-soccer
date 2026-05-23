@@ -20,10 +20,12 @@ var _create_mode := ""  # "lan" or "cloud"
 const C = preload("res://scripts/shared/scene.gd")
 const SCRIPT_PATHS = preload("res://scripts/shared/script_path.gd")
 var _gfx_ui: Control = null
+var _cloud_create_session: ClientSession = null
 
 const LOBBY_SCENE := "res://scenes/Lobby.tscn"
 
 func _ready() -> void:
+	Configuration.load_config()
 	GameState.player_name = Settings.player_name
 	var args := OS.get_cmdline_args()
 
@@ -33,9 +35,14 @@ func _ready() -> void:
 		GameState.is_dedicated = true
 		Configuration.load_config()
 		var id = _get_arg_value("id", args)
-		var port = _get_arg_value("port", args)
-		var session = SessionManager.create_cloud_server_session(SCRIPT_PATHS.SERVER_SESSION, id, port)
-		session.host(Settings.player_name, C.LOBBY)
+		var port = int(_get_arg_value("port", args))
+		var server_name = _get_arg_value("server_name", args)
+		if port <= 0:
+			port = NetConfig.PORT
+		if server_name == "":
+			server_name = Settings.player_name
+		var session = await SessionManager.create_cloud_server_session(SCRIPT_PATHS.SERVER_SESSION, id, port)
+		session.host(server_name, C.LOBBY)
 		return
 
 	# -------- normal client flow below --------
@@ -174,8 +181,7 @@ func get_lan_ip() -> String:
 	return ""
 
 func _on_joined_server() -> void:
-	_set_status("Connected! Entering lobby…")
-	get_tree().change_scene_to_file(LOBBY_SCENE)
+	_set_status("Connected. Syncing lobby…")
 
 func _on_connection_failed() -> void:
 	_set_status("Connection failed. Check IP/port and try again.")
@@ -532,17 +538,15 @@ func _create_server_config_ui() -> Control:
 func _create_server_final(name: String, is_public: bool, password: String) -> void:
 	GameState.reset_lobby()
 	GameState.player_name = Settings.player_name
-	GameState.is_host = true
-
-	GameState.roster[1] = {
-		"name": GameState.player_name,
-		"ready": false
-	}
-
 	var id := Crypto.new().generate_random_bytes(16).hex_encode()
 
 	if _create_mode == "lan":
-		var session = SessionManager.create_lan_server_session(SCRIPT_PATHS.SERVER_SESSION, id)
+		GameState.is_host = true
+		GameState.roster[1] = {
+			"name": GameState.player_name,
+			"ready": false
+		}
+		var session = await SessionManager.create_lan_server_session(SCRIPT_PATHS.SERVER_SESSION, id)
 		GameState.info.name = name
 		GameState.info.is_lan = true
 		GameState.info.port= 24565
@@ -558,4 +562,39 @@ func _create_server_final(name: String, is_public: bool, password: String) -> vo
 		session.host(name, C.LOBBY)
 
 	elif _create_mode == "cloud":
-		print("TODO: cloud server creation")
+		GameState.is_host = false
+		_set_connect_ui_enabled(false)
+		_set_status("Creating cloud match on Oracle…")
+		var session := await _ensure_cloud_create_session()
+		var payload := {
+			"id": id,
+			"name": name,
+			"server_name": name,
+			"is_public": is_public,
+			"has_password": password != "",
+			"requested_by": Settings.player_name
+		}
+		session.create_cloud_match(payload)
+
+func _ensure_cloud_create_session() -> ClientSession:
+	if is_instance_valid(_cloud_create_session):
+		return _cloud_create_session
+
+	var session = await SessionManager.create_client_session(SCRIPT_PATHS.CLIENT_SESSION)
+	_cloud_create_session = session as ClientSession
+	if not _cloud_create_session.cloud_match_created.is_connected(_on_cloud_match_created):
+		_cloud_create_session.cloud_match_created.connect(_on_cloud_match_created)
+	if not _cloud_create_session.cloud_match_create_failed.is_connected(_on_cloud_match_create_failed):
+		_cloud_create_session.cloud_match_create_failed.connect(_on_cloud_match_create_failed)
+	if not _cloud_create_session.joined_server.is_connected(_on_joined_server):
+		_cloud_create_session.joined_server.connect(_on_joined_server)
+	return _cloud_create_session
+
+func _on_cloud_match_created(info: Dictionary) -> void:
+	var ip := String(info.get("ip", ""))
+	var port := int(info.get("port", 0))
+	_set_status("Cloud match ready at %s:%d. Joining…" % [ip, port])
+
+func _on_cloud_match_create_failed(message: String) -> void:
+	_set_status("Cloud match creation failed: %s" % message)
+	_set_connect_ui_enabled(true)
