@@ -18,6 +18,7 @@ var _all_player_frozen := true
 var ball_scene : Node
 var spawns_blue : Node
 var spawns_red : Node
+var p_controllers = []
 
 const BLUE := Color(0.20, 0.60, 1.00)
 const RED  := Color(1.00, 0.30, 0.30)  
@@ -149,18 +150,13 @@ func _update_countdown_ui(ms:int) -> void:
 	elif ms == -1:
 		_countdown_label.hide()
 
-func _color_all_players(roster : Dictionary) -> void:
-	for k in roster.keys():
-		var pid := int(k)
-		var name := String(roster.get(pid, {}).get("name", ""))
-		var team := int(roster.get(pid, {}).get("team", 0))
+func _color_all_players(controllers : Array) -> void:
+	for controller in controllers:
+		var team : int = controller.team
 		#print("about to calll _cl_init_entry: ", multiplayer.get_unique_id())
 		# initialize only if missing
-		var p := get_node(roster[k]["player_path"]) as Node3D
-		if p == null:
-			continue
-
-		if GameState.is_blue(pid):
+		var p = controller.player
+		if team == GameState.Team.BLUE:
 			_tint_recursive(p, BLUE)
 		else:
 			_tint_recursive(p, RED)
@@ -200,14 +196,14 @@ func _tint_recursive(n: Node, col: Color) -> void:
 		var child: Node = children[i] as Node
 		_tint_recursive(child, col)
 
-func initialize(roster : Dictionary, network_endpoint : Node, state_path : NodePath, ball_path : NodePath, blue_path : NodePath, red_path : NodePath) -> void:
+func setup(blue: Node3D, red: Node3D, ball_sp: Node3D, scene: Node3D, ingame : Node, scoreboard, controllers) -> void:
 
-	state = get_node_or_null(state_path)
-	_network_endpoint = network_endpoint
-	ball_scene = get_node_or_null(ball_path)
-	spawns_blue = get_node_or_null(blue_path)
-	spawns_red = get_node_or_null(red_path)
-	_color_all_players(roster)
+	state = ingame
+	ball_scene = blue
+	spawns_blue = blue
+	spawns_red = red
+	_scoreboard_instance = scoreboard
+	_color_all_players(controllers)
 
 func _ready() -> void:
 	
@@ -259,36 +255,27 @@ func _toggle_player_process(toggle : bool) -> void:
 func _position_players2() -> void:
 	var blue_placed := 1
 	var red_placed  := 1
-
 	# Find a target to face: live Ball if it exists, else the BallSpawn
 	var ball := ball_scene
 	#var target_pos := ball.global_transform.origin if ball != null else ball_spawn.global_transform.origin
 	#var target_pos := ball_spawn.global_position
-	for k in GameState.roster.keys():
-		var pid := int(k)
-		var name := String(GameState.roster.get(pid, {}).get("name", ""))
-		var team := int(GameState.roster.get(pid, {}).get("team", 0))
-		#print("about to calll _cl_init_entry: ", multiplayer.get_unique_id())
-		# initialize only if missing
-		var p := get_node(GameState.roster[k]["player_path"]) as Node3D
-		#print("the player's id is: ", pid)
-		if p == null:
-			continue
-
-		if GameState.is_blue(pid):
+	for controller in p_controllers:
+		var pid : int = controller.id
+		var team :int= controller.team
+		if team == GameState.Team.BLUE:
 			var sp := spawns_blue.get_node_or_null("Spawn%d" % blue_placed) as Node3D
 			if sp:
-				p.global_transform = sp.global_transform
+				controller.set_position(sp.global_transform)
 				blue_placed += 1
 		else:
 			var sp := spawns_red.get_node_or_null("Spawn%d" % red_placed) as Node3D
 			if sp:
-				p.global_transform = sp.global_transform
+				controller.set_position(sp.global_transform)
 				red_placed += 1
 		# tell that specific client to aim their camera
 		_init_entry(pid, name, team)
-		p.face_at(ball.global_transform.origin)
-		p.freeze(true)
+		controller.face_at(ball.global_transform.origin)
+		controller.freeze(true)
 
 func process_data(data : Dictionary, msg : StringName) -> void:
 	if msg == "init":

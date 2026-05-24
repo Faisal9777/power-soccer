@@ -81,6 +81,7 @@ var _tackle_phasing: bool = false
 @export var mouse_sens: float = 0.008
 @onready var aim_pivot: Node3D = $AimPivot
 @onready var visual : Node3D = $Visual
+@onready var body_mesh : Node3D = $Mesh
 @export var min_pitch := deg_to_rad(-60)
 @export var max_pitch := deg_to_rad( 60)
 # --- Aiming/orbit state (client-local) ---
@@ -290,8 +291,6 @@ func attach_camera(c: Camera3D, j: Node) -> void:
 		_mark_self_layer_recursive(self)  # ✅ move my visuals to SELF layer only
 		cam.current = true
 		cam.near = max(cam.near, 0.12)
-	
-	
 
 # Aim the camera at a world position.
 # yaw_only=true keeps the camera level (no pitch); set false to let it tilt up/down.
@@ -376,10 +375,19 @@ func update_player_states(input: Dictionary, delta) -> void:
 		return
 	
 	_update_player_facing(input)
-	_handle_movement(input, delta)
 	#_yaw_delta_accum = 0.0
 	#_pitch_delta_accum = 0.0
 
+func handle_movement(inp, delta) -> void:
+	if _cooldowns["move"] == 0.0:
+		var yaw := rotation.y
+		var fwd := Vector3.FORWARD.rotated(Vector3.UP, yaw); fwd.y = 0.0; fwd = fwd.normalized()
+		var right := Vector3.RIGHT.rotated(Vector3.UP, yaw); right.y = 0.0; right = right.normalized()
+		var mvx := float(inp["mvx"])
+		var mvz := float(inp["mvz"])
+		var input_dir := (right * mvx + fwd * mvz).normalized()
+		var is_sprinting : bool = inp.get("sprint")
+		_move_server(input_dir, delta, is_sprinting)
 
 
 func _mark_self_layer_recursive(n: Node) -> void:
@@ -436,6 +444,7 @@ func _btn_just_released(name: String) -> bool:
 # --- Engine callbacks ---
 
 func _ready() -> void:
+	body_mesh.layers = RenderLayers.PLAYER_BODY_MASK
 	add_to_group("players")
 		#add a script called ClientPlayer
 	_yaw_abs = rotation.y
@@ -860,16 +869,6 @@ func _handle_action_server(input_dir: Vector3, delta: float) -> void:
 		_handle_jump_server()
 	_handle_kick_action_server()
 
-func _handle_movement(inp, delta) -> void:
-	if _cooldowns["move"] == 0.0:
-		var yaw := rotation.y
-		var fwd := Vector3.FORWARD.rotated(Vector3.UP, yaw); fwd.y = 0.0; fwd = fwd.normalized()
-		var right := Vector3.RIGHT.rotated(Vector3.UP, yaw); right.y = 0.0; right = right.normalized()
-		var mvx := float(inp["mvx"])
-		var mvz := float(inp["mvz"])
-		var input_dir := (right * mvx + fwd * mvz).normalized()
-		var is_sprinting : bool = inp.get("sprint")
-		_move_server(input_dir, delta, is_sprinting)
 
 func _move_server(input_dir: Vector3, delta: float, is_sprinting : bool) -> void:
 	var mag := 1.0
@@ -1067,7 +1066,7 @@ func get_aim_arrow_position() -> Transform3D:
 func freeze(toggle : bool) -> void:
 	_is_frozen = toggle
 	if cam:
-		cam.freeze(toggle)
+		cam.freeze_rotation(toggle)
 
 
 func _debug_red_dot(ball: Node3D,p: Vector3, seconds: float = 1.5, size: float = 0.06) -> void:
@@ -1396,8 +1395,7 @@ func face_at(target_postion : Vector3) -> void:
 		var pr := aim_pivot.rotation
 		pr.x = clamp(pitch, min_pitch, max_pitch)
 		aim_pivot.rotation = pr
-	if cam:
-		cam.face_at(target_postion)
+
 	
 func _update_player_facing_server(delta: float) -> void:
 	if !multiplayer.is_server(): return
@@ -1430,19 +1428,11 @@ func _update_player_facing(cmd: Dictionary) -> void:
 		_face_ball_server()
 		return
 
-	# ✅ Read absolute angles from the command (robust for unreliable + latest-wins)
-	var yaw := float(cmd.get("yaw", rotation.y))
-	var pitch_default := 0.0
-	if is_instance_valid(aim_pivot):
-		pitch_default = aim_pivot.rotation.x
+func set_look_rotation(yaw: float, pitch: float) -> void:
 
-	var pitch := float(cmd.get("pitch", pitch_default))
-
-	# Keep them in safe ranges (server-side sanity)
 	yaw = wrapf(yaw, -PI, PI)
 	pitch = clamp(pitch, min_pitch, max_pitch)
 
-	# Apply (no smoothing; this is authoritative input apply)
 	_apply_facing_absolute(yaw, pitch, 1.0)
 
 func _apply_facing_absolute(yaw: float, pitch: float, alpha: float = 1.0) -> void:

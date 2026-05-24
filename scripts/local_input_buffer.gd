@@ -1,5 +1,5 @@
-# InputManager.gd (autoload)
-extends Node
+extends InputBuffer
+class_name LocalInputBuffer
 
 var _mouse_delta := Vector2.ZERO
 var should_listen := true
@@ -24,13 +24,12 @@ func get_mouse_delta() -> Vector2:
 func end_frame():
 	_mouse_delta = Vector2.ZERO
 
-func set_input_listening(toggle):
-	should_listen = toggle
-
-func get_action_strength(action):
+func get_action_strength(action) -> float:
 	if should_listen:
-		Input.get_action_strength(action)
+		return Input.get_action_strength(action)
+	return 0
 
-func is_action_pressed(action):
+func is_action_pressed(action) -> bool:
 	if should_listen:
-		Input.is_action_pressed(action)
+		return Input.is_action_pressed(action)
+	return false

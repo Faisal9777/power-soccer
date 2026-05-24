@@ -2,6 +2,7 @@ extends Node
 
 signal hud_update(score_blue:int, score_red:int, time_left:float, phase:String)
 signal match_ended(winner:int) # -1 draw, 0 blue, 1 red
+signal game_end(duration : float, scene : String)
 # Injected from Lobby/World before/after _ready:
 @export var win_scene_path: String = "res://scenes/WinScene.tscn"
 @export var lose_scene_path: String = "res://scenes/DefeatScene.tscn"
@@ -19,12 +20,13 @@ var match_config := {
 var _duration_sec := 180
 var _goal_limit := 0
 var _roster := {}
+var p_controllers : Array = []
 var _end_ms: int = -1             # replicated ALWAYS during prestart
 var _cd_ms: int = -2
 var _all_team_assinged_color := false   
 var _scoreboard_instance: Control
 var _network_endpoint : Node
-var _client : Node
+
 var GameClient := load("res://scripts/multiplayer/game_client.gd")
 
 var game : Dictionary = {}
@@ -61,7 +63,8 @@ var IS_HOST := GameState.is_host
 const BLUE := Color(0.20, 0.60, 1.00)
 const RED  := Color(1.00, 0.30, 0.30)
 
-func setup(s_cfg: Dictionary, blue: Node3D, red: Node3D, ball_sp: Node3D, scene: Node3D) -> void:
+func setup(s_cfg: Dictionary, blue: Node3D, red: Node3D, ball_sp: Node3D, scene: Node3D, ingame : Node, 
+roster : Dictionary, scoreboard, controllers) -> void:
 	_duration_sec = s_cfg.get("duration_sec")
 	_goal_limit = s_cfg.get("goal_limit")
 	_roster = s_cfg.get("roster")
@@ -69,12 +72,11 @@ func setup(s_cfg: Dictionary, blue: Node3D, red: Node3D, ball_sp: Node3D, scene:
 	spawns_red   = red
 	ball_spawn   = ball_sp
 	ball_scene  = scene
+	state = ingame
+	_roster = roster
+	_scoreboard_instance = scoreboard
+	p_controllers = controllers
 
-
-func set_scoreboard(scoreboard : Control) -> void:
-	_client.set_scoreboard(scoreboard)
-	#var stats_array = get_stats_in_array()
-	#_scoreboard_instance.set_stats(stats_array)
 
 func get_stats_in_array() -> Array[Dictionary]:
 	var stats: Array[Dictionary] = []
@@ -185,20 +187,8 @@ func _set_game() -> void:
 	#
 	#}
 	_position_players2()
-	#_client.start_game()
 	_start_countdown_server()
 	#_network_endpoint.rpc("receive_network_input_dictionary", NetCodes.Msg.GAME_BEGIN,{})
-
-
-func init(game : Node, network_endpoint : Node, is_also_player : bool, roster : Dictionary) -> void:
-	state = game
-	_network_endpoint = network_endpoint
-	state.set_multiplayer_authority(1)
-	if is_also_player:
-		_initialize_game_updater(roster)
-
-
-
 
 
 func _ready() -> void:
@@ -245,12 +235,6 @@ func _physics_process_server(delta: float) -> void:
 		var remaining := _cd_ms - now   # ms until countdown end
 		state.countdown_ms = int(ceil(remaining / 1000.0))
 
-func _initialize_game_updater(roster : Dictionary) -> void:
-	_client  = GameClient.new()
-	_client.name = "GameClient"
-	_network_endpoint.add_child(_client)
-	_client.initialize(roster, _network_endpoint, state.get_path(), ball_scene.get_path(), spawns_blue.get_path(), spawns_red.get_path())
-
 
 func _on_time_up_server() -> void:
 	_end_ms = -1
@@ -272,31 +256,24 @@ func _position_players2() -> void:
 	var ball := ball_scene
 	#var target_pos := ball.global_transform.origin if ball != null else ball_spawn.global_transform.origin
 	#var target_pos := ball_spawn.global_position
-	for k in GameState.roster.keys():
-		var pid := int(k)
-		var name := String(GameState.roster.get(pid, {}).get("name", ""))
-		var team := int(GameState.roster.get(pid, {}).get("team", 0))
-		#print("about to calll _cl_init_entry: ", multiplayer.get_unique_id())
-		# initialize only if missing
-		var p := get_node(GameState.roster[k]["player_path"]) as Node3D
-		#print("the player's id is: ", pid)
-		if p == null:
-			continue
+	for controller in p_controllers:
+		var team : int= controller.team
+	
 
-		if GameState.is_blue(pid):
+		if team == GameState.Team.BLUE:
 			var sp := spawns_blue.get_node_or_null("Spawn%d" % blue_placed) as Node3D
 			if sp:
-				p.global_transform = sp.global_transform
+				controller.set_position(sp.global_transform)
 				blue_placed += 1
 		else:
 			var sp := spawns_red.get_node_or_null("Spawn%d" % red_placed) as Node3D
 			if sp:
-				p.global_transform = sp.global_transform
+				controller.set_position(sp.global_transform)
 				red_placed += 1
 		# tell that specific client to aim their camera
 		
-		p.face_at(ball_spawn.global_transform.origin)
-		p.freeze(true)
+		controller.face_at(ball_spawn.global_transform.origin)
+		controller.freeze(true)
 
 func _spawn_players_from_roster() -> void:
 	# player_scene should be known (from GameState or exported on World)
@@ -402,14 +379,14 @@ func _process_game_end() -> void:
 			_finalize_game_end(pid,{"duration" : 3, "scene" : blue_scene})
 		else:
 			_finalize_game_end(pid,{"duration" : 3, "scene" : red_scene})
-	if _client and GameState.is_blue(multiplayer.get_unique_id()):
-		_client.end_game({"duration" : 3, "scene" : blue_scene})
+	if GameState.is_blue(multiplayer.get_unique_id()):
+		game_end.emit(3, blue_scene)
 	else:
-		_client.end_game({"duration" : 3, "scene" : red_scene})
+		game_end.emit(3, red_scene)
 func _finalize_game_end(pid : int, data : Dictionary) -> void:
 	var _pid = int(pid)
 	if pid != multiplayer.get_unique_id():
-		_network_endpoint.rpc_id(_pid, "receive_network_input_dictionary", NetCodes.Msg.GAME_END, data)
+		_network_endpoint.rpc_id(_pid, NetCodes.Rpc.INPUT_STREAM, NetCodes.Msg.GAME_END, data)
 	#if _client and :
 		#_
 

@@ -8,10 +8,16 @@ var _input_accum: float = 0.0
 var _network_endpoint : Node
 var _peers_ready := 0
 var _is_also_player := true
+var _game : Node
+var p_controller : LocalController
+var controllers : Array = []
 # Input pump
 const NET_INPUT_HZ: float = 30.0
 var last_server_seq:= {}
+var can_process := false
+
 func start_init(players: Dictionary,
+	score_board : Control,
 	ingame: Node,
 	blue_spawns: Node3D,
 	red_spawns: Node3D,
@@ -20,79 +26,37 @@ func start_init(players: Dictionary,
 	match_len_sec: int,
 	goal_limit: int,
 	roster: Dictionary,
-	ball_path : NodePath, 
-	joystick_path : NodePath) -> void:
+	joystick : Node) -> void:
+	InputManager.set_input_listening(false)
 	_players = players
-	var _game_server = GameServer.new()
+	ingame.set_roster(GameState.roster)
+	_player_controller_setup(players, ball_scene.get_path(), joystick, controllers)
+	_game = GameServer.new()
+	add_child(_game)
 	# Give Game everything it needs *before* it's added (so _ready can safely use them)
-	_game_server.setup({
+	_game.setup({
 			"duration_sec": match_len_sec,
 			"goal_limit":   goal_limit,
 			"roster":       roster,
-		}, blue_spawns, red_spawns, ball_spawn, ball_scene)
-	_game_server.init(ingame, _network_endpoint, _is_also_player, roster)
-	_network_endpoint.set_game(_game_server)
-	ingame.set_roster(GameState.roster)
-	if _is_also_player:
-		_peers_ready += 1
-		_camera_setup(ball_path, joystick_path)
+		}, blue_spawns, red_spawns, ball_spawn, ball_scene, ingame, roster, score_board, controllers)
+	_game.game_end.connect(_on_game_end)
 	#_debug_data(roster, ingame, ball_scene, blue_spawns, red_spawns)
-	var data := {"roster" : roster, "state_path": ingame.get_path(), "ball_path" : ball_scene.get_path(),
-	"blue_path" : blue_spawns.get_path(), "red_path" : red_spawns.get_path(), "joystick_path": joystick_path}
-	_network_endpoint.rpc("receive_network_input_dictionary", NetCodes.Msg.INIT_BEGIN, data)
+	var data := {"roster" : roster}
+	if _is_also_player:
+		_peers_ready +=1
+	_network_endpoint.rpc(NetCodes.Rpc.INPUT_STREAM, NetCodes.Msg.INIT_BEGIN, data)
 
-func process_input(cmd: Dictionary, peer_id: int) -> void:
-	var seq := int(cmd.get("seq", -1))
-	if seq < 0:
-		return
+func process_input_by_id(peer_id: int, cmd : Dictionary) -> void:
+	var idx = controllers.find_custom(
+	func(c):
+		return c.id == peer_id
+	)
 
-	# Absolute angles now (no deltas)
-	var mvx := float(cmd.get("mvx", 0.0))
-	var mvz := float(cmd.get("mvz", 0.0))
-	var yaw := float(cmd.get("yaw", 0.0))
-	var pitch := float(cmd.get("pitch", 0.0))
+	if idx == -1:
+		print("the player does not exist with the id: ", idx)
+	
+	controllers[idx].input_buffer.save_input(cmd)
 
-	# optional debug gating
-	var moved : bool = abs(mvx) > 0.01 or abs(mvz) > 0.01
-	var looked := false # abs(yaw) > ... doesn't mean "looked" for absolute; ignore or track change yourself
-
-	if not _players_input.has(peer_id):
-		_players_input[peer_id] = {}   # will store the LATEST cmd (Dictionary)
-		last_server_seq[peer_id] = -1
-
-	var last := int(last_server_seq[peer_id])
-	if seq <= last:
-		return # old/out-of-order
-
-	# ✅ Missing-seq-proof: keep ONLY the latest cmd; overwrite older
-	last_server_seq[peer_id] = seq
-	_players_input[peer_id] = cmd
-
-#func process_input(cmd: Dictionary, peer_id : int) -> void:
-	##var player: CharacterBody3D = _players[peer_id]
-	##player.update_player_states(cmd)
-	#var seq := int(cmd.get("seq", -1))
-	##print("recieved input from the client: ", peer_id)
-	#var mvx := float(cmd.get("mvx", 0.0))
-	#var mvz := float(cmd.get("mvz", 0.0))
-	#var yaw := float(cmd.get("yaw_delta", 0.0))
-	#var pitch := float(cmd.get("pitch_delta", 0.0))
-#
-	#var moved : bool = abs(mvx) > 0.01 or abs(mvz) > 0.01
-	#var looked : bool= abs(yaw) > 0.001 or abs(pitch) > 0.001
-	#if seq < 0:
-		#return
-#
-	#if not _players_input.has(peer_id):
-		#_players_input[peer_id] = {}       # seq -> cmd
-		#last_server_seq[peer_id] = -1
-#
-	#var last := int(last_server_seq[peer_id])
-	#if seq <= last:
-		#return # old/duplicate
-#
-	#var buf: Dictionary = _players_input[peer_id]
-	#buf[seq] = cmd
 
 func process_input_dictionary(msg: int, value : Dictionary) -> void:
 	#print("the msg recieved in receive_network_input_dictionary is: ", msg)
@@ -100,8 +64,11 @@ func process_input_dictionary(msg: int, value : Dictionary) -> void:
 		_peers_ready += 1
 		#print("_peers_ready: ", _peers_ready)
 		if _peers_ready == GameState.roster.size():
-			_network_endpoint.start_game()
-			_network_endpoint.rpc("receive_network_input_dictionary", NetCodes.Msg.GAME_BEGIN, {})
+			_game.start_game()
+			LoadingUI.hide_loading()
+			TaskScheduler.schedule(60, _broadcast_snapshots)
+			can_process = true
+			_network_endpoint.rpc(NetCodes.Rpc.INPUT_STREAM, NetCodes.Msg.GAME_BEGIN, {})
 
 func get_node_track() -> Node3D:
 	return
@@ -119,64 +86,22 @@ func _ready() -> void:
 
 
 func _physics_process(delta: float) -> void:
-	return
-	if _is_also_player:
-		var p : Node = _players[multiplayer.get_unique_id()]
-		var inp_data := p.get_input_data() as Dictionary
-		p.update_player_states(inp_data, delta)
-	_update_local_player_states(delta)
-	_input_accum += delta
-	var step: float = 1.0 / NET_INPUT_HZ
-	while _input_accum >= step:
-		_input_accum -= step
-		_broadcast_snapshots()
+	if can_process:
+		_simulate_remote_players(delta)
+		p_controller.physics_tick(delta)
+
+func _simulate_remote_players(delta) -> void:
+	for controller in controllers:
+		controller.physics_tick(delta)
 
 func _broadcast_snapshots() -> void:
 	var snapshots := {}
 
-	for peer_id in _players.keys():  # your list of Player nodes on server
-		var snapshot := _players[peer_id].get_snapshot() as Dictionary
-		snapshot["last_server_seq"] = int(last_server_seq.get(peer_id, -1))
-		snapshots[peer_id] = snapshot
+	for controller in controllers:  # your list of Player nodes on server
+		var snapshot := controller.get_snapshot() as Dictionary
+		snapshots[controller.id] = snapshot
 
-	_network_endpoint.rpc("receive_network_input", snapshots, multiplayer.get_unique_id())
-
-func _broadcast_snapshots2() -> void:
-	var snapshots: Dictionary = {}  # { pid:int : { "path": NodePath, "global_transform": Transform3D } }
-
-	for k in GameState.roster.keys():
-		var pid := int(k)
-
-		# Each roster entry is something like:
-		# { "name": ..., "team": ..., "player_path": NodePath or String }
-		var entry := GameState.roster[pid] as Dictionary
-		if !entry.has("player_path"):
-			continue
-
-		var raw_path = entry["player_path"]
-		var path: NodePath = raw_path if raw_path is NodePath else NodePath(raw_path)
-
-		var player := get_node_or_null(path) as Node3D
-		if player == null:
-			# Player not spawned / already freed
-			continue
-
-		# Build one snapshot for this player:
-		# - store the path so clients can resolve the node
-		# - store the full global_transform (position + rotation + scale)
-		var snap: Dictionary = {
-			"path": path,
-			"global_transform": player.global_transform,
-		}
-
-		snapshots[pid] = snap
-
-	# If nothing to send, bail out
-	if snapshots.is_empty():
-		return
-
-	# Broadcast to all peers (you can pick reliable/unreliable as you prefer)
-	_network_endpoint.rpc("receive_network_input", snapshots, multiplayer.get_unique_id())
+	_network_endpoint.rpc(NetCodes.Rpc.INPUT_STREAM, NetCodes.Msg.SNAPSHOTS,snapshots)
 
 
 func _build_player_paths() -> Dictionary:
@@ -186,25 +111,32 @@ func _build_player_paths() -> Dictionary:
 		paths[peer_id] = p.get_path()  # NodePath
 	return paths
 
-func _camera_setup(ball_path : NodePath, joystick_path : NodePath) -> void:
-	var cam: Camera3D = get_node_or_null("/root/World/Scene/Camera3D") as Camera3D
-	var p := _players[multiplayer.get_unique_id()] 
-	if cam == null:
-		cam = p.get_node_or_null("Camera3D") as Camera3D
-	if cam == null:
-		return
+func _player_controller_setup(rosters : Dictionary, ball_path : NodePath, joystick: Node, controllers) -> void:
+	for k in rosters.keys():
+		var peer_id := int(k)
+		var entry := GameState.roster[k] as Dictionary
+		var ppath: NodePath = entry.get("player_path", NodePath(""))
+		var team = entry.get("team")
+		var name = entry.get("name")
+		if ppath.is_empty():
+			print("Roster peer ", peer_id, " has EMPTY player_path")
+			continue
 
-	# Wire camera (existing)
-	cam.current = true
+		var node := get_node_or_null(ppath)
+		if peer_id == multiplayer.get_unique_id():
+			var player = get_node(ppath)
+			var cam = get_node_or_null("/root/World/Scene/Camera3D") as Camera3D
+			cam.init(node, joystick)
+			var input_buffer = LocalInputBuffer.new()
+			p_controller = LocalController.new(node, peer_id, name, team, cam, joystick, input_buffer)
+			controllers.append(p_controller)
+		else:
+			
+			controllers.append(NodeController.new(node, peer_id, name, team, SavedInputBuffer.new()))
 
-	cam.set_follow(p)
-	if cam.has_method("activate"):   cam.call_deferred("activate")
-	
-	var joystick : Node3D = get_node(joystick_path) 
-	# NEW: give the camera its joystick
-	if joystick and cam.has_method("set_joystick"):
-		cam.call_deferred("set_joystick", joystick)
-	p.attach_camera(cam, joystick)
+		if node != null:
+			_players[k] = node
+
 
 
 #func _update_local_player_states(delta : float) -> void:
@@ -225,23 +157,15 @@ func _camera_setup(ball_path : NodePath, joystick_path : NodePath) -> void:
 			## no next input yet -> do nothing for now (later: hold last / idle)
 			#pass
 
-func _update_local_player_states(delta : float) -> void:
-	for peer_id in _players_input.keys():
-		if not _players.has(peer_id):
-			continue
-
-		var player: Node = _players[peer_id]
-		var cmd := _players_input[peer_id] as Dictionary
-
-		# If you want, you can add a timeout safety here later.
-		player.update_player_states(cmd, delta)
 
 func _on_peer_left(id : int) -> void:
 	pass
 
 func _on_all_peers_left() -> void:
 	get_tree().change_scene_to_file("res://scenes/Lobby.tscn")
-		
+
+func _on_game_end(duration, scene) -> void:
+	print('implement on game end')
 
 func _debug_data(roster: Dictionary, ingame: Node, ball_scene: Node, blue_spawns: Node, red_spawns: Node) -> void:
 	print("--- BUILD DATA DEBUG ---")

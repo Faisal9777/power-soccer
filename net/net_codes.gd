@@ -12,5 +12,11 @@ enum Msg {
 	GAME_BEGIN       = 5,
 	GAME_END       = 6,
 	REGISTER_PEER = 7,
-	ROSTER_DATA = 8
+	ROSTER_DATA = 8,
+	SNAPSHOTS = 9
 }
+
+
+class Rpc:
+	const INPUT_STREAM := "receive_network_input_dictionary"
+	const INPUT_BY_ID := "receive_network_input_by_id"
