@@ -47,8 +47,7 @@ var _grapple_crosshair: GrappleCrosshair
 
 # Keep a typed map of peer-id -> Player node
 var _players: Dictionary[int, CharacterBody3D] = {}    # { int: Node }
-var _game : Node
-var _game_server : Node
+
 # --- Pause dialog (created at runtime) ---
 var _pause_ui: Control
 var _gfx_ui: Control
@@ -79,7 +78,7 @@ var Ingame := load("res://scripts/multiplayer/ingame_states.gd")
 var net: Node = null
 @onready var team_blue: Node3D = get_node(TEAM_BLUE_PATH)
 @onready var team_red:  Node3D = get_node(TEAM_RED_PATH)
-
+@onready var local_view_proxy := $LocalViewProxy
 var _my_player: Node = null
 var _input_accum: float = 0.0
 var ball_scene : Node3D = null
@@ -105,19 +104,8 @@ var _pass_cd_label: Label
 var _pass_cd_local: float = 0.0
 var _pass_cd_last_from_player: float = -999.0
 
-
-func build_game_updater(roster : Dictionary) -> void:
-	_initialize_game_updater(roster)
-
-func build_game_controller() -> void:
-	_initalize_game_controller()
-
 func _ready() -> void:
 	LoadingUI.show_loading()
-	if not multiplayer.is_server():
-		net = WorldClientScript.new()
-		_initialize_multiplayer("NetClient", net)
-		net.init($LocalViewProxy)
 	if multiplayer.is_server():
 		out_bounds.body_entered.connect(_on_ball_out_of_bounds)
 	if OS.has_feature("mobile"):
@@ -166,8 +154,26 @@ func _ready() -> void:
 	
 	add_child(game)
 	_setup_scoreboard_popup(game)
-	if multiplayer.is_server():
-		_server_setup3()
+	var ingame := get_node_or_null("ingame_state")
+	var blue_spawns := get_node(TEAM_BLUE_PATH)  as Node3D
+	var red_spawns  := get_node(TEAM_RED_PATH)   as Node3D
+	var ball_spawn  := get_node(BALL_SPAWN_PATH) as Node3D
+
+	if not multiplayer.is_server():
+		net = WorldClientScript.new()
+		_initialize_multiplayer("NetClient", net)
+		net.init(local_view_proxy, _scoreboard_instance, ingame, blue_spawns, red_spawns, ball_spawn,
+		 ball_scene, get_node(joystick_path))
+	else:
+		_create_ball_server()
+		var ids: Array[int] = []
+		for k in GameState.roster.keys():
+			ids.append(int(k))   # ensure int
+			_server_begin_match(ids)
+		net = WorldServerScript.new()
+		_initialize_multiplayer("NetServer", net)
+		net.start_init(_players, _scoreboard_instance, ingame, blue_spawns, red_spawns, ball_spawn,
+		ball_scene, GameState.match_len_sec, GameState.goal_limit, GameState.roster, get_node(joystick_path))
 		
 
 
@@ -186,19 +192,8 @@ func _ready() -> void:
 		_players[1] = pre
 		print("Registered preplaced Player as host player; authority=", pre.get_multiplayer_authority())
 
-func set_game(game : Node) -> void:
-	_game = game
-	_game.set_scoreboard(_scoreboard_instance)
-	add_child(_game)
-
 func start_game() -> void:
-	
-	var start_data = {"ball_scene" : BALL_PATH,
-	"spawns_blue": TEAM_BLUE_PATH,
-	"spawns_red": TEAM_RED_PATH
-	}
-	
-	_game.start_game()
+
 	LoadingUI.hide_loading()
 
 
@@ -640,166 +635,9 @@ func _create_graphics_settings_ui() -> Control:
 func _apply_graphics_settings(fullscreen: bool, vsync: bool, quality: int, tex_quality: int, scale_3d: float) -> void:
 	Settings.set_and_save(fullscreen, vsync, quality, tex_quality, scale_3d)
 
-
-
-func _server_setup() -> void:
-	if !multiplayer.is_server():
-		return
-	
-	_create_ball_server()
-
-	var ids: Array[int] = []
-	for k in GameState.roster.keys():
-		var pid := int(k)
-		if GameState.is_dedicated_server() and pid == 1:
-			continue  # server is not a player in dedicated mode
-		ids.append(pid)
-
-	_server_begin_match(ids)
-
-	# Resolve to actual nodes in World context
-	var blue_spawns := get_node(TEAM_BLUE_PATH)  as Node3D
-	var red_spawns  := get_node(TEAM_RED_PATH)   as Node3D
-	var ball_spawn  := get_node(BALL_SPAWN_PATH) as Node3D
-
-	# Give Game everything it needs *before* it's added (so _ready can safely use them)
-	_game.setup({
-		"duration_sec": GameState.match_len_sec,
-		"goal_limit":   GameState.goal_limit,
-		"roster":       GameState.roster,
-	}, blue_spawns, red_spawns, ball_spawn, ball_scene)
-	_game.set_game()
-	net = WorldServerScript.new()
-	_initialize_multiplayer("NetServer", net)
-	net.set_players(_players)
-
-func _server_setup2(game : Node) -> void:
-	if !multiplayer.is_server():
-		return
-	
-	_create_ball_server()
-	var ids: Array[int] = []
-	for k in GameState.roster.keys():
-		ids.append(int(k))   # ensure int
-		_server_begin_match(ids)
-	_initalize_game_server(game)
-	rpc("_begin_next_initialization", GameState.roster.duplicate(true))
-
-func _server_setup3() -> void:
-	if !multiplayer.is_server():
-		return
-	
-	_create_ball_server()
-	var ids: Array[int] = []
-	for k in GameState.roster.keys():
-		ids.append(int(k))   # ensure int
-		_server_begin_match(ids)
-	net = WorldServerScript.new()
-	_initialize_multiplayer("NetServer", net)
-	var ingame := get_node_or_null("ingame_state")
-	var blue_spawns := get_node(TEAM_BLUE_PATH)  as Node3D
-	var red_spawns  := get_node(TEAM_RED_PATH)   as Node3D
-	var ball_spawn  := get_node(BALL_SPAWN_PATH) as Node3D
-	net.start_init(_players, ingame, blue_spawns, red_spawns, ball_spawn,
-	ball_scene, GameState.match_len_sec, GameState.goal_limit, GameState.roster, ball_scene.get_path(), joystick_path)
-	
-@rpc("authority", "reliable", "call_local")
-func _begin_next_initialization(roster : Dictionary) -> void:
-	GameState.roster = roster
-	_initialize_game2()
-	rpc("client_init_done")
-
-@rpc("authority", "reliable", "call_local")
-func _client_init_done() -> void:
-	_peers_ready += 1
-	print("_peers_ready: ", _peers_ready)
-	if _peers_ready == GameState.roster.size():
-		_game_server.start_game()
-
 func _initialize_multiplayer(name: String, net : Node) -> void:
 	net.name = name
 	add_child(net)
-
-func _initialize_ingame_setup() -> void:
-	var game : Node = Ingame.new()
-	game.name = "ingame_state"
-	add_child(game)
-	_server_setup2(game)
-
-func _initalize_game_controller() -> void:
-	if !multiplayer.is_server():
-		return
-		# Resolve to actual nodes in World context
-	var ingame := get_node_or_null("ingame_state")
-	var blue_spawns := get_node(TEAM_BLUE_PATH)  as Node3D
-	var red_spawns  := get_node(TEAM_RED_PATH)   as Node3D
-	var ball_spawn  := get_node(BALL_SPAWN_PATH) as Node3D
-	
-	_game_server = GameServer.new()
-	# Give Game everything it needs *before* it's added (so _ready can safely use them)
-	_game_server.setup({
-			"duration_sec": GameState.match_len_sec,
-			"goal_limit":   GameState.goal_limit,
-			"roster":       GameState.roster,
-		}, blue_spawns, red_spawns, ball_spawn, ball_scene)
-	_game_server.set_game(ingame, self)
-	add_child(_game_server)
-
-
-func _initalize_game_server(ingame : Node) -> void:
-	if !multiplayer.is_server():
-		return
-		# Resolve to actual nodes in World context
-	var blue_spawns := get_node(TEAM_BLUE_PATH)  as Node3D
-	var red_spawns  := get_node(TEAM_RED_PATH)   as Node3D
-	var ball_spawn  := get_node(BALL_SPAWN_PATH) as Node3D
-	
-	_game_server = GameServer.new()
-	# Give Game everything it needs *before* it's added (so _ready can safely use them)
-	_game_server.setup({
-			"duration_sec": GameState.match_len_sec,
-			"goal_limit":   GameState.goal_limit,
-			"roster":       GameState.roster,
-		}, blue_spawns, red_spawns, ball_spawn, ball_scene)
-	_game_server.set_game(ingame, self)
-	add_child(_game_server)
-	net = WorldServerScript.new()
-	_initialize_multiplayer("NetServer", net)
-	net.set_players(_players)
-
-
-func _initialize_game() -> void:
-	var game := Game.new()
-	game.name = "Game"
-		## Resolve to actual nodes in World context
-	#var blue_spawns := get_node(TEAM_BLUE_PATH)  as Node3D
-	#var red_spawns  := get_node(TEAM_RED_PATH)   as Node3D
-	#var ball_spawn  := get_node(BALL_SPAWN_PATH) as Node3D
-	##var ball_scene := get_node(BALL_PATH) as Node3D
-#
-	## Give Game everything it needs *before* it's added (so _ready can safely use them)
-	#game.setup({
-			#"duration_sec": GameState.match_len_sec,
-			#"goal_limit":   GameState.goal_limit,
-			#"roster":       GameState.roster,
-		#}, blue_spawns, red_spawns, ball_spawn, ball_scene)
-
-	_game = game
-	add_child(game)
-
-func _initialize_game2() -> void:
-	print("_initialize_game2, game client will be initalized for the multiplayer id: ", multiplayer.get_unique_id())
-	_game  = GameClient.new()
-	_game.name = "GameClient"
-	_game.set_properties(_scoreboard_instance, self)
-	add_child(_game)
-
-func _initialize_game_updater(roster : Dictionary) -> void:
-	_game  = GameClient.new()
-	_game.name = "GameClient"
-	_game.set_properties(_scoreboard_instance, self)
-	_game.initialize(roster)
-	add_child(_game)
 
 func _create_ball_server() -> void:
 	# Instance a **fresh** rigid body
@@ -903,7 +741,8 @@ func _reset_inputs() -> void:
 
 func _process(delta: float) -> void:
 	if Input.is_action_just_pressed("debug"):
-		_all_players_positions()
+		print("mid; ", multiplayer.get_unique_id())
+		#_all_players_positions()
 	if Input.is_action_just_pressed("host_key"):
 		if multiplayer.multiplayer_peer is ENetMultiplayerPeer and multiplayer.is_server():
 			print("Already hosting (ENet)")        # start hosting
@@ -916,11 +755,6 @@ func _process(delta: float) -> void:
 		if multiplayer.multiplayer_peer is ENetMultiplayerPeer:
 			print("Already connected (ENet)")
 	
-	if Input.is_action_just_pressed("debug_third") and is_instance_valid(_game):
-		_game._rpc_set_goal_camera_third_person()  # direct local call
-
-	if Input.is_action_just_pressed("debug_first") and is_instance_valid(_game):
-		_game._rpc_set_camera_first_person()       # direct local call
 	_update_tackle_cooldown_ui(delta)
 	_update_pass_cooldown_ui(delta)
 
@@ -1278,28 +1112,13 @@ func _enable_local_view_now(p: Node) -> void:
 			cam.call_deferred("set", "ball_target_path", ball.get_path())
 
 @rpc("any_peer", "unreliable_ordered")
-func receive_network_input(cmd: Dictionary, peer_id : int) -> void:
-	net.process_input(cmd, peer_id)
+func receive_network_input_by_id(peer_id : int, cmd : Dictionary) -> void:
+	net.process_input_by_id(peer_id, cmd)
 	
 
 @rpc("any_peer", "reliable")
 func receive_network_input_dictionary(msg: int, value : Dictionary) -> void:
-	if msg == NetCodes.Msg.GAME_END:
-		_game.end_game(value)
-	else:
-		if not net:
-			print("net does not exist for: ", multiplayer.get_unique_id())
-		net.process_input_dictionary(msg, value)
-
-@rpc("any_peer", "reliable")
-func transmit_game_data(value : Dictionary, msg : StringName) -> void:
-	if msg == "finish":
-		_game_server.transmissiont_completed()
-		transmit_game_data.rpc_id(1, {}, "finish")
-	else:
-		print("multiplayer id is: ", multiplayer.get_unique_id())
-		_game.process_data(value, msg)
-
+	net.process_input_dictionary(msg, value)
 
 @rpc("authority", "unreliable_ordered")
 func _rpc_client_receive_facing_snapshots(snapshots: Dictionary) -> void:
