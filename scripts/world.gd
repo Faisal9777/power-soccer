@@ -82,6 +82,8 @@ var net: Node = null
 
 var _my_player: Node = null
 var _input_accum: float = 0.0
+var _direct_input_seq: int = 0
+var _last_direct_input_seq: Dictionary = {}
 var ball_scene : Node3D = null
 var  tackle_edge_latched := false
 var  stop_ball_edge_latched := false
@@ -603,6 +605,12 @@ func _create_graphics_settings_ui() -> Control:
 		_update_scale_text.call()
 	)
 
+	# --- Network indicators toggle ---
+	var net_indicators := CheckBox.new()
+	net_indicators.text = "Network Indicators"
+	net_indicators.button_pressed = bool(Settings.net_indicators)
+	v.add_child(net_indicators)
+
 	# --------------------
 	# Bottom buttons (always visible)
 	# --------------------
@@ -635,15 +643,16 @@ func _create_graphics_settings_ui() -> Control:
 			vsync.button_pressed,
 			quality.selected,
 			tex_quality.selected,
-			float(scale_slider.value)
+			float(scale_slider.value),
+			net_indicators.button_pressed
 		)
 	)
 
 	return root
 
 
-func _apply_graphics_settings(fullscreen: bool, vsync: bool, quality: int, tex_quality: int, scale_3d: float) -> void:
-	Settings.set_and_save(fullscreen, vsync, quality, tex_quality, scale_3d)
+func _apply_graphics_settings(fullscreen: bool, vsync: bool, quality: int, tex_quality: int, scale_3d: float, net_indicators: bool) -> void:
+	Settings.set_and_save(fullscreen, vsync, quality, tex_quality, scale_3d, net_indicators)
 
 
 
@@ -990,6 +999,7 @@ func on_peer_joined(id: int) -> void:
 
 func _on_peer_left(id: int) -> void:
 	print("Peer left: ", id)
+	_last_direct_input_seq.erase(id)
 	if GameState.roster.has(id):
 		GameState.roster.erase(id)
 	if _players.has(id):
@@ -1143,7 +1153,11 @@ func _gather_input() -> Dictionary:
 	var yaw := 0.0
 	var cam := get_viewport().get_camera_3d()
 	if cam:
-		yaw = cam.global_transform.basis.get_euler().y
+		var forward := -cam.global_transform.basis.z
+		forward.y = 0.0
+		if forward.length_squared() > 0.0001:
+			forward = forward.normalized()
+			yaw = atan2(forward.x, forward.z)
 	else:
 		var me: CharacterBody3D = _players.get(multiplayer.get_unique_id(), null) as CharacterBody3D
 		if me:
@@ -1194,6 +1208,8 @@ func _send_local_input() -> void:
 		return
 
 	var d := _gather_input()
+	d["seq"] = _direct_input_seq
+	_direct_input_seq += 1
 
 	# ✅ IMPORTANT: also feed local player immediately on this machine
 	# so client-side code (_ability.client_tick, UI, etc.) can react instantly.
@@ -1213,6 +1229,15 @@ func _send_local_input() -> void:
 
 @rpc("any_peer")
 func _rpc_client_input(from_id: int, d: Dictionary) -> void:
+	var sender_id := multiplayer.get_remote_sender_id()
+	if multiplayer.is_server() and sender_id > 0 and sender_id != from_id:
+		return
+	var seq := int(d.get("seq", -1))
+	if seq >= 0:
+		var last_seq := int(_last_direct_input_seq.get(from_id, -1))
+		if seq <= last_seq:
+			return
+		_last_direct_input_seq[from_id] = seq
 	if d.get("grapple_toggle", false):
 		print("World got grapple toggle from ", from_id)
 	if _players.has(from_id):
@@ -1307,8 +1332,25 @@ func _enable_local_view_now(p: Node) -> void:
 
 @rpc("any_peer", "unreliable_ordered")
 func receive_network_input(cmd: Dictionary, peer_id : int) -> void:
+	var sender_id := multiplayer.get_remote_sender_id()
+	if multiplayer.is_server() and sender_id > 0 and sender_id != peer_id:
+		return
 	net.process_input(cmd, peer_id)
 	
+@rpc("any_peer", "unreliable_ordered")
+func _rpc_net_ping(client_msec: int) -> void:
+	if not multiplayer.is_server():
+		return
+	var sender_id := multiplayer.get_remote_sender_id()
+	if sender_id <= 0:
+		return
+	rpc_id(sender_id, "_rpc_net_pong", client_msec, Time.get_ticks_msec())
+
+@rpc("authority", "unreliable_ordered")
+func _rpc_net_pong(client_msec: int, _server_msec: int) -> void:
+	if net and net.has_method("record_ping_pong"):
+		net.record_ping_pong(client_msec, _server_msec)
+
 
 @rpc("any_peer", "reliable")
 func receive_network_input_dictionary(msg: int, value : Dictionary) -> void:

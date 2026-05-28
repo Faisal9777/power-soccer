@@ -11,10 +11,15 @@ var _expected_ready_peers := 0
 var _ready_peer_ids := {}
 var _game_begin_sent := false
 var _is_also_player := true
-# Input pump
-const NET_INPUT_HZ: float = 30.0
+# Snapshot pump
+const NET_SNAPSHOT_HZ: float = 30.0
+const INPUT_STALE_MSEC: int = 250
 var last_server_seq:= {}
 var last_received_seq := {}
+var last_received_msec := {}
+var stale_input_events := {}
+var input_stale_active := {}
+var _server_tick := 0
 func start_init(players: Dictionary,
 	ingame: Node,
 	blue_spawns: Node3D,
@@ -70,6 +75,9 @@ func process_input(cmd: Dictionary, peer_id: int) -> void:
 		_players_input[peer_id] = {}   # will store the LATEST cmd (Dictionary)
 		last_server_seq[peer_id] = -1
 		last_received_seq[peer_id] = -1
+		last_received_msec[peer_id] = Time.get_ticks_msec()
+		stale_input_events[peer_id] = 0
+		input_stale_active[peer_id] = false
 
 	var last := int(last_received_seq.get(peer_id, -1))
 	if seq <= last:
@@ -78,6 +86,8 @@ func process_input(cmd: Dictionary, peer_id: int) -> void:
 	# Missing-seq-proof: keep ONLY the latest cmd; overwrite older.
 	# last_server_seq is updated after the command is actually simulated.
 	last_received_seq[peer_id] = seq
+	last_received_msec[peer_id] = Time.get_ticks_msec()
+	input_stale_active[peer_id] = false
 	_players_input[peer_id] = cmd
 
 #func process_input(cmd: Dictionary, peer_id : int) -> void:
@@ -173,17 +183,22 @@ func _physics_process(delta: float) -> void:
 		p.update_player_states(inp_data, delta)
 	_update_local_player_states(delta)
 	_input_accum += delta
-	var step: float = 1.0 / NET_INPUT_HZ
+	var step: float = 1.0 / NET_SNAPSHOT_HZ
 	while _input_accum >= step:
 		_input_accum -= step
 		_broadcast_snapshots()
 
 func _broadcast_snapshots() -> void:
 	var snapshots := {}
+	_server_tick += 1
 
 	for peer_id in _players.keys():  # your list of Player nodes on server
 		var snapshot := _players[peer_id].get_snapshot() as Dictionary
 		snapshot["last_server_seq"] = int(last_server_seq.get(peer_id, -1))
+		snapshot["server_tick"] = _server_tick
+		snapshot["input_age_ms"] = Time.get_ticks_msec() - int(last_received_msec.get(peer_id, Time.get_ticks_msec()))
+		snapshot["input_stale"] = bool(input_stale_active.get(peer_id, false))
+		snapshot["stale_input_events"] = int(stale_input_events.get(peer_id, 0))
 		snapshots[peer_id] = snapshot
 
 	_network_endpoint.rpc("receive_network_input", snapshots, multiplayer.get_unique_id())
@@ -275,6 +290,7 @@ func _camera_setup(ball_path : NodePath, joystick_path : NodePath) -> void:
 			#pass
 
 func _update_local_player_states(delta : float) -> void:
+	var now := Time.get_ticks_msec()
 	for peer_id in _players_input.keys():
 		if not _players.has(peer_id):
 			continue
@@ -283,18 +299,51 @@ func _update_local_player_states(delta : float) -> void:
 		var cmd := _players_input[peer_id] as Dictionary
 		var seq := int(cmd.get("seq", -1))
 		var last_applied := int(last_server_seq.get(peer_id, -1))
+		var input_age := now - int(last_received_msec.get(peer_id, now))
+		var input_is_stale := input_age > INPUT_STALE_MSEC
 
-		if seq > last_applied and player.has_method("apply_net_input"):
+		if input_is_stale:
+			if not bool(input_stale_active.get(peer_id, false)):
+				stale_input_events[peer_id] = int(stale_input_events.get(peer_id, 0)) + 1
+			input_stale_active[peer_id] = true
+			cmd = _make_idle_command(cmd)
+		else:
+			input_stale_active[peer_id] = false
+
+		if (input_is_stale or seq > last_applied) and player.has_method("apply_net_input"):
 			player.apply_net_input(cmd)
 		if player.has_method("update_player_states"):
 			player.update_player_states(cmd, delta)
 		if seq >= 0 and seq > last_applied:
 			last_server_seq[peer_id] = seq
 
+func _make_idle_command(cmd: Dictionary) -> Dictionary:
+	var idle := cmd.duplicate(true)
+	idle["mvx"] = 0.0
+	idle["mvz"] = 0.0
+	idle["sprint"] = false
+	idle["jump_pressed"] = false
+	idle["tackle_pressed"] = false
+	idle["dribble"] = false
+	idle["stop_ball"] = false
+	idle["shoot_down"] = false
+	idle["shoot_up"] = false
+	idle["rmb"] = false
+	idle["assist_pass_pressed"] = false
+	idle["latch_toggle"] = false
+	idle["ability_toggle"] = false
+	idle["ability_action1"] = false
+	idle["ability_action2"] = false
+	idle["ability_action3"] = false
+	return idle
+
 func _on_peer_left(id : int) -> void:
 	_players_input.erase(id)
 	last_server_seq.erase(id)
 	last_received_seq.erase(id)
+	last_received_msec.erase(id)
+	stale_input_events.erase(id)
+	input_stale_active.erase(id)
 	_ready_peer_ids.erase(id)
 	_peers_ready = _ready_peer_ids.size()
 	if GameState.roster.has(id):

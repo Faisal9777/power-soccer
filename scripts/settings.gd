@@ -9,6 +9,7 @@ var fullscreen := false
 var vsync := true
 var quality := 1          # 0=Low, 1=Med, 2=High (MSAA)
 var tex_quality := 2      # 0=Low, 1=Med, 2=High (Textures)
+var net_indicators := true
 
 # NEW: 3D render scale (Project Settings -> Rendering -> Scaling 3D -> Scale)
 var scale_3d: float = 1.0
@@ -18,12 +19,13 @@ func _enter_tree() -> void:
 	_apply()
 
 # UPDATED: add new_scale_3d
-func set_and_save(new_fullscreen: bool, new_vsync: bool, new_quality: int, new_tex_quality: int, new_scale_3d: float) -> void:
+func set_and_save(new_fullscreen: bool, new_vsync: bool, new_quality: int, new_tex_quality: int, new_scale_3d: float, new_net_indicators: bool) -> void:
 	fullscreen = new_fullscreen
 	vsync = new_vsync
 	quality = new_quality
 	tex_quality = new_tex_quality
 	scale_3d = new_scale_3d
+	net_indicators = new_net_indicators
 	_apply()
 	_save()
 
@@ -67,6 +69,7 @@ func _load() -> void:
 		vsync       = cfg.get_value("video", "vsync", vsync)
 		quality     = cfg.get_value("video", "quality", quality)
 		tex_quality = cfg.get_value("video", "texture_quality", tex_quality)
+		net_indicators = bool(cfg.get_value("video", "net_indicators", net_indicators))
 
 		# NEW:
 		scale_3d    = float(cfg.get_value("video", "scale_3d", scale_3d))
@@ -81,6 +84,7 @@ func _save() -> void:
 	cfg.set_value("video", "vsync", vsync)
 	cfg.set_value("video", "quality", quality)
 	cfg.set_value("video", "texture_quality", tex_quality)
+	cfg.set_value("video", "net_indicators", net_indicators)
 
 	# NEW:
 	cfg.set_value("video", "scale_3d", scale_3d)

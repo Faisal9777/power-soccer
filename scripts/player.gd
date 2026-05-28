@@ -36,6 +36,12 @@ class_name Player
 @export var dribble_up: float = 0.15
 @export var dribble_cooldown: float = 1
 @export var dribble_cone_dot: float = 0.0
+@export var shoot_range: float = 2.75
+@export var dribble_range: float = 2.25
+@export var dribble_fling_forward_threshold: float = 0.9
+@export var dribble_fling_side_max: float = 0.22
+@export var stop_ball_range: float = 3.5
+@export var stop_ball_cooldown: float = 3.0
 
 @export var vel_influence: float = 0.3
 @export var vel_ref_speed: float = 0.0
@@ -230,7 +236,7 @@ var _ui_charge := 0.0  # client-only visual charge
 @onready var is_mobile: bool = OS.has_feature("mobile")
 @onready var joystick: Node = null
 # Add "tackle": 0.0 to the dictionary
-var _cooldowns := {"shoot": 0.0, "move": 0.0, "jump": 0.0, "tackle": 0.0, "assist_pass": 0.0}
+var _cooldowns := {"shoot": 0.0, "move": 0.0, "jump": 0.0, "tackle": 0.0, "assist_pass": 0.0, "stop_ball": 0.0}
 
 # --- Net input state (fed by world.gd on the server) ---
 var _net := {
@@ -913,32 +919,52 @@ func _handle_jump_server() -> void:
 		_cooldowns["jump"] = jump_cooldownn
 
 func _handle_kick_action_server() -> void:
+	_handle_ball_stop_server()
 	if _cooldowns["shoot"] != 0.0:
 		return
 	_handle_shoot_server()
 	_handle_dribble_server()
-	_handle_ball_stop_server()
 
 func _handle_ball_stop_server() -> void:
-	if _btn_down("stop_ball") and current_ball and is_instance_valid(current_ball) and _can_perform("stop", stamina_min_to_stop_ball):
-		current_ball.linear_velocity = Vector3.ZERO
-		current_ball.angular_velocity = Vector3.ZERO
-		current_ball.sleeping = false
-		_cooldowns["shoot"] = dribble_cooldown * 0.5
+	if !_btn_down("stop_ball"):
+		return
+	if _cooldowns["stop_ball"] > 0.0:
+		return
+	if current_ball == null or !is_instance_valid(current_ball):
+		return
+	if !_ball_within_stop_range():
+		return
+	if !_can_perform("stop", stamina_min_to_stop_ball):
+		return
+
+	current_ball.linear_velocity = Vector3.ZERO
+	current_ball.angular_velocity = Vector3.ZERO
+	current_ball.sleeping = false
+	_cooldowns["stop_ball"] = stop_ball_cooldown
 
 func _handle_dribble_server() -> void:
 	if !_btn_down("dribble") or _cooldowns["shoot"] != 0.0:
 		return
-	#if not _can_perform("dribble", stamina_min_to_dribble): return
 	var mvx := float(_net["mvx"])
 	var mvz := float(_net["mvz"])
-	if mvx + mvz == 0 or not _can_perform("dribble", stamina_min_to_dribble): return 
-	if mvx < -0.2:
-		perform_dribble_server(-1); _cooldowns["shoot"] = dribble_cooldown
-	elif mvx > 0.2:
-		perform_dribble_server(1);  _cooldowns["shoot"] = dribble_cooldown
-	elif mvz > 0.2:
-		_fling_ball_server();       _cooldowns["shoot"] = dribble_cooldown
+	if Vector2(mvx, mvz).length() < 0.1 or not _can_perform("dribble", stamina_min_to_dribble):
+		return
+	if !_ball_within_dribble_range():
+		return
+
+	# Fling only on near-pure forward intent, so diagonals still dribble.
+	if mvz >= dribble_fling_forward_threshold and abs(mvx) <= dribble_fling_side_max:
+		_fling_ball_server()
+		_cooldowns["shoot"] = dribble_cooldown
+		return
+
+	# All other directions: directional push
+	var yaw := float(_net.get("cam_yaw", rotation.y))
+	var fwd   := Vector3.BACK.rotated(Vector3.UP, yaw);  fwd.y = 0.0;  fwd   = fwd.normalized()
+	var right := Vector3.LEFT.rotated(Vector3.UP, yaw); right.y = 0.0; right = right.normalized()
+	var dir := (right * mvx + fwd * mvz).normalized()
+	perform_dribble_server(dir)
+	_cooldowns["shoot"] = dribble_cooldown
 
 func _fling_ball_server() -> void:
 	if current_ball == null or !is_instance_valid(current_ball):
@@ -953,41 +979,53 @@ func _fling_ball_server() -> void:
 	current_ball.sleeping = false
 	current_ball.apply_impulse(J, Vector3.ZERO)
 
-func perform_dribble_server(direction: int) -> void:
+func perform_dribble_server(dribble_dir: Vector3) -> void:
 	if current_ball == null or !is_instance_valid(current_ball):
 		return
 
+	dribble_dir.y = 0.0
+	if dribble_dir.length_squared() < 0.001:
+		return
+	dribble_dir = dribble_dir.normalized()
+
 	var player_pos := global_transform.origin
-	var ball_pos := current_ball.global_transform.origin
-	var to_ball := ball_pos - player_pos
-	var to_ball_xz := Vector3(to_ball.x, 0.0, to_ball.z)
+	var ball_pos   := current_ball.global_transform.origin
+	var to_ball_xz := Vector3(ball_pos.x - player_pos.x, 0.0, ball_pos.z - player_pos.z)
 	if to_ball_xz == Vector3.ZERO:
 		return
 
-	# 🔁 Use camera yaw, same as movement
+	# Cone check uses camera forward (original behaviour) so left/back dribbles aren't blocked
 	var yaw := float(_net.get("cam_yaw", rotation.y))
-	var fwd := Vector3.FORWARD.rotated(Vector3.UP, yaw)
-	fwd.y = 0.0
-	if fwd.length() == 0.0:
-		return
-	fwd = fwd.normalized()
-
-	# ball must be roughly in front of the *camera*
-	if fwd.dot(to_ball_xz.normalized()) < dribble_cone_dot:
+	var cam_fwd := Vector3.BACK.rotated(Vector3.UP, yaw); cam_fwd.y = 0.0; cam_fwd = cam_fwd.normalized()
+	if cam_fwd.dot(to_ball_xz.normalized()) < dribble_cone_dot:
 		return
 
-	var right_xz := fwd.cross(Vector3.UP).normalized()
-	# remove forward drift
 	var v := current_ball.linear_velocity
-	current_ball.linear_velocity = v - fwd * v.dot(fwd)
+	current_ball.linear_velocity = v - dribble_dir * v.dot(dribble_dir)
 
-	var J := right_xz * float(direction) * dribble_impulse + Vector3.UP * dribble_up
-	var radius := _get_ball_radius(current_ball)
-	var approx_contact := ball_pos - fwd * radius
-	var local_contact := current_ball.to_local(approx_contact).lerp(Vector3.ZERO, 0.4)
+	var J := dribble_dir * dribble_impulse + Vector3.UP * dribble_up
+	var radius         := _get_ball_radius(current_ball)
+	var approx_contact := ball_pos - dribble_dir * radius
+	var local_contact  := current_ball.to_local(approx_contact).lerp(Vector3.ZERO, 0.4)
 	current_ball.sleeping = false
 	current_ball.apply_impulse(J, local_contact)
 
+func _ball_within_shoot_range() -> bool:
+	return _ball_within_range(shoot_range)
+
+func _ball_within_dribble_range() -> bool:
+	return _ball_within_range(dribble_range)
+
+func _ball_within_stop_range() -> bool:
+	return _ball_within_range(stop_ball_range)
+
+func _ball_within_range(max_range: float) -> bool:
+	if current_ball == null or !is_instance_valid(current_ball):
+		return false
+	var to_ball := current_ball.global_transform.origin - global_transform.origin
+	to_ball.y = 0.0
+	return to_ball.length() <= max_range
+	
 func _handle_shoot_server() -> void:
 
 
@@ -1000,6 +1038,8 @@ func _kick_at_contact_server() -> void:
 	if aim_arrow == null or !is_instance_valid(aim_arrow):
 		return
 	if _charge <= 0.0:
+		return
+	if !_ball_within_shoot_range():
 		return
 
 	# Ball center and radius

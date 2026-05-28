@@ -14,9 +14,14 @@ var _visual_target: Vector3 = Vector3.ZERO
 @export var catchup_speed := 18.0
 @export var deadzone := 0.02
 @export var snap_dist := 2.5
-@export var local_reconcile_deadzone := 0.12
-@export var local_reconcile_blend := 0.35
+@export var local_reconcile_deadzone := 0.25
+@export var local_reconcile_blend := 0.18
 @export var local_reconcile_snap_dist := 3.0
+@export var max_prediction_replay_msec: int = 250
+@export var max_prediction_replay_inputs: int = 16
+@export var show_net_debug_overlay := true
+@export var net_debug_ping_interval_sec := 1.0
+@export var net_debug_update_interval_sec := 0.25
 
 var proxy : Node3D 
 var anchor: Node3D
@@ -42,6 +47,24 @@ var _remote_buf: Dictionary[int, Array] = {}
 
 var _my_id: int = -1
 var _fixed_dt: float = 1.0 / 60.0
+
+var _net_debug_layer: CanvasLayer
+var _net_debug_root: Control
+var _net_debug_label: Label
+var _net_debug_ping_accum := 0.0
+var _net_debug_ui_accum := 0.0
+var _net_debug_ping_ms := -1.0
+var _net_debug_last_rtt_ms := -1.0
+var _net_debug_jitter_ms := 0.0
+var _net_debug_snapshot_jitter_ms := 0.0
+var _net_debug_last_snapshot_msec := -1
+var _net_debug_pending_inputs := 0
+var _net_debug_pending_oldest_ms := 0
+var _net_debug_replay_inputs := 0
+var _net_debug_correction_m := 0.0
+var _net_debug_stale_events := 0
+var _net_debug_input_age_ms := 0
+var _net_debug_input_stale := false
 
 @onready var _network_endpoint: Node = get_parent()
 
@@ -98,6 +121,8 @@ func _ready() -> void:
 	_fixed_dt = 1.0 / max(1.0, hz)
 	Network.connection_failed.connect(_on_connection_failed)
 	Network.server_disconnected.connect(_on_server_disconnected)
+	show_net_debug_overlay = bool(Settings.net_indicators)
+	_ensure_net_debug_overlay()
 
 
 # ---------- Main loop ----------
@@ -134,6 +159,7 @@ func _physics_process(delta: float) -> void:
 		return
 
 	cmd["seq"] = _next_input_seq
+	cmd["client_msec"] = Time.get_ticks_msec()
 	_next_input_seq += 1
 
 	var stored := cmd.duplicate(true)
@@ -151,12 +177,14 @@ func _physics_process(delta: float) -> void:
 
 	if _pending_inputs.size() > 256:
 		_pending_inputs = _pending_inputs.slice(_pending_inputs.size() - 256, _pending_inputs.size())
+	_trim_pending_inputs()
 	if is_instance_valid(_network_endpoint) and _network_endpoint.has_method("_reset_inputs"):
 		_network_endpoint.call("_reset_inputs")
 
 
 func _process(_delta: float) -> void:
 	#_smooth_local_visual(_delta)
+	_tick_net_debug(_delta)
 	_smooth_local_view(_delta)
 	# Remote interpolation runs every render frame for smoothness
 	var now := Time.get_ticks_msec()
@@ -206,6 +234,7 @@ func _process(_delta: float) -> void:
 # ---------- Snapshot storage ----------
 func _store_snapshots(snapshots: Dictionary) -> void:
 	var now := Time.get_ticks_msec()
+	_track_snapshot_jitter(now, snapshots)
 	_my_id = multiplayer.get_unique_id()
 	for k in snapshots.keys():
 		var peer_id := int(k)
@@ -224,6 +253,9 @@ func _store_snapshots(snapshots: Dictionary) -> void:
 			if snap_id > _latest_local_snapshot_id:
 				_latest_local_snapshot_id = snap_id
 				_latest_local_snapshot = snap
+				_net_debug_stale_events = int(snap.get("stale_input_events", _net_debug_stale_events))
+				_net_debug_input_age_ms = int(snap.get("input_age_ms", _net_debug_input_age_ms))
+				_net_debug_input_stale = bool(snap.get("input_stale", _net_debug_input_stale))
 		else:
 			# Remote players: push into a small buffer for interpolation
 			if not _remote_buf.has(peer_id):
@@ -262,6 +294,7 @@ func _reconcile_local(p: Node, snap: Dictionary, delta : float) -> void:
 			_pending_inputs.remove_at(i)
 		else:
 			i += 1
+	_trim_pending_inputs()
 
 	# 3) Replay remaining predicted-but-unconfirmed inputs using FIXED dt
 	for cmd in _pending_inputs:
@@ -287,19 +320,161 @@ func _reconcile_local_best_practice(p: Node3D, snap: Dictionary) -> void:
 			_pending_inputs.remove_at(i)
 		else:
 			i += 1
+	_trim_pending_inputs()
 
 	# --- D) replay remaining inputs using FIXED dt (determinism) ---
+	_net_debug_replay_inputs = _pending_inputs.size()
 	for cmd in _pending_inputs:
 		if p.has_method("apply_net_input"):
 			p.apply_net_input(cmd)
 		p.update_player_states(cmd, _fixed_dt)
 	var corrected_pos := p.global_position
 	var reconcile_error := predicted_pos.distance_to(corrected_pos)
+	_net_debug_correction_m = reconcile_error
 	if reconcile_error <= local_reconcile_deadzone:
 		p.global_position = predicted_pos
 	elif reconcile_error < local_reconcile_snap_dist:
 		p.global_position = predicted_pos.lerp(corrected_pos, clampf(local_reconcile_blend, 0.0, 1.0))
 	_calculate_error_after_reconcile()
+
+func _trim_pending_inputs() -> void:
+	var now := Time.get_ticks_msec()
+	var cutoff := now - max_prediction_replay_msec
+
+	var i := 0
+	while i < _pending_inputs.size():
+		var cmd := _pending_inputs[i] as Dictionary
+		var sent_msec := int(cmd.get("client_msec", now))
+		if sent_msec < cutoff:
+			_pending_inputs.remove_at(i)
+		else:
+			i += 1
+
+	while _pending_inputs.size() > max_prediction_replay_inputs:
+		_pending_inputs.pop_front()
+	_update_pending_input_metrics(now)
+
+func _update_pending_input_metrics(now: int) -> void:
+	_net_debug_pending_inputs = _pending_inputs.size()
+	if _pending_inputs.is_empty():
+		_net_debug_pending_oldest_ms = 0
+		return
+	var first := _pending_inputs[0] as Dictionary
+	_net_debug_pending_oldest_ms = now - int(first.get("client_msec", now))
+
+func _track_snapshot_jitter(now: int, snapshots: Dictionary) -> void:
+	if snapshots.is_empty():
+		return
+	if _net_debug_last_snapshot_msec >= 0:
+		var interval := float(now - _net_debug_last_snapshot_msec)
+		var expected := 1000.0 / 30.0
+		var sample := absf(interval - expected)
+		_net_debug_snapshot_jitter_ms = lerpf(_net_debug_snapshot_jitter_ms, sample, 0.12)
+	_net_debug_last_snapshot_msec = now
+
+func record_ping_pong(client_msec: int, _server_msec: int) -> void:
+	var now := Time.get_ticks_msec()
+	var rtt := maxf(0.0, float(now - client_msec))
+	if _net_debug_last_rtt_ms >= 0.0:
+		var sample_jitter := absf(rtt - _net_debug_last_rtt_ms)
+		_net_debug_jitter_ms = lerpf(_net_debug_jitter_ms, sample_jitter, 0.2)
+	_net_debug_last_rtt_ms = rtt
+	_net_debug_ping_ms = rtt if _net_debug_ping_ms < 0.0 else lerpf(_net_debug_ping_ms, rtt, 0.25)
+
+func _tick_net_debug(delta: float) -> void:
+	var desired_overlay := bool(Settings.net_indicators)
+	if show_net_debug_overlay != desired_overlay:
+		show_net_debug_overlay = desired_overlay
+
+	if not show_net_debug_overlay:
+		if is_instance_valid(_net_debug_root):
+			_net_debug_root.visible = false
+		return
+
+	_ensure_net_debug_overlay()
+	if is_instance_valid(_net_debug_root):
+		_net_debug_root.visible = true
+
+	_net_debug_ping_accum += delta
+	if _net_debug_ping_accum >= net_debug_ping_interval_sec:
+		_net_debug_ping_accum = 0.0
+		if not multiplayer.is_server() and is_instance_valid(_network_endpoint):
+			_network_endpoint.rpc_id(server_peer_id, "_rpc_net_ping", Time.get_ticks_msec())
+
+	_net_debug_ui_accum += delta
+	if _net_debug_ui_accum >= net_debug_update_interval_sec:
+		_net_debug_ui_accum = 0.0
+		_update_net_debug_overlay()
+
+func _ensure_net_debug_overlay() -> void:
+	if not show_net_debug_overlay:
+		return
+	if is_instance_valid(_net_debug_label):
+		return
+
+	_net_debug_layer = CanvasLayer.new()
+	_net_debug_layer.name = "NetDebugLayer"
+	_net_debug_layer.layer = 500
+	add_child(_net_debug_layer)
+
+	_net_debug_root = MarginContainer.new()
+	_net_debug_root.name = "NetDebugRoot"
+	_net_debug_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_net_debug_root.anchor_left = 0.0
+	_net_debug_root.anchor_top = 0.0
+	_net_debug_root.anchor_right = 0.0
+	_net_debug_root.anchor_bottom = 0.0
+	_net_debug_root.offset_left = 10
+	_net_debug_root.offset_top = 10
+	_net_debug_root.offset_right = 320
+	_net_debug_root.offset_bottom = 150
+	_net_debug_layer.add_child(_net_debug_root)
+
+	var panel := PanelContainer.new()
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_net_debug_root.add_child(panel)
+
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.02, 0.02, 0.02, 0.72)
+	style.border_color = Color(1, 1, 1, 0.22)
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(6)
+	panel.add_theme_stylebox_override("panel", style)
+
+	var pad := MarginContainer.new()
+	pad.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pad.add_theme_constant_override("margin_left", 8)
+	pad.add_theme_constant_override("margin_right", 8)
+	pad.add_theme_constant_override("margin_top", 6)
+	pad.add_theme_constant_override("margin_bottom", 6)
+	panel.add_child(pad)
+
+	_net_debug_label = Label.new()
+	_net_debug_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_net_debug_label.add_theme_font_size_override("font_size", 13)
+	_net_debug_label.add_theme_color_override("font_color", Color(1, 1, 1, 0.96))
+	_net_debug_label.custom_minimum_size = Vector2(280, 0)
+	pad.add_child(_net_debug_label)
+	_update_net_debug_overlay()
+
+func _update_net_debug_overlay() -> void:
+	if not is_instance_valid(_net_debug_label):
+		return
+
+	var ping_text := "--" if _net_debug_ping_ms < 0.0 else "%.0f" % _net_debug_ping_ms
+	var stale_text := "yes" if _net_debug_input_stale else "no"
+	_net_debug_label.text = "NET TEST\nPing: %s ms | Jitter: %.0f ms\nPending replay: %d (%d ms)\nCorrection: %.2f m | Replayed: %d\nStale input: %d | active: %s | age: %d ms\nSnapshot jitter: %.0f ms" % [
+		ping_text,
+		_net_debug_jitter_ms,
+		_net_debug_pending_inputs,
+		_net_debug_pending_oldest_ms,
+		_net_debug_correction_m,
+		_net_debug_replay_inputs,
+		_net_debug_stale_events,
+		stale_text,
+		_net_debug_input_age_ms,
+		_net_debug_snapshot_jitter_ms,
+	]
 
 func _calculate_error_after_reconcile() -> void:
 
