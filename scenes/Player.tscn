@@ -1,6 +1,6 @@
 [gd_scene load_steps=7 format=3 uid="uid://dv5l1qjf5gwfn"]
 
-[ext_resource type="Script" uid="uid://ct4g33ulp8nx5" path="res://scripts/player.gd" id="1_xhfnw"]
+[ext_resource type="Script" uid="uid://bywep5vmx3yv5" path="res://scripts/player.gd" id="1_xhfnw"]
 [ext_resource type="ArrayMesh" uid="uid://dfkb3j37cjp2g" path="res://3DModels/android_phone.obj" id="2_kpjcp"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_ld6s0"]
@@ -42,7 +42,7 @@ collision_mask = 5
 script = ExtResource("1_xhfnw")
 walk_speed = 9.5
 sprint_speed = 12.0
-jump_velocity = 10.0
+jump_velocity = 18.0
 stamina_regen_rate = 10.0
 stamina_sprint_drain = 20.0
 stamina_tackle_cost = 30.0

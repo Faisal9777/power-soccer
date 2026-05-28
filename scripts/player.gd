@@ -36,8 +36,8 @@ class_name Player
 @export var dribble_up: float = 0.15
 @export var dribble_cooldown: float = 1
 @export var dribble_cone_dot: float = 0.0
-@export var shoot_range: float = 2.75
-@export var dribble_range: float = 2.25
+@export var shoot_range: float = 3.25
+@export var dribble_range: float = 3.25
 @export var dribble_fling_forward_threshold: float = 0.9
 @export var dribble_fling_side_max: float = 0.22
 @export var stop_ball_range: float = 3.5
@@ -534,6 +534,9 @@ func _local_physics_process(delta: float) -> void:
 func _update_arrow_position(delta: float) -> void:
 	var ball := _resolve_ball() as RigidBody3D
 	if aim_arrow == null or ball == null or !is_instance_valid(ball) or !aim_active:
+		_show_arrow(false)
+		return
+	if !_ball_within_shoot_range() and !_ball_within_dribble_range():
 		_show_arrow(false)
 		return
 
