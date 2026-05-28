@@ -525,6 +525,7 @@ shape = SubResource("ConvexPolygonShape3D_f1i8d")
 [node name="Camera3D" parent="Scene" groups=["MainCamera"] instance=ExtResource("7_l8ah6")]
 ball_target_path = NodePath("")
 joystick_path = NodePath("../../CanvasLayer/UI/JoyStick")
+_pitch = 1.0
 
 [node name="Teams" type="Node3D" parent="."]
 

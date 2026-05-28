@@ -15,7 +15,7 @@ func freeze(toggle) -> void:
 func face_at(pos : Vector3) -> void:
 	var dir : Vector3 = (pos - player.global_position).normalized()
 
-	look_yaw = atan2(dir.x, dir.z)
+	look_yaw = atan2(-dir.x, -dir.z)
 
 	var flat_len := Vector2(dir.x, dir.z).length()
 	look_pitch = atan2(dir.y, flat_len)

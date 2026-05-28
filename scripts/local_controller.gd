@@ -22,8 +22,10 @@ func freeze(toggle) -> void:
 	cam.freeze_rotation(toggle)
 
 func process_input(delta):
+	if is_frozen:
+		return
 	var input = input_buffer.get_input()
-	applied_cmd_id = input.get("seq")
+	applied_cmd_id += 1 
 	_apply_inputs(input, delta)
 
 func _init(p_player, pid, p_name, team, c_cam, joystick, i_buffer : InputBuffer):

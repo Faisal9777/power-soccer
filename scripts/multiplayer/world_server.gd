@@ -9,6 +9,8 @@ var _network_endpoint : Node
 var _peers_ready := 0
 var _is_also_player := true
 var _game : Node
+var _client_game : Node
+var GameClient := load("res://scripts/multiplayer/game_client.gd")
 var p_controller : LocalController
 var controllers : Array = []
 # Input pump
@@ -27,7 +29,6 @@ func start_init(players: Dictionary,
 	goal_limit: int,
 	roster: Dictionary,
 	joystick : Node) -> void:
-	InputManager.set_input_listening(false)
 	_players = players
 	ingame.set_roster(GameState.roster)
 	_player_controller_setup(players, ball_scene.get_path(), joystick, controllers)
@@ -38,12 +39,14 @@ func start_init(players: Dictionary,
 			"duration_sec": match_len_sec,
 			"goal_limit":   goal_limit,
 			"roster":       roster,
-		}, blue_spawns, red_spawns, ball_spawn, ball_scene, ingame, roster, score_board, controllers)
+		}, blue_spawns, red_spawns, ball_spawn, ball_scene, ingame, roster, controllers)
 	_game.game_end.connect(_on_game_end)
+	_game.game_started.connect(_on_game_started)
 	#_debug_data(roster, ingame, ball_scene, blue_spawns, red_spawns)
 	var data := {"roster" : roster}
 	if _is_also_player:
 		_peers_ready +=1
+		_client_game = NodeUtils.create_game_client(self, GameClient, "GameClient", ingame, score_board, controllers)
 	_network_endpoint.rpc(NetCodes.Rpc.INPUT_STREAM, NetCodes.Msg.INIT_BEGIN, data)
 
 func process_input_by_id(peer_id: int, cmd : Dictionary) -> void:
@@ -64,11 +67,15 @@ func process_input_dictionary(msg: int, value : Dictionary) -> void:
 		_peers_ready += 1
 		#print("_peers_ready: ", _peers_ready)
 		if _peers_ready == GameState.roster.size():
+			var game_data = {"ball_position" : _game.ball_spawn.global_transform.origin}
+			for controller in controllers:
+				game_data[controller.id] = {"player_position" : controller.player.global_transform,
+				"is_frozen" : controller.is_frozen}
 			_game.start_game()
 			LoadingUI.hide_loading()
 			TaskScheduler.schedule(60, _broadcast_snapshots)
 			can_process = true
-			_network_endpoint.rpc(NetCodes.Rpc.INPUT_STREAM, NetCodes.Msg.GAME_BEGIN, {})
+			_network_endpoint.rpc(NetCodes.Rpc.INPUT_STREAM, NetCodes.Msg.GAME_BEGIN, game_data)
 
 func get_node_track() -> Node3D:
 	return
@@ -86,9 +93,10 @@ func _ready() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	if Input.is_action_just_pressed("debug"):
+		print("mid; ", multiplayer.get_unique_id())
 	if can_process:
 		_simulate_remote_players(delta)
-		p_controller.physics_tick(delta)
 
 func _simulate_remote_players(delta) -> void:
 	for controller in controllers:
@@ -124,10 +132,12 @@ func _player_controller_setup(rosters : Dictionary, ball_path : NodePath, joysti
 
 		var node := get_node_or_null(ppath)
 		if peer_id == multiplayer.get_unique_id():
+			node.visible = false
 			var player = get_node(ppath)
 			var cam = get_node_or_null("/root/World/Scene/Camera3D") as Camera3D
 			cam.init(node, joystick)
-			var input_buffer = LocalInputBuffer.new()
+			var input_source = NodeUtils.init_input_source(self)
+			var input_buffer = LocalInputBuffer.new(input_source)
 			p_controller = LocalController.new(node, peer_id, name, team, cam, joystick, input_buffer)
 			controllers.append(p_controller)
 		else:
@@ -166,6 +176,10 @@ func _on_all_peers_left() -> void:
 
 func _on_game_end(duration, scene) -> void:
 	print('implement on game end')
+
+func _on_game_started(game_data) -> void:
+	_client_game.start_round(game_data)
+	_network_endpoint.rpc(NetCodes.Rpc.INPUT_STREAM, NetCodes.Msg.ROUND_START, game_data)
 
 func _debug_data(roster: Dictionary, ingame: Node, ball_scene: Node, blue_spawns: Node, red_spawns: Node) -> void:
 	print("--- BUILD DATA DEBUG ---")

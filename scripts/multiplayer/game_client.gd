@@ -15,9 +15,6 @@ var _countdown_label: Label
 var _is_player_frozen:= true
 var _network_endpoint : Node
 var _all_player_frozen := true
-var ball_scene : Node
-var spawns_blue : Node
-var spawns_red : Node
 var p_controllers = []
 
 const BLUE := Color(0.20, 0.60, 1.00)
@@ -196,14 +193,16 @@ func _tint_recursive(n: Node, col: Color) -> void:
 		var child: Node = children[i] as Node
 		_tint_recursive(child, col)
 
-func setup(blue: Node3D, red: Node3D, ball_sp: Node3D, scene: Node3D, ingame : Node, scoreboard, controllers) -> void:
+func setup(ingame : Node, scoreboard, controllers) -> void:
 
 	state = ingame
-	ball_scene = blue
-	spawns_blue = blue
-	spawns_red = red
 	_scoreboard_instance = scoreboard
+	p_controllers = controllers
 	_color_all_players(controllers)
+
+func start_round(game_data) -> void:
+	for controller in p_controllers:
+		controller.freeze(game_data[controller.id])
 
 func _ready() -> void:
 	
@@ -230,8 +229,8 @@ func _position_players() -> void:
 	return
 
 
-func start_game() -> void:
-	_position_players2()
+func start_game(game_data) -> void:
+	_position_players2(game_data)
 
 func end_game(value : Dictionary) -> void:
 	var duration := value.get("duration", 3) as int
@@ -252,30 +251,14 @@ func _toggle_player_process(toggle : bool) -> void:
 		p.freeze(switch)
 	_all_player_frozen = switch
 
-func _position_players2() -> void:
-	var blue_placed := 1
-	var red_placed  := 1
-	# Find a target to face: live Ball if it exists, else the BallSpawn
-	var ball := ball_scene
-	#var target_pos := ball.global_transform.origin if ball != null else ball_spawn.global_transform.origin
-	#var target_pos := ball_spawn.global_position
+func _position_players2(game_data) -> void:
+	var ball_position : Vector3 = game_data["ball_position"]
 	for controller in p_controllers:
-		var pid : int = controller.id
-		var team :int= controller.team
-		if team == GameState.Team.BLUE:
-			var sp := spawns_blue.get_node_or_null("Spawn%d" % blue_placed) as Node3D
-			if sp:
-				controller.set_position(sp.global_transform)
-				blue_placed += 1
-		else:
-			var sp := spawns_red.get_node_or_null("Spawn%d" % red_placed) as Node3D
-			if sp:
-				controller.set_position(sp.global_transform)
-				red_placed += 1
-		# tell that specific client to aim their camera
-		_init_entry(pid, name, team)
-		controller.face_at(ball.global_transform.origin)
-		controller.freeze(true)
+		controller.set_position(game_data[controller.id]["player_position"])
+		
+		_init_entry(controller.id, controller.name, controller.team)
+		controller.face_at(ball_position)
+		controller.freeze(game_data[controller.id]["is_frozen"])
 
 func process_data(data : Dictionary, msg : StringName) -> void:
 	if msg == "init":

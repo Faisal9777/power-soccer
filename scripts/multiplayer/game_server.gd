@@ -3,6 +3,7 @@ extends Node
 signal hud_update(score_blue:int, score_red:int, time_left:float, phase:String)
 signal match_ended(winner:int) # -1 draw, 0 blue, 1 red
 signal game_end(duration : float, scene : String)
+signal game_started(game_data)
 # Injected from Lobby/World before/after _ready:
 @export var win_scene_path: String = "res://scenes/WinScene.tscn"
 @export var lose_scene_path: String = "res://scenes/DefeatScene.tscn"
@@ -24,10 +25,7 @@ var p_controllers : Array = []
 var _end_ms: int = -1             # replicated ALWAYS during prestart
 var _cd_ms: int = -2
 var _all_team_assinged_color := false   
-var _scoreboard_instance: Control
 var _network_endpoint : Node
-
-var GameClient := load("res://scripts/multiplayer/game_client.gd")
 
 var game : Dictionary = {}
 # ---------- UI ----------
@@ -64,7 +62,7 @@ const BLUE := Color(0.20, 0.60, 1.00)
 const RED  := Color(1.00, 0.30, 0.30)
 
 func setup(s_cfg: Dictionary, blue: Node3D, red: Node3D, ball_sp: Node3D, scene: Node3D, ingame : Node, 
-roster : Dictionary, scoreboard, controllers) -> void:
+roster : Dictionary, controllers) -> void:
 	_duration_sec = s_cfg.get("duration_sec")
 	_goal_limit = s_cfg.get("goal_limit")
 	_roster = s_cfg.get("roster")
@@ -74,7 +72,6 @@ roster : Dictionary, scoreboard, controllers) -> void:
 	ball_scene  = scene
 	state = ingame
 	_roster = roster
-	_scoreboard_instance = scoreboard
 	p_controllers = controllers
 
 
@@ -161,7 +158,10 @@ func _start_countdown_server() -> void:
 
 func _start_game() -> void:
 	state.is_paused = false
-	_toggle_player_process(true)
+	var game_data = {}
+	for controller in p_controllers:
+		game_data[controller.id] = false
+	game_started.emit(game_data)
 	#_toggle_player_process(false)
 
 func _toggle_player_process(toggle : bool) -> void:

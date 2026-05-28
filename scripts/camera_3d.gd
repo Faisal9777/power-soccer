@@ -36,8 +36,8 @@ var _follow_target: Node3D
 var _target_ball: Node3D
 @export var joystick_path :NodePath
 var joystick: Control = null
-var _yaw: float = 0.0
-var _pitch: float = -0.25
+@export var _yaw: float = 0.0
+@export var _pitch: float = -0.25
 
 var _wheel_step: float = 0.7
 var _captured: bool = true
@@ -45,7 +45,7 @@ var _pending_face_point: Vector3 = Vector3.ZERO
 var _has_pending_face: bool = false
 var _is_frozen := false
 @export var front_is_plus_z: bool = true
-
+var is_debugging := false
 func _ready() -> void:
 	_self_layer_mask = 1 << (self_layer_ui - 1)
 	_target = get_node_or_null(target_path)
@@ -336,6 +336,7 @@ func set_first_person_view() -> void:
 	_apply_fp_tp_self_visibility()
 
 func _apply_fp_tp_self_visibility() -> void:
+	return
 	if distance <= 0.05:
 		# First person:
 		# hide player body
