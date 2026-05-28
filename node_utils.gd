@@ -14,3 +14,21 @@ static func create_cloud_transport(endpoint, parent: Node) -> CloudHeartbeatTran
 	var t = CloudHeartbeatTransport.new(endpoint, http)
 
 	return t
+
+static func init_input_source(parent: Node) -> Node:
+	var t = InputSource.new()
+	parent.add_child(t)
+
+	return t
+
+static func create_game_client(parent: Node, cl, name, state, scoreboard, controllers) -> Node:
+	var t = create_node(parent, cl, name)
+	t.setup(state, scoreboard, controllers)
+	return t
+
+static func create_node(parent: Node, cl, name : String) -> Node:
+	var t = cl.new()
+	t.name = name
+	parent.add_child(t)
+
+	return t

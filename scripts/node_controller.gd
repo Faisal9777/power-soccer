@@ -18,8 +18,8 @@ func _init(p_player, pid, p_name, p_team, i_buffer : InputBuffer):
 	super._init(p_player, p_name, pid, p_team)
 
 func physics_tick(delta: float) -> void:
-	var inputs : Dictionary = input_buffer.get_input()
-	_apply_inputs(inputs, delta)
+	process_input(delta)
+
 
 func _apply_inputs(input, delta) -> void:
 	var p_input = _get_player_input(input)

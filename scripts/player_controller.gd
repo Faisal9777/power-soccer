@@ -48,6 +48,8 @@ func physics_tick(delta: float) -> void:
 		process_input(delta)
 
 func process_input(delta):
+	if is_frozen:
+		return
 	var input = input_buffer.get_input()
 	_next_input_seq += 1
 

@@ -60,7 +60,7 @@ func process_input_dictionary(msg : int, value : Dictionary) -> void:
 		_evaluate_all_phases()
 
 	if msg == NetCodes.Msg.GAME_BEGIN:
-		_game.start_game()
+		_game.start_game(value)
 		LoadingUI.hide_loading()
 		p_controller.start_process()
 	elif msg == NetCodes.Msg.GAME_END:
@@ -68,6 +68,8 @@ func process_input_dictionary(msg : int, value : Dictionary) -> void:
 	
 	elif msg == NetCodes.Msg.SNAPSHOTS:
 		_store_snapshots(value)
+	elif msg == NetCodes.Msg.ROUND_START:
+		_game.start_round(value)
 		
 
 # ---------- Public API (call these from your world/spawner) ----------
@@ -101,7 +103,6 @@ func init(p : Node3D,
 	ball_spawn: Node3D,
 	ball_scene: Node3D,
 	j_stick) -> void:
-	InputManager.set_input_listening(true)
 	proxy = p
 	joystick = j_stick
 	blue_sp = blue_spawns
@@ -175,9 +176,10 @@ func _resolve_players_from_roster(rosters) -> void:
 
 		var node := get_node_or_null(ppath)
 		if peer_id == multiplayer.get_unique_id():
+			node.visible = false
 			var cam = get_node_or_null("/root/World/Scene/Camera3D") as Camera3D
 			cam.init(proxy, joystick)
-			var input_buffer = LocalInputBuffer.new()
+			var input_buffer = LocalInputBuffer.new(NodeUtils.init_input_source(self))
 			p_controller = PlayerController.new(node, peer_id, name, team, cam, joystick, self, input_buffer)
 			proxy.init(node, p_controller)
 			controllers.append(p_controller)
@@ -188,7 +190,7 @@ func _resolve_players_from_roster(rosters) -> void:
 			_players[k] = node
 	_game = GameClient.new()
 	add_child(_game)
-	_game.setup(blue_sp, red_sp, ball_sp, ball, state, scoreboard, controllers)
+	_game.setup(state, scoreboard, controllers)
 
 
 func _on_server_disconnected() -> void:

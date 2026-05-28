@@ -13,7 +13,8 @@ enum Msg {
 	GAME_END       = 6,
 	REGISTER_PEER = 7,
 	ROSTER_DATA = 8,
-	SNAPSHOTS = 9
+	SNAPSHOTS = 9,
+	ROUND_START = 10
 }
 
 

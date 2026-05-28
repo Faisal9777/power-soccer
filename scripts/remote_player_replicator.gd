@@ -31,9 +31,6 @@ func store_snapshot(snap: Dictionary) -> void:
 
 	# Optional: update internal state too (animations, etc.) if apply_snapshot exists.
 	# We'll still override transform in interpolation, but internal vars can be useful.
-	if player.has_method("apply_snapshot"):
-		player.apply_snapshot(snap)
-
 	while _snapshot_queue.size() > remote_buffer_max:
 		_snapshot_queue.pop_front()
 

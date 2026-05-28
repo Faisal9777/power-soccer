@@ -46,7 +46,7 @@ properties/0/replication_mode = 1
 
 [node name="Player" type="CharacterBody3D"]
 collision_layer = 2
-collision_mask = 5
+collision_mask = 7
 script = ExtResource("1_xhfnw")
 walk_speed = 9.5
 sprint_speed = 12.0
