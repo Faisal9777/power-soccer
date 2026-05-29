@@ -25,6 +25,8 @@ var _dir: Vector3 = Vector3.ZERO
 var _target_len: float = 0.0
 var _len: float = 0.0
 var _linger_left: float = 0.0
+var owner_player: Node = null
+var target_position: Vector3
 
 func _ready() -> void:
 	_hook_mi = hook.get_node_or_null("HookMesh") as MeshInstance3D
@@ -43,7 +45,16 @@ func get_latch_point() -> Vector3:
 func set_start_world(from: Vector3) -> void:
 	_start = from
 
+func setup(data: Dictionary) -> void:
+	target_position = data["to"]
 
+	if data.has("player_path"):
+		owner_player = get_node_or_null(data["player_path"])
+
+	start(
+		data["from"],
+		target_position
+	)
 
 func start(from: Vector3, to: Vector3) -> void:
 	set_as_top_level(true)
@@ -81,6 +92,13 @@ func start(from: Vector3, to: Vector3) -> void:
 		hook.set("open_amount", 1.0)
 
 func _process(delta: float) -> void:
+	if owner_player:
+		set_start_world(
+			owner_player.get_muzzle_from_view()
+		)
+
+		set_end_world(target_position)
+	
 	# Flying
 	if !_latched:
 		_len = minf(_target_len, _len + speed * delta)

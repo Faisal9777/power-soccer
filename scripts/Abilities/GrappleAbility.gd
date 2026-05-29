@@ -55,20 +55,7 @@ func init(net : Node, player : Node) -> void:
 
 func handle_action(inputs : Dictionary) -> void:
 
-	# Always keep rope visuals updated (if any)
-	if shot and is_instance_valid(shot):
-		shot.set_start_world(_player.get_muzzle_from_view())
-
-	if shot and is_instance_valid(shot) and latched_local:
-		var end_pos := latched_point_local
-		if String(target_path_local) != "":
-			var t := _player.get_node_or_null(target_path_local)
-			if t is Node3D:
-				end_pos = (t as Node3D).global_position
-				if t is Player:
-					end_pos += Vector3.UP * 0.9
-		if shot.has_method("set_end_world"):
-			shot.set_end_world(end_pos)
+ 
 
 	# ✅ Block ability inputs unless the mode is active
 	if !_player.ability_mode_active:
@@ -100,21 +87,7 @@ func client_tick(player: Player, delta: float) -> void:
 	if !player._is_local_owner():
 		return
 
-	# Always keep rope visuals updated (if any)
-	if shot and is_instance_valid(shot) and player.cam:
-		shot.set_start_world(player.get_muzzle_from_camera(player.cam))
-
-	if shot and is_instance_valid(shot) and latched_local:
-		var end_pos := latched_point_local
-		if String(target_path_local) != "":
-			var t := player.get_node_or_null(target_path_local)
-			if t is Node3D:
-				end_pos = (t as Node3D).global_position
-				if t is Player:
-					end_pos += Vector3.UP * 0.9
-		if shot.has_method("set_end_world"):
-			shot.set_end_world(end_pos)
-
+ 
 	# ✅ Block ability inputs unless the mode is active
 	if !player.ability_mode_active:
 		return
@@ -219,8 +192,12 @@ func sv_on_release(player: Player) -> void:
 
 # --- internals ---
 func _client_cleanup(player: Player) -> void:
-	if shot and is_instance_valid(shot):
-		shot.queue_free()
+	var controller := player.get_node("AbilityVisualController")
+
+	controller.rpc(
+		"rpc_remove_visual",
+		"grapple"
+	)
 	shot = null
 	latched_local = false
 	target_path_local = NodePath("")
@@ -257,19 +234,31 @@ func _fire_visual_and_store(player: Player) -> void:
 
 	var start_pos := player.get_muzzle_from_camera(player.cam)
 
-	var s := grapple_shot_scene.instantiate() as GrappleShot
-	player.get_tree().current_scene.add_child(s)
-	s.start(start_pos, end_pos)
-
-	s.latched.connect(func(p: Vector3):
-		latched_local = true
-		latched_point_local = p            # ✅ store latch point
-		target_path_local = target_path
-		player._request_ability_latched(p, target_path)
+	var controller := player.get_node(
+		"AbilityVisualController"
+	) as AbilityVisualController
+	controller.rpc(
+		"rpc_spawn_visual",
+		"grapple",
+		"res://scenes/GrappleShot.tscn",
+		{
+			"from": start_pos,
+			"to": end_pos,
+			"player_path": str(player.get_path())
+		}
 	)
 
+	await player.get_tree().process_frame
 
-	shot = s
+	shot = controller.active_visuals.get("grapple")
+
+	if shot:
+		shot.latched.connect(func(p: Vector3):
+			latched_local = true
+			latched_point_local = p
+			target_path_local = target_path
+			player._request_ability_latched(p, target_path)
+		)
 
 func _sv_update_point_from_target(player: Player) -> void:
 	if !latched_server:

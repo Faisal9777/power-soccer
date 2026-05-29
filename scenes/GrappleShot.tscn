@@ -1,7 +1,7 @@
 [gd_scene load_steps=3 format=3 uid="uid://d4mdf4duq868k"]
 
-[ext_resource type="Script" uid="uid://d0avn18j4wjhv" path="res://scripts/grapple_shot.gd" id="1_cfvmp"]
-[ext_resource type="Script" uid="uid://xb644i5ud0pt" path="res://scripts/hook.gd" id="2_1p83u"]
+[ext_resource type="Script" uid="uid://bnfnepofbjjvw" path="res://scripts/grapple_shot.gd" id="1_cfvmp"]
+[ext_resource type="Script" uid="uid://c48h6tk5vyd8p" path="res://scripts/hook.gd" id="2_1p83u"]
 
 [node name="GrappleShot" type="Node3D"]
 script = ExtResource("1_cfvmp")
