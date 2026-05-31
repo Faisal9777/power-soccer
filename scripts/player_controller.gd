@@ -10,7 +10,6 @@ var _latest_local_snapshot: Dictionary = {}   # newest snapshot waiting to recon
 var _latest_local_snapshot_id: int = -1       # ordering guard (server_tick or last_server_seq)
 var _pending_inputs: Array[Dictionary] = []   # only for LOCAL player
 var _fixed_dt: float = 1.0 / 60.0
-var _next_input_seq := -1
 
 var send_interval := 1.0 / 20.0  # 20 Hz
 var send_accumulator := 0.0
@@ -26,7 +25,10 @@ func stop_process() -> void:
 	TaskScheduler.cancel(task_id)
 
 func store_snapshot(snap) -> void:
-	var snap_id := int(snap.get("server_tick", snap.get("last_server_seq", -1)))
+	var seq = snap.get("seq", snap.get("last_server_seq", -1))
+	if not seq:
+		return
+	var snap_id := int(seq)
 	#_calculate_offset_for_local_visual(peer_id, snap)
 	
 	# Local player: keep ONLY newest snapshot
@@ -39,7 +41,7 @@ func _init(p_player, pid, p_name, team_name, c_cam, joystick, net, i_buffer : Lo
 	super._init(p_player, pid, p_name, team_name, c_cam, joystick, i_buffer)
 
 func _process_interval():
-	var value := {"inputs" : _pending_inputs}
+	var value := {"inputs" : _pending_inputs.duplicate()}
 	network.submit_input(value)
 
 func physics_tick(delta: float) -> void:
@@ -51,10 +53,7 @@ func process_input(delta):
 	if is_frozen:
 		return
 	var input = input_buffer.get_input()
-	_next_input_seq += 1
-
 	var stored := input.duplicate(true)
-	stored["seq"] = _next_input_seq
 	_pending_inputs.append(stored)
 	_apply_inputs(input, delta)
 	if _pending_inputs.size() > 256:
@@ -76,12 +75,15 @@ func _reconcile_local_best_practice(p: Node3D, snap: Dictionary) -> void:
 
 	# --- B) apply authoritative snap (server state) ---
 	if p.has_method("apply_snapshot"):
+		
 		p.apply_snapshot(snap)
+		look_yaw = snap["yaw"]
+		look_pitch = snap["pitch"]
 	else:
 		p.global_transform = _snap_to_xform(snap, p)
 
 	# --- C) drop confirmed inputs ---
-	var last_server_seq := int(snap.get("last_server_seq", -1))
+	var last_server_seq := int(snap.get("seq", -1))
 
 	var i := 0
 	while i < _pending_inputs.size():

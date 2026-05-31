@@ -25,6 +25,9 @@ func face_at(pos : Vector3) -> void:
 func set_position(gb_transform : Transform3D) -> void:
 	player.global_transform = gb_transform
 
+func get_body_mesh() -> MeshInstance3D:
+	return player.body_mesh
+
 func process_tick(delta: float) -> void:
 	return
 

@@ -880,11 +880,10 @@ func _move_server(input_dir: Vector3, delta: float, is_sprinting : bool) -> void
 	# Joystick magnitude just scales it down (analog walk).
 	var base_speed := sprint_speed if is_sprinting and _can_perform("sprint", stamina_sprint_drain * delta) else walk_speed
 	var target_speed := base_speed * mag
-
+	
 # ✅ LATCH slow only on ground (NOT grapple)
 	if ball_latched and is_on_floor():
 		target_speed *= latch_floor_speed_mul
-
 
 	var lateral := velocity
 	lateral.y = 0.0

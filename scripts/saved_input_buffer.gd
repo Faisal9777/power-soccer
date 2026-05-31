@@ -2,35 +2,32 @@ class_name SavedInputBuffer
 extends InputBuffer
 
 var _queue: Array[Dictionary] = []
-
-
+var pending_input := {} 
 # =========================================================
 # Optional: last returned input (for debugging/replay)
 # =========================================================
-var last_input: Dictionary = {}
-
 
 # =========================================================
 # Server injects input here
 # (called when network packet arrives)
 # =========================================================
-func save_input(cmd: Dictionary) -> void:
-	_queue.append(cmd)
+func save_input(cmd: Array) -> void:
+	_queue += cmd
 
+func push_back(input: Dictionary) -> void:
+	_queue.append(input)
+
+func push_input(input: Dictionary) -> void:
+	pending_input = input
 
 # =========================================================
 # Controller pulls input in order (FIFO)
 # =========================================================
-func get_input() -> Dictionary:
+func _get_input() -> Dictionary:
+	return pending_input
 
-	if _queue.is_empty():
-		return {}
-
-	var cmd: Dictionary = _queue.pop_front()
-
-	last_input = cmd
-	return cmd
-
+func _generate_sequence() -> void:
+	seq = pending_input["seq"]
 
 # =========================================================
 # Optional helpers

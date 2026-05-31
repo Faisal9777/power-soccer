@@ -57,8 +57,11 @@ func process_input_by_id(peer_id: int, cmd : Dictionary) -> void:
 
 	if idx == -1:
 		print("the player does not exist with the id: ", idx)
-	
-	controllers[idx].input_buffer.save_input(cmd)
+	var controller = controllers[idx]
+	var inputs = cmd.get("inputs", [])
+	if inputs and inputs.size() > 0:
+		var input = _get_latest_input(inputs)
+		controller.input_buffer.push_input(input)
 
 
 func process_input_dictionary(msg: int, value : Dictionary) -> void:
@@ -67,11 +70,11 @@ func process_input_dictionary(msg: int, value : Dictionary) -> void:
 		_peers_ready += 1
 		#print("_peers_ready: ", _peers_ready)
 		if _peers_ready == GameState.roster.size():
+			_game.start_game()
 			var game_data = {"ball_position" : _game.ball_spawn.global_transform.origin}
 			for controller in controllers:
 				game_data[controller.id] = {"player_position" : controller.player.global_transform,
 				"is_frozen" : controller.is_frozen}
-			_game.start_game()
 			LoadingUI.hide_loading()
 			TaskScheduler.schedule(60, _broadcast_snapshots)
 			can_process = true
@@ -93,8 +96,6 @@ func _ready() -> void:
 
 
 func _physics_process(delta: float) -> void:
-	if Input.is_action_just_pressed("debug"):
-		print("mid; ", multiplayer.get_unique_id())
 	if can_process:
 		_simulate_remote_players(delta)
 
@@ -107,8 +108,8 @@ func _broadcast_snapshots() -> void:
 
 	for controller in controllers:  # your list of Player nodes on server
 		var snapshot := controller.get_snapshot() as Dictionary
+		snapshot["seq"] = controller.input_buffer.current_input.get("seq")
 		snapshots[controller.id] = snapshot
-
 	_network_endpoint.rpc(NetCodes.Rpc.INPUT_STREAM, NetCodes.Msg.SNAPSHOTS,snapshots)
 
 
@@ -132,13 +133,13 @@ func _player_controller_setup(rosters : Dictionary, ball_path : NodePath, joysti
 
 		var node := get_node_or_null(ppath)
 		if peer_id == multiplayer.get_unique_id():
-			node.visible = false
 			var player = get_node(ppath)
 			var cam = get_node_or_null("/root/World/Scene/Camera3D") as Camera3D
 			cam.init(node, joystick)
 			var input_source = NodeUtils.init_input_source(self)
 			var input_buffer = LocalInputBuffer.new(input_source)
 			p_controller = LocalController.new(node, peer_id, name, team, cam, joystick, input_buffer)
+			p_controller.get_body_mesh().visible = false
 			controllers.append(p_controller)
 		else:
 			
@@ -203,3 +204,10 @@ func _debug_data(roster: Dictionary, ingame: Node, ball_scene: Node, blue_spawns
 		print("red_path =", red_spawns.get_path(), " empty? ", red_spawns.get_path().is_empty())
 
 	print("--- END BUILD DATA DEBUG ---")
+
+
+func _get_latest_input(inputs: Array) -> Dictionary:
+	return inputs.reduce(func(a, b):
+		if a.seq > b.seq:
+			return a
+		return b)

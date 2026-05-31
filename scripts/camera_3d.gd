@@ -57,9 +57,9 @@ func snap_to(target_transform : Transform3D) -> void:
 	# -------------------------------------------------
 	# SNAP FOLLOW TARGET
 	# -------------------------------------------------
-	if is_instance_valid(_follow_target):
+	if is_instance_valid(_follow_target) and _follow_target.has_method("snap_to"):
 
-		_follow_target.global_transform = target_transform
+		_follow_target.snap_to(target_transform)
 	# -------------------------------------------------
 	# BUILD CURRENT CAMERA BASIS
 	# -------------------------------------------------

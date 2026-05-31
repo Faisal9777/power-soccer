@@ -15,6 +15,10 @@ func init(anchor : Node, controller : PlayerController) -> void:
 
 func snap_to(gb_transform : Transform3D) -> void:
 	global_transform = gb_transform
+
+	_t_prev = gb_transform
+	_t_curr = gb_transform
+
 	_err = Vector3.ZERO
 
 func _process(delta: float) -> void:
