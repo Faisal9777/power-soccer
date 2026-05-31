@@ -131,8 +131,6 @@ func _physics_process(delta: float) -> void:
 
 
 func _process(_delta: float) -> void:
-	if p_controller:
-		p_controller.process_tick(_delta)
 	if controllers and controllers.size() > 0:
 		for controller in controllers:
 			controller.process_tick(_delta)
@@ -150,6 +148,8 @@ func _store_snapshots(snapshots: Dictionary) -> void:
 	_my_id = multiplayer.get_unique_id()
 	for k in snapshots.keys():
 		var peer_id := int(k)
+		var c_id = ArrayUtils.find(controllers, peer_id)
+		var controller = controllers[c_id]
 		if not _players.has(peer_id):
 			continue
 
@@ -157,10 +157,7 @@ func _store_snapshots(snapshots: Dictionary) -> void:
 
 		# Prefer server_tick if you add it later; fallback to last_server_seq
 
-		if peer_id == _my_id:
-			p_controller.store_snapshot(snap)
-		else:
-			controllers[peer_id].store_snapshot(snap)
+		controller.store_snapshot(snap)
 
 func _resolve_players_from_roster(rosters) -> void:
 	# Build unresolved list first
@@ -176,11 +173,11 @@ func _resolve_players_from_roster(rosters) -> void:
 
 		var node := get_node_or_null(ppath)
 		if peer_id == multiplayer.get_unique_id():
-			node.visible = false
 			var cam = get_node_or_null("/root/World/Scene/Camera3D") as Camera3D
 			cam.init(proxy, joystick)
 			var input_buffer = LocalInputBuffer.new(NodeUtils.init_input_source(self))
 			p_controller = PlayerController.new(node, peer_id, name, team, cam, joystick, self, input_buffer)
+			p_controller.get_body_mesh().visible = false
 			proxy.init(node, p_controller)
 			controllers.append(p_controller)
 		else:

@@ -14,7 +14,6 @@ func set_position(gb_transform : Transform3D) -> void:
 
 func get_snapshot() -> Dictionary:
 	var snap = player.get_snapshot()
-	snap["last_server_seq"] = applied_cmd_id
 	return snap
 
 func freeze(toggle) -> void:
