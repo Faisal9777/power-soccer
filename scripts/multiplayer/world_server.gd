@@ -12,7 +12,7 @@ var _ready_peer_ids := {}
 var _game_begin_sent := false
 var _is_also_player := true
 # Snapshot pump
-const NET_SNAPSHOT_HZ: float = 30.0
+const NET_SNAPSHOT_HZ: float = 45.0
 const INPUT_STALE_MSEC: int = 250
 var last_server_seq:= {}
 var last_received_seq := {}
@@ -325,9 +325,13 @@ func _make_idle_command(cmd: Dictionary) -> Dictionary:
 	idle["jump_pressed"] = false
 	idle["tackle_pressed"] = false
 	idle["dribble"] = false
+	idle["dribble_pressed"] = false
+	idle["dribble_event_id"] = 0
 	idle["stop_ball"] = false
 	idle["shoot_down"] = false
 	idle["shoot_up"] = false
+	idle["shoot_release_id"] = 0
+	idle["shoot_held_msec"] = 0
 	idle["rmb"] = false
 	idle["assist_pass_pressed"] = false
 	idle["latch_toggle"] = false

@@ -65,6 +65,7 @@ var _peers_ready := 0
 
 # Input pump
 const NET_INPUT_HZ: float = 30.0
+const ACTION_EVENT_RESEND_MSEC: int = 350
 const TEAM_BLUE_PATH:  NodePath = ^"Teams/TeamBlue/Spawns"
 const TEAM_RED_PATH:   NodePath = ^"Teams/TeamRed/Spawns"
 const BALL_SPAWN_PATH: NodePath = ^"BallSpawn"
@@ -89,11 +90,24 @@ var  tackle_edge_latched := false
 var  stop_ball_edge_latched := false
 var  jump_edge_latched := false
 var  shoot_edge_latched := false
+var dribble_edge_latched := false
 var latch_edge_latched := false 
 var ability_toggle_edge_latched := false
 var ability_a1_edge_latched := false
 var ability_a2_edge_latched := false
 var ability_a3_edge_latched := false
+var _last_input_sample_frame: int = -1
+var _shoot_press_msec: int = -1
+var _shoot_release_held_msec: int = 0
+var _shoot_release_aim_position = null
+var _input_event_ids := {
+	"shoot_release": 0,
+	"dribble": 0,
+}
+var _input_event_resend_until := {
+	"shoot_release": 0,
+	"dribble": 0,
+}
 
 @onready var tackle_btn: TouchScreenButton = $CanvasLayer/UI/ActionPad/Tackle
 var _tackle_cd_label: Label
@@ -878,8 +892,28 @@ func _physics_process(delta: float) -> void:
 		_reset_inputs()
 func _shoot_action() -> String:
 	return "shoot_touch" if is_mobile else "shoot"
+
+func _queue_input_event(name: String) -> void:
+	_input_event_ids[name] = int(_input_event_ids.get(name, 0)) + 1
+	_input_event_resend_until[name] = Time.get_ticks_msec() + ACTION_EVENT_RESEND_MSEC
+
+func _input_event_active(name: String) -> bool:
+	return Time.get_ticks_msec() <= int(_input_event_resend_until.get(name, 0))
+
 func _update_inputs() -> void:
+	var frame := Engine.get_physics_frames()
+	if _last_input_sample_frame == frame:
+		return
+	_last_input_sample_frame = frame
+
 	var gm := false
+	var shoot_action := _shoot_action()
+	var now := Time.get_ticks_msec()
+	if Input.is_action_just_pressed(shoot_action):
+		_shoot_press_msec = now
+		_input_event_resend_until["shoot_release"] = 0
+		_shoot_release_aim_position = null
+
 	if Input.is_action_just_pressed("jump") and not jump_edge_latched:
 		jump_edge_latched = true
 	if Input.is_action_just_pressed("tackle") and not tackle_edge_latched:
@@ -887,9 +921,19 @@ func _update_inputs() -> void:
 			tackle_edge_latched = true
 	if Input.is_action_just_pressed("stop_ball") and not stop_ball_edge_latched:
 		stop_ball_edge_latched = true		
+	if Input.is_action_just_pressed("dribble") and not dribble_edge_latched:
+		dribble_edge_latched = true
+		_queue_input_event("dribble")
 	# Only allow shoot edge when NOT grappling
-	if !gm and Input.is_action_just_released(_shoot_action()) and not shoot_edge_latched:
+	if !gm and Input.is_action_just_released(shoot_action) and not shoot_edge_latched:
 		shoot_edge_latched = true
+		_queue_input_event("shoot_release")
+		_shoot_release_held_msec = 0
+		if _shoot_press_msec >= 0:
+			_shoot_release_held_msec = max(0, now - _shoot_press_msec)
+		_shoot_press_msec = -1
+		if is_instance_valid(_my_player) and _my_player.has_method("get_aim_arrow_position"):
+			_shoot_release_aim_position = _my_player.get_aim_arrow_position()
 	# ⬇️ NEW: toggle input (press once = "edge" event)
 	if Input.is_action_just_pressed("ball_latch") and not latch_edge_latched:
 		 
@@ -916,6 +960,7 @@ func _reset_inputs() -> void:
 	tackle_edge_latched = false
 	stop_ball_edge_latched = false
 	shoot_edge_latched = false
+	dribble_edge_latched = false
 	latch_edge_latched = false     # ⬅️ NEW
 	assist_pass_edge_latched = false
 	ability_toggle_edge_latched = false
@@ -941,8 +986,8 @@ func _process(delta: float) -> void:
 	if Input.is_action_just_pressed("debug_third") and is_instance_valid(_game):
 		_game._rpc_set_goal_camera_third_person()  # direct local call
 
-	if Input.is_action_just_pressed("debug_first") and is_instance_valid(_game):
-		_game._rpc_set_camera_first_person()       # direct local call
+	#if Input.is_action_just_pressed("debug_first") and is_instance_valid(_game):
+	#	_game._rpc_set_camera_first_person()       # direct local call
 	_update_tackle_cooldown_ui(delta)
 	_update_pass_cooldown_ui(delta)
 
@@ -1174,8 +1219,31 @@ func _gather_input() -> Dictionary:
 		facing = (_my_player.get_yaw() if _my_player else Dictionary())
 	var gm := false
 
-	var shoot_down := Input.is_action_pressed(_shoot_action())
-	var shoot_up := shoot_edge_latched
+	var shoot_action := _shoot_action()
+	var shoot_release_active := shoot_edge_latched or _input_event_active("shoot_release")
+	var dribble_press_active := dribble_edge_latched or _input_event_active("dribble")
+	var shoot_down := Input.is_action_pressed(shoot_action)
+	if shoot_down:
+		shoot_release_active = false
+	var shoot_up := shoot_release_active
+	var shoot_held_msec := 0
+	if shoot_down and _shoot_press_msec < 0:
+		_shoot_press_msec = Time.get_ticks_msec()
+	if shoot_down and _shoot_press_msec >= 0:
+		shoot_held_msec = Time.get_ticks_msec() - _shoot_press_msec
+	elif shoot_release_active:
+		shoot_held_msec = _shoot_release_held_msec
+
+	var aim_position = null
+	if shoot_release_active:
+		if _shoot_release_aim_position != null:
+			aim_position = _shoot_release_aim_position
+		elif is_instance_valid(_my_player) and _my_player.has_method("get_aim_arrow_position"):
+			aim_position = _my_player.get_aim_arrow_position()
+	elif _shoot_release_aim_position != null:
+		_shoot_release_aim_position = null
+
+	var dribble_down := Input.is_action_pressed("dribble")
 
 	if gm:
 		shoot_down = false
@@ -1186,13 +1254,17 @@ func _gather_input() -> Dictionary:
 	"sprint": Input.is_action_pressed("sprint"),
 	"jump_pressed": jump_edge_latched,
 	"tackle_pressed": tackle_edge_latched,
-	"dribble": Input.is_action_pressed("dribble"),
+	"dribble": dribble_down,
+	"dribble_pressed": dribble_press_active,
+	"dribble_event_id": int(_input_event_ids.get("dribble", 0)) if dribble_press_active else 0,
 	"stop_ball": stop_ball_edge_latched,
 	"shoot_down": shoot_down,
 	"shoot_up": shoot_up,
+	"shoot_release_id": int(_input_event_ids.get("shoot_release", 0)) if shoot_release_active else 0,
+	"shoot_held_msec": shoot_held_msec,
 	"rmb": Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT),
 	"facing": facing,
-	"aim_position": _my_player.get_aim_arrow_position() if _my_player and shoot_edge_latched else null,
+	"aim_position": aim_position,
 	"cam_yaw": yaw,
 	"assist_pass_pressed": assist_pass_edge_latched,
 	"latch_toggle": latch_edge_latched,

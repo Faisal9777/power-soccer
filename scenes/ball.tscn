@@ -1,6 +1,9 @@
-[gd_scene load_steps=5 format=3 uid="uid://ds26o286r5vvn"]
+[gd_scene load_steps=6 format=3 uid="uid://ds26o286r5vvn"]
 
-[ext_resource type="Script" uid="uid://dqski1v7ddsi4" path="res://scripts/ball.gd" id="1_x8fbi"]
+[ext_resource type="Script" uid="uid://dak13k3p1qhbx" path="res://scripts/ball.gd" id="1_x8fbi"]
+
+[sub_resource type="PhysicsMaterial" id="PhysicsMaterial_7s4qf"]
+bounce = 0.4
 
 [sub_resource type="SphereMesh" id="SphereMesh_djrsh"]
 radius = 1.0
@@ -24,7 +27,10 @@ properties/2/replication_mode = 1
 collision_layer = 4
 collision_mask = 3
 mass = 0.1
+physics_material_override = SubResource("PhysicsMaterial_7s4qf")
 can_sleep = false
+linear_damp_mode = 1
+linear_damp = 0.25
 script = ExtResource("1_x8fbi")
 
 [node name="Mesh" type="MeshInstance3D" parent="."]

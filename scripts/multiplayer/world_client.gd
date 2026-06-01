@@ -9,7 +9,9 @@ var _visual_target: Vector3 = Vector3.ZERO
 @export var input_rpc_name: StringName = &"receive_network_input"
 @export var visual_deadzone := 0.05  # try 5–10 cm
 # How far "behind" we render remote players for smooth interpolation (ms)
-@export var remote_interp_delay_ms: int = 120
+@export var remote_interp_delay_ms: int = 100
+@export var remote_interp_delay_max_ms: int = 180
+@export var remote_interp_jitter_mul: float = 2.0
 @export var remote_buffer_max: int = 10
 @export var catchup_speed := 18.0
 @export var deadzone := 0.02
@@ -17,11 +19,12 @@ var _visual_target: Vector3 = Vector3.ZERO
 @export var local_reconcile_deadzone := 0.25
 @export var local_reconcile_blend := 0.18
 @export var local_reconcile_snap_dist := 3.0
-@export var max_prediction_replay_msec: int = 250
-@export var max_prediction_replay_inputs: int = 16
+@export var max_prediction_replay_msec: int = 500
+@export var max_prediction_replay_inputs: int = 40
 @export var show_net_debug_overlay := true
 @export var net_debug_ping_interval_sec := 1.0
 @export var net_debug_update_interval_sec := 0.25
+@export var expected_snapshot_hz: float = 45.0
 
 var proxy : Node3D 
 var anchor: Node3D
@@ -65,6 +68,7 @@ var _net_debug_correction_m := 0.0
 var _net_debug_stale_events := 0
 var _net_debug_input_age_ms := 0
 var _net_debug_input_stale := false
+var _remote_interp_delay_current_ms := 100.0
 
 @onready var _network_endpoint: Node = get_parent()
 
@@ -119,6 +123,7 @@ func _ready() -> void:
 	_my_id = multiplayer.get_unique_id()
 	var hz := float(ProjectSettings.get_setting("physics/common/physics_ticks_per_second"))
 	_fixed_dt = 1.0 / max(1.0, hz)
+	_remote_interp_delay_current_ms = float(remote_interp_delay_ms)
 	Network.connection_failed.connect(_on_connection_failed)
 	Network.server_disconnected.connect(_on_server_disconnected)
 	show_net_debug_overlay = bool(Settings.net_indicators)
@@ -151,6 +156,9 @@ func _physics_process(delta: float) -> void:
 		return
 	
 	_reconcile_player(me)
+
+	if is_instance_valid(_network_endpoint) and _network_endpoint.has_method("_update_inputs"):
+		_network_endpoint.call("_update_inputs")
 
 	# 2) Local prediction + send input
 	var cmd := _gather_local_command(me)
@@ -188,7 +196,8 @@ func _process(_delta: float) -> void:
 	_smooth_local_view(_delta)
 	# Remote interpolation runs every render frame for smoothness
 	var now := Time.get_ticks_msec()
-	var render_time := now - remote_interp_delay_ms
+	var render_delay_ms := _get_remote_interp_delay_ms(_delta)
+	var render_time := now - render_delay_ms
 	for peer_id in _remote_buf.keys():
 		
 		if peer_id == _my_id:
@@ -367,10 +376,21 @@ func _track_snapshot_jitter(now: int, snapshots: Dictionary) -> void:
 		return
 	if _net_debug_last_snapshot_msec >= 0:
 		var interval := float(now - _net_debug_last_snapshot_msec)
-		var expected := 1000.0 / 30.0
+		var expected := 1000.0 / maxf(1.0, expected_snapshot_hz)
 		var sample := absf(interval - expected)
 		_net_debug_snapshot_jitter_ms = lerpf(_net_debug_snapshot_jitter_ms, sample, 0.12)
 	_net_debug_last_snapshot_msec = now
+
+func _get_remote_interp_delay_ms(delta: float) -> int:
+	var base := float(remote_interp_delay_ms)
+	var target := base + _net_debug_snapshot_jitter_ms * remote_interp_jitter_mul
+	target = clampf(target, base, float(remote_interp_delay_max_ms))
+	_remote_interp_delay_current_ms = lerpf(
+		_remote_interp_delay_current_ms,
+		target,
+		clampf(delta * 5.0, 0.0, 1.0)
+	)
+	return int(_remote_interp_delay_current_ms + 0.5)
 
 func record_ping_pong(client_msec: int, _server_msec: int) -> void:
 	var now := Time.get_ticks_msec()
@@ -463,7 +483,7 @@ func _update_net_debug_overlay() -> void:
 
 	var ping_text := "--" if _net_debug_ping_ms < 0.0 else "%.0f" % _net_debug_ping_ms
 	var stale_text := "yes" if _net_debug_input_stale else "no"
-	_net_debug_label.text = "NET TEST\nPing: %s ms | Jitter: %.0f ms\nPending replay: %d (%d ms)\nCorrection: %.2f m | Replayed: %d\nStale input: %d | active: %s | age: %d ms\nSnapshot jitter: %.0f ms" % [
+	_net_debug_label.text = "NET TEST\nPing: %s ms | Jitter: %.0f ms\nPending replay: %d (%d ms)\nCorrection: %.2f m | Replayed: %d\nStale input: %d | active: %s | age: %d ms\nSnapshot jitter: %.0f ms | Buffer: %.0f ms" % [
 		ping_text,
 		_net_debug_jitter_ms,
 		_net_debug_pending_inputs,
@@ -474,6 +494,7 @@ func _update_net_debug_overlay() -> void:
 		stale_text,
 		_net_debug_input_age_ms,
 		_net_debug_snapshot_jitter_ms,
+		_remote_interp_delay_current_ms,
 	]
 
 func _calculate_error_after_reconcile() -> void:

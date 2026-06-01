@@ -9,7 +9,7 @@ class_name Player
 
 @export var tackle_cooldown_dur: float = 20.0  # 20 seconds cooldown
 @export var kick_force: float = 16.0
-@export var kick_up: float = 3.0
+@export var kick_up: float = 1.0
 @export var shoot_cooldown: float = 0.25
 @export var cooldown_per_impulse: float = 0.05
 @export var jump_cooldownn: float = 0.5
@@ -36,8 +36,8 @@ class_name Player
 @export var dribble_up: float = 0.15
 @export var dribble_cooldown: float = 1
 @export var dribble_cone_dot: float = 0.0
-@export var shoot_range: float = 3.25
-@export var dribble_range: float = 3.25
+@export var shoot_range: float = 4.25
+@export var dribble_range: float = 4.25
 @export var dribble_fling_forward_threshold: float = 0.9
 @export var dribble_fling_side_max: float = 0.22
 @export var stop_ball_range: float = 3.5
@@ -246,9 +246,13 @@ var _net := {
 	"jump_pressed": false,
 	"tackle_pressed": false,
 	"dribble": false,
+	"dribble_pressed": false,
+	"dribble_event_id": 0,
 	"stop_ball": false,
 	"shoot_down": false,
 	"shoot_up": false,
+	"shoot_release_id": 0,
+	"shoot_held_msec": 0,
 	"rmb": false,
 	"facing": {"yaw_delta" : _yaw_delta_accum, "pitch_delta" : _pitch_delta_accum},
 	"aim_position": null,
@@ -261,6 +265,10 @@ var _net := {
 	"ability_action1": false,
 	"ability_action2": false,
 	"ability_action3": false,
+}
+var _last_consumed_action_ids := {
+	"shoot_release": 0,
+	"dribble": 0,
 }
 
 
@@ -409,7 +417,7 @@ func _disable_self_shadows_recursive(n: Node) -> void:
 func _btn_down(name: String) -> bool:
 	match name:
 		"sprint": return bool(_net["sprint"])
-		"dribble": return bool(_net["dribble"])
+		"dribble": return bool(_net["dribble"]) or _has_action_event("dribble", "dribble_pressed", "dribble_event_id")
 		"stop_ball": return bool(_net["stop_ball"])
 		"shoot": return bool(_net["shoot_down"])
 		_: return false
@@ -433,8 +441,21 @@ func _btn_just_pressed(name: String) -> bool:
 
 func _btn_just_released(name: String) -> bool:
 	match name:
-		"shoot": return bool(_net["shoot_up"])
+		"shoot": return _has_action_event("shoot_release", "shoot_up", "shoot_release_id")
 		_: return false
+
+func _has_action_event(name: String, flag_key: String, id_key: String) -> bool:
+	if !bool(_net.get(flag_key, false)):
+		return false
+	var event_id := int(_net.get(id_key, 0))
+	if event_id <= 0:
+		return true
+	return event_id > int(_last_consumed_action_ids.get(name, 0))
+
+func _consume_action_event(name: String, id_key: String) -> void:
+	var event_id := int(_net.get(id_key, 0))
+	if event_id > 0:
+		_last_consumed_action_ids[name] = event_id
 
 # --- Engine callbacks ---
 
@@ -958,6 +979,7 @@ func _handle_dribble_server() -> void:
 	# Fling only on near-pure forward intent, so diagonals still dribble.
 	if mvz >= dribble_fling_forward_threshold and abs(mvx) <= dribble_fling_side_max:
 		_fling_ball_server()
+		_consume_action_event("dribble", "dribble_event_id")
 		_cooldowns["shoot"] = dribble_cooldown
 		return
 
@@ -967,6 +989,7 @@ func _handle_dribble_server() -> void:
 	var right := Vector3.LEFT.rotated(Vector3.UP, yaw); right.y = 0.0; right = right.normalized()
 	var dir := (right * mvx + fwd * mvz).normalized()
 	perform_dribble_server(dir)
+	_consume_action_event("dribble", "dribble_event_id")
 	_cooldowns["shoot"] = dribble_cooldown
 
 func _fling_ball_server() -> void:
@@ -1033,17 +1056,24 @@ func _handle_shoot_server() -> void:
 
 
 	if aim_active and current_ball != null and _btn_just_released("shoot"):
-		_kick_at_contact_server()
+		if _kick_at_contact_server():
+			_consume_action_event("shoot_release", "shoot_release_id")
 
-func _kick_at_contact_server() -> void:
+func _kick_at_contact_server() -> bool:
 	if current_ball == null or !is_instance_valid(current_ball):
-		return
+		return false
 	if aim_arrow == null or !is_instance_valid(aim_arrow):
-		return
+		return false
+	if _net.get("aim_position", null) == null:
+		return false
+	var held_msec := int(_net.get("shoot_held_msec", 0))
+	if held_msec > 0 and charge_time_to_max > 0.0:
+		var client_charge := clampf((float(held_msec) / 1000.0) * charge_rate_mul / charge_time_to_max, 0.0, 1.0)
+		_charge = maxf(_charge, client_charge)
 	if _charge <= 0.0:
-		return
+		return false
 	if !_ball_within_shoot_range():
-		return
+		return false
 
 	# Ball center and radius
 	var C: Vector3 = current_ball.global_transform.origin
@@ -1103,6 +1133,7 @@ func _kick_at_contact_server() -> void:
 	_charge = 0.0
 	if is_instance_valid(_charge_bar):
 		_charge_bar.value = 0.0
+	return true
 
 func get_aim_arrow_position() -> Transform3D:
 	return aim_arrow.global_transform
@@ -1162,8 +1193,16 @@ func _start_tackle_server() -> void:
 			fwd = to_ball.normalized()
 
 	if fwd == Vector3.ZERO:
-		fwd = -global_transform.basis.z
-		fwd.y = 0.0
+		var move_dir := _get_input_dir_server()
+
+		if move_dir.length() > 0.1:
+			fwd = move_dir.normalized()
+		else:
+			var yaw := float(_net.get("cam_yaw", rotation.y))
+
+			fwd = Vector3.BACK.rotated(Vector3.UP, yaw)
+			fwd.y = 0.0
+			fwd = fwd.normalized()
 
 	if fwd.length() == 0.0:
 		return

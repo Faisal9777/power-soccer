@@ -8,6 +8,12 @@ signal peer_left(id: int)
 signal all_peers_left
 signal connection_failed
 signal server_disconnected
+var recent_servers := {}
+
+const ENET_TIMEOUT_LIMIT := 32
+const ENET_TIMEOUT_MIN := 15000
+const ENET_TIMEOUT_MAX := 45000
+const ENET_PING_INTERVAL := 1500
 
 var _signals_hooked_server := false
 var _signals_hooked_client := false
@@ -20,6 +26,37 @@ var is_host := false
 
 const C = preload("res://scripts/shared/scene.gd")
 
+func _configure_peer(peer_id: int) -> void:
+	var peer := multiplayer.multiplayer_peer
+
+	if peer == null:
+		return
+
+	if !(peer is ENetMultiplayerPeer):
+		return
+
+	var enet_peer := peer as ENetMultiplayerPeer
+	var packet_peer := enet_peer.get_peer(peer_id)
+
+	if packet_peer == null:
+		return
+
+	packet_peer.set_timeout(
+		ENET_TIMEOUT_LIMIT,
+		ENET_TIMEOUT_MIN,
+		ENET_TIMEOUT_MAX
+	)
+
+ 
+	print(
+		"Configured ENet peer ",
+		peer_id,
+		" timeout_min=",
+		ENET_TIMEOUT_MIN,
+		" timeout_max=",
+		ENET_TIMEOUT_MAX
+	)
+	
 # =========================
 # HOST
 # =========================
@@ -29,10 +66,10 @@ func host(info: Dictionary) -> void:
 		return
 	var port := info.get("port", 0) as int
 	var enet := ENetMultiplayerPeer.new()
-	var err := enet.create_server(port, 16)
+	var err2 := enet.create_server(port, 16)
 
-	if err != OK:
-		push_error("Host failed: %s" % err)
+	if err2 != OK:
+		push_error("Host failed: %s" % err2)
 		return
 
 	multiplayer.multiplayer_peer = enet
@@ -46,9 +83,15 @@ func host(info: Dictionary) -> void:
 	is_host = true
 	print("Server started on port ", port)
 	server_started.emit()
-	udp_discovery.bind(NetConfig.DISCOVERY_PORT)
-	udp_discovery.set_broadcast_enabled(true)
+	udp_broadcast.close()
 
+	var err := udp_broadcast.bind(NetConfig.DISCOVERY_PORT)
+
+	if err != OK:
+		print("Broadcast bind failed: ", err)
+		return
+
+	udp_broadcast.set_broadcast_enabled(true)
 func probe(data: Dictionary) -> void:
 	var ip: String = data.get("ip", "")
 	
@@ -59,7 +102,8 @@ func probe(data: Dictionary) -> void:
 	print("📡 Probing:", ip)
 	
 	var msg := {
-		"type": "DISCOVER"
+		"type": "DISCOVER",
+		"timestamp": Time.get_ticks_msec()
 	}
 	
 	var json := JSON.stringify(msg)
@@ -71,6 +115,8 @@ func probe(data: Dictionary) -> void:
 # JOIN
 # =========================
 func join(ip: String, port: int) -> bool:
+	stop_discovery()
+
 	if multiplayer.multiplayer_peer is ENetMultiplayerPeer:
 		if multiplayer.is_server():
 			push_warning("Already hosting.")
@@ -99,15 +145,18 @@ func join(ip: String, port: int) -> bool:
 # DISCOVERY (CLIENT)
 # =========================
 func start_discovery() -> void:
-	print("starting discovery2")
+	print("Starting discovery")
+
+	udp_discovery.close()
+
 	var err := udp_discovery.bind(NetConfig.DISCOVERY_PORT)
+
 	if err != OK:
 		print("Discovery bind failed: %s" % err)
 		return
 
-	udp_discovery.bind(NetConfig.DISCOVERY_PORT)
 	udp_discovery.set_broadcast_enabled(true)
-
+	
 func stop_discovery():
 	udp_discovery.close()
 
@@ -130,7 +179,7 @@ func _poll_discovery():
 			if parsed.get("type") == "DISCOVER":
 				
 				var response := {
-					"id": multiplayer.get_unique_id(),
+					"id": GameState.info.name + "_" + str(NetConfig.PORT),
 					"name": GameState.info.name,
 					"players_connected": GameState.get_players_connected(),
 					"lobby_size": GameState.get_lobby_size(),
@@ -149,12 +198,73 @@ func _poll_discovery():
 		parsed["ip"] = ip
 		server_found.emit(parsed)
 
+func _poll_host_discovery():
+
+	while udp_broadcast.get_available_packet_count() > 0:
+
+		var packet = udp_broadcast.get_packet()
+		var ip = udp_broadcast.get_packet_ip()
+		var port = udp_broadcast.get_packet_port()
+
+		var parsed = JSON.parse_string(packet.get_string_from_utf8())
+
+		if typeof(parsed) != TYPE_DICTIONARY:
+			continue
+
+		if parsed.get("type") != "DISCOVER":
+			continue
+
+		var response := {
+			"type": "DISCOVER_RESPONSE",
+			"server_id": GameState.info.name + "_" + str(NetConfig.PORT),
+			"name": GameState.info.name,
+			"players_connected": GameState.get_players_connected(),
+			"lobby_size": GameState.get_lobby_size(),
+			"port": NetConfig.PORT,
+			"timestamp": parsed.get("timestamp", 0)
+		}
+
+		udp_broadcast.set_dest_address(ip, port)
+		udp_broadcast.put_packet(JSON.stringify(response).to_utf8_buffer())
+func _poll_client_discovery():
+
+	while udp_discovery.get_available_packet_count() > 0:
+
+		var packet = udp_discovery.get_packet()
+		var ip = udp_discovery.get_packet_ip()
+
+		var parsed = JSON.parse_string(packet.get_string_from_utf8())
+
+		if typeof(parsed) != TYPE_DICTIONARY:
+			continue
+
+		if parsed.get("type") != "DISCOVER_RESPONSE":
+			continue
+
+		parsed["ip"] = ip
+
+		var ping = Time.get_ticks_msec() - parsed.get("timestamp", 0)
+		parsed["ping"] = ping
+
+		var key = parsed["server_id"]
+
+		var now = Time.get_ticks_msec()
+
+		if recent_servers.has(key):
+
+			if now - recent_servers[key] < 500:
+				continue
+
+		recent_servers[key] = now
+		server_found.emit(parsed)
 # =========================
 # PROCESS LOOP
 # =========================
 func _process(delta):
-	_poll_discovery()
-
+	if is_host:
+		_poll_host_discovery()
+	else:
+		_poll_client_discovery()
 
 # =========================
 # PEER EVENTS
@@ -162,6 +272,9 @@ func _process(delta):
 func _on_peer_connected(id: int) -> void:
 	if not multiplayer.is_server():
 		return
+
+	_configure_peer(id)
+
 	peer_joined.emit(id)
 
 
@@ -187,8 +300,10 @@ func _on_server_disconnected() -> void:
 	server_disconnected.emit()
 
 func _on_connection_successful() -> void:
-	joined_server.emit()
+	# Server peer is always peer ID 1 on clients
+	_configure_peer(1)
 
+	joined_server.emit()
 
 # =========================
 # CLEANUP / QUIT
@@ -207,3 +322,5 @@ func close_connection() -> void:
 
 	multiplayer.multiplayer_peer = null
 	is_host = false
+	udp_discovery.close()
+	udp_broadcast.close()
