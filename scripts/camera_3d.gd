@@ -125,6 +125,8 @@ func set_follow(target: Node) -> void:
 func focus_at(target: Node) -> void:
 	_target = target
 
+func stop_focus() -> void:
+	_target = null
 
 # ----------------------------
 # Public toggle for UI/other code
@@ -268,9 +270,17 @@ func init(proxy, joystick) -> void:
 func _update_facing(delta) -> void:
 	if rotation_manager:
 		var sy: float = (-1.0 if invert_y else 1.0)
+
 		_yaw = rotation_manager.look_yaw
-		_pitch = rotation_manager.look_pitch
-		_apply_rotation(delta)
+		_pitch = rotation_manager.look_pitch * sy
+
+		_pitch = clamp(_pitch,
+			rotation_manager.min_pitch,
+			rotation_manager.max_pitch
+		)
+
+	_apply_rotation(delta)
+
 
 func _apply_rotation(delta: float) -> void:
 
@@ -280,22 +290,20 @@ func _apply_rotation(delta: float) -> void:
 		else global_transform
 	)
 
-	if not _is_frozen:
-
-		if is_instance_valid(_target):
-
-			var dir := (
-				_target.global_position
-				- global_position
-			).normalized()
-
-			_yaw = atan2(dir.x, dir.z)
-
-			_pitch = clamp(
-				asin(dir.y),
-				rotation_manager.min_pitch,
-				rotation_manager.max_pitch
-			)
+	#if not _is_frozen:
+#
+		#if is_instance_valid(_target):
+			## Direction FROM camera TO target
+			#var dir := (_target.global_position - global_position).normalized()
+			#
+			## Flip the direction to match your yaw/pitch convention
+			#_yaw = atan2(-dir.x, -dir.z)
+			#
+			#_pitch = clamp(
+				#asin(dir.y),
+				#rotation_manager.min_pitch,
+				#rotation_manager.max_pitch
+			#)
 
 	var cam_basis := (
 		Basis(Vector3.UP, _yaw)

@@ -24,13 +24,13 @@ func process_input(delta):
 	if is_frozen:
 		return
 	var input = input_buffer.get_input()
-	applied_cmd_id += 1 
+	applied_cmd_id += 1
 	_apply_inputs(input, delta)
 
-func _init(p_player, pid, p_name, team, c_cam, joystick, i_buffer : InputBuffer):
+func _init(p_player, pid, p_name, team, c_cam, ball, joystick, i_buffer : InputBuffer):
 	cam = c_cam
 	cam.set_rotation_source(self)
-	super._init(p_player, pid, p_name, team, i_buffer)
+	super._init(p_player, pid, p_name, team, ball, i_buffer)
 
 func _get_player_movement(input) -> Dictionary:
 	var mvx : float = 0.0

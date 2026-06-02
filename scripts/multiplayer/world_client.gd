@@ -57,6 +57,8 @@ func process_input_dictionary(msg : int, value : Dictionary) -> void:
 		var roster := value.get("roster") as Dictionary
 		GameState.roster = roster
 		server_data_completed = true
+		var ball_path = value.get("ball_path")
+		ball = get_node_or_null(ball_path)
 		_evaluate_all_phases()
 
 	if msg == NetCodes.Msg.GAME_BEGIN:
@@ -101,14 +103,12 @@ func init(p : Node3D,
 	blue_spawns: Node3D,
 	red_spawns: Node3D,
 	ball_spawn: Node3D,
-	ball_scene: Node3D,
 	j_stick) -> void:
 	proxy = p
 	joystick = j_stick
 	blue_sp = blue_spawns
 	red_sp = red_spawns
 	ball_sp = ball_spawn
-	ball = ball_scene
 	state = ingame
 	scoreboard = score_board 
 	
@@ -176,7 +176,7 @@ func _resolve_players_from_roster(rosters) -> void:
 			var cam = get_node_or_null("/root/World/Scene/Camera3D") as Camera3D
 			cam.init(proxy, joystick)
 			var input_buffer = LocalInputBuffer.new(NodeUtils.init_input_source(self))
-			p_controller = PlayerController.new(node, peer_id, name, team, cam, joystick, self, input_buffer)
+			p_controller = PlayerController.new(node, peer_id, name, team, cam, ball, joystick, self, input_buffer)
 			p_controller.get_body_mesh().visible = false
 			proxy.init(node, p_controller)
 			controllers.append(p_controller)

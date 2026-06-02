@@ -36,9 +36,9 @@ func store_snapshot(snap) -> void:
 		_latest_local_snapshot_id = snap_id
 		_latest_local_snapshot = snap
 
-func _init(p_player, pid, p_name, team_name, c_cam, joystick, net, i_buffer : LocalInputBuffer):
+func _init(p_player, pid, p_name, team_name, c_cam, ball, joystick, net, i_buffer : LocalInputBuffer):
 	network = net
-	super._init(p_player, pid, p_name, team_name, c_cam, joystick, i_buffer)
+	super._init(p_player, pid, p_name, team_name, c_cam, ball, joystick, i_buffer)
 
 func _process_interval():
 	var value := {"inputs" : _pending_inputs.duplicate()}
@@ -62,7 +62,6 @@ func process_input(delta):
 	on_predicted.emit(player.global_transform)
 
 func _reconcile_player(me : Node) -> void:
-
 	# 1) Reconcile (if snapshot exists)
 	if not _latest_local_snapshot.is_empty():
 		var snap := _latest_local_snapshot

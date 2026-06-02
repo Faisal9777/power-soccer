@@ -13,10 +13,12 @@ func is_action_pressed(action) -> bool:
 		return Input.is_action_pressed(action)
 	return false
 
+
 func _init(mouse_input : InputSource):
 	_mouse_input = mouse_input
 
 func _get_input() -> Dictionary:
 	return {'mouse_delta' : _mouse_input.get_mouse_delta(), 'move_right': get_action_strength("move_right"),
 	'move_left': get_action_strength("move_left"), 'move_forward': get_action_strength("move_forward"),
-	'move_back': get_action_strength("move_back"), 'sprint' : is_action_pressed("sprint")}
+	'move_back': get_action_strength("move_back"), 'sprint' : is_action_pressed("sprint"),
+	'rmb' : Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)}

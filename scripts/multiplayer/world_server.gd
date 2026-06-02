@@ -31,7 +31,7 @@ func start_init(players: Dictionary,
 	joystick : Node) -> void:
 	_players = players
 	ingame.set_roster(GameState.roster)
-	_player_controller_setup(players, ball_scene.get_path(), joystick, controllers)
+	_player_controller_setup(players, ball_scene, joystick, controllers)
 	_game = GameServer.new()
 	add_child(_game)
 	# Give Game everything it needs *before* it's added (so _ready can safely use them)
@@ -43,7 +43,7 @@ func start_init(players: Dictionary,
 	_game.game_end.connect(_on_game_end)
 	_game.game_started.connect(_on_game_started)
 	#_debug_data(roster, ingame, ball_scene, blue_spawns, red_spawns)
-	var data := {"roster" : roster}
+	var data := {"roster" : roster, "ball_path" : ball_scene.get_path()}
 	if _is_also_player:
 		_peers_ready +=1
 		_client_game = NodeUtils.create_game_client(self, GameClient, "GameClient", ingame, score_board, controllers)
@@ -120,7 +120,7 @@ func _build_player_paths() -> Dictionary:
 		paths[peer_id] = p.get_path()  # NodePath
 	return paths
 
-func _player_controller_setup(rosters : Dictionary, ball_path : NodePath, joystick: Node, controllers) -> void:
+func _player_controller_setup(rosters : Dictionary, ball : Node, joystick: Node, controllers) -> void:
 	for k in rosters.keys():
 		var peer_id := int(k)
 		var entry := GameState.roster[k] as Dictionary
@@ -138,12 +138,12 @@ func _player_controller_setup(rosters : Dictionary, ball_path : NodePath, joysti
 			cam.init(node, joystick)
 			var input_source = NodeUtils.init_input_source(self)
 			var input_buffer = LocalInputBuffer.new(input_source)
-			p_controller = LocalController.new(node, peer_id, name, team, cam, joystick, input_buffer)
+			p_controller = LocalController.new(node, peer_id, name, team, cam, ball, joystick, input_buffer)
 			p_controller.get_body_mesh().visible = false
 			controllers.append(p_controller)
 		else:
 			
-			controllers.append(NodeController.new(node, peer_id, name, team, SavedInputBuffer.new()))
+			controllers.append(NodeController.new(node, peer_id, name, team, ball, SavedInputBuffer.new()))
 
 		if node != null:
 			_players[k] = node
