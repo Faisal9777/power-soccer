@@ -1,6 +1,7 @@
 class_name NodeController
 extends Controller
 var input_buffer : InputBuffer
+var w_ball : Node
 var mouse_sens: float = 0.008
 var min_pitch: float = deg_to_rad(-70.0)
 var max_pitch: float = deg_to_rad(75.0)
@@ -13,8 +14,10 @@ func process_input(delta):
 	var input = input_buffer.get_input()
 	_apply_inputs(input, delta)
 
-func _init(p_player, pid, p_name, p_team, i_buffer : InputBuffer):
+
+func _init(p_player, pid, p_name, p_team, ball, i_buffer : InputBuffer):
 	input_buffer = i_buffer
+	w_ball = ball
 	super._init(p_player, p_name, pid, p_team)
 
 func physics_tick(delta: float) -> void:
@@ -29,16 +32,31 @@ func _apply_inputs(input, delta) -> void:
 	player.set_look_rotation(yaw, pitch)
 
 func _get_player_input(input) -> Dictionary:
-	var look_delta = input.get('mouse_delta', {"x":0, "y":0})
-	look_yaw -= look_delta.x * mouse_sens
-	look_pitch -= look_delta.y * mouse_sens
-
-	look_pitch = clamp(look_pitch, min_pitch, max_pitch)
-
+	_generate_facing_direction(input)
 	var mov_input = _get_player_movement(input)
 	mov_input["yaw"] = look_yaw
 	mov_input["pitch"] = look_pitch
 	return mov_input
+
+func _generate_facing_direction(input) -> void:
+	if input.get('rmb'):
+	# Direction FROM camera TO target
+		var dir : Vector3 = (w_ball.global_position - player.global_position).normalized()
+		
+		# Flip the direction to match your yaw/pitch convention
+		look_yaw = atan2(-dir.x, -dir.z)
+		
+		look_pitch = clamp(
+			asin(dir.y),
+			min_pitch,
+			max_pitch
+		)
+	else:
+		var look_delta = input.get('mouse_delta', {"x":0, "y":0})
+		look_yaw -= look_delta.x * mouse_sens
+		look_pitch -= look_delta.y * mouse_sens
+
+		look_pitch = clamp(look_pitch, min_pitch, max_pitch)
 
 func _get_player_movement(input) -> Dictionary:
 

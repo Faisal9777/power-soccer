@@ -627,65 +627,50 @@ func _update_charge_ui_from_replication() -> void:
 	_charge_bar.visible = _charge > 0.001 or _net["shoot_down"]
 
 func simulate_server(delta: float) -> void:
-	if _is_frozen:
-		return
 	_air_momentum_keep_left = maxf(0.0, _air_momentum_keep_left - delta)
+
+	_handle_latch_mode_server(delta)
 
 	if current_ball_path:
 		_resolve_ball()
 
-	# ✅ latch toggle + stamina drain must still happen while reeling
-	_handle_latch_mode_server(delta)
-	#if is_instance_valid(current_ball) and current_ball.linear_velocity.length() > 0.1:
-		#log_ball_velocity()
-	if not _is_frozen:
-		if current_ball_path:
-			_resolve_ball() 
-		_update_cooldowns(delta)
-		_update_charge_server(delta)
-		apply_gravity(delta)
-		#_face_camera_yaw(delta)
-		#_update_player_facing_server(delta)
-		#_calculate_arrow_position(delta)
-		var input_dir := _get_input_dir_server()
-		_pre_move_vel = velocity
-		_handle_tackle_input_server(delta)
-		_handle_action_server(input_dir, delta)
-		_update_stamina_server(delta)
-
-	
+	# assist pass is independent of frozen state
 	_handle_assist_pass_server()
 
-	# ✅ if grapple reel already moved us this tick, don't do normal movement,
-	# but DO keep stamina logic stable and keep ball glued.
+	# external pull overrides normal movement
 	if _external_pull_active:
 		var to := _external_pull_to - global_position
 		var dist := to.length()
+
 		if dist <= _external_pull_stop_dist:
 			clear_external_pull()
-		else:
-			var dir = to / max(dist, 0.001)
-			velocity.x = dir.x * _external_pull_speed
-			velocity.z = dir.z * _external_pull_speed
-			apply_gravity(delta)
-			move_and_slide()
+			return
+
+		var dir : Vector3= to / max(dist, 0.001)
+
+		velocity.x = dir.x * _external_pull_speed
+		velocity.z = dir.z * _external_pull_speed
+
+		apply_gravity(delta)
+		move_and_slide()
 		return
 
-	# normal sim continues here
+	# normal movement
 	apply_gravity(delta)
 
 	var input_dir := _get_input_dir_server()
 
-	# sprint decision
 	var mvx := float(_net.get("mvx", 0.0))
 	var mvz := float(_net.get("mvz", 0.0))
-	var mv_len := Vector2(mvx, mvz).length()
-	var has_movement := mv_len > 0.01
 
+	var has_movement := Vector2(mvx, mvz).length() > 0.01
 	var want_sprint := _btn_down("sprint")
+
 	_using_sprint = want_sprint and has_movement and _stamina > stamina_min_to_sprint
 
 	_pre_move_vel = velocity
+	_update_cooldowns(delta)
+	_update_charge_server(delta)
 	_handle_tackle_input_server(delta)
 	_handle_action_server(input_dir, delta)
 	_update_stamina_server(delta)
@@ -695,7 +680,6 @@ func simulate_server(delta: float) -> void:
 	if ability_mode_active and _ability:
 		_ability.server_tick(self, delta)
 
-		# movement override (grapple reel)
 		if _ability.server_movement_override(self, delta):
 			_using_sprint = false
 			_update_stamina_server(delta)

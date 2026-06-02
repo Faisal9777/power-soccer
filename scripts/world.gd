@@ -162,8 +162,7 @@ func _ready() -> void:
 	if not multiplayer.is_server():
 		net = WorldClientScript.new()
 		_initialize_multiplayer("NetClient", net)
-		net.init(local_view_proxy, _scoreboard_instance, ingame, blue_spawns, red_spawns, ball_spawn,
-		 ball_scene, get_node(joystick_path))
+		net.init(local_view_proxy, _scoreboard_instance, ingame, blue_spawns, red_spawns, ball_spawn, get_node(joystick_path))
 	else:
 		_create_ball_server()
 		var ids: Array[int] = []
