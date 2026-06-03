@@ -7,6 +7,7 @@ signal server_found(info)
 
 var _transport_method : IAnnounceTransport
 var current_scene = ""
+var scene_data = {}
 var scene_after_server = ""
 var server_info = {}
 var can_broadcast := false
@@ -26,9 +27,18 @@ func set_current_scene(scene : String):
 
 func change_state(state_info: String):
 	server_info.state = state_info
-	if state_info == C.LOBBY:
+	var scene_to_load = ""
+	if state_info == "Lobby":
 		toggle_broadcast(true)
-		get_tree().change_scene_to_file(state_info)
+		scene_to_load = C.LOBBY
+	if state_info == C.WORLD:
+		scene_to_load = C.WORLD
+	elif state_info == "Scoreboard":
+		scene_to_load = C.SCORE
+		scene_data["next_scene"] = "Lobby"
+		
+	current_scene = state_info
+	get_tree().change_scene_to_file(scene_to_load)
 
 func setup(transport_method, id, port):
 	_transport_method = transport_method

@@ -369,16 +369,7 @@ func _process_game_end() -> void:
 	else:
 		blue_scene = lose_scene_path
 		red_scene = win_scene_path
-	for k in GameState.roster.keys():
-		var p_path :NodePath= GameState.roster[k]["player_path"]
-		var p := get_node(p_path)	
 
-		p.freeze(true)
-		var pid = int(k)
-		if GameState.is_blue(pid):
-			_finalize_game_end(pid,{"duration" : 3, "scene" : blue_scene})
-		else:
-			_finalize_game_end(pid,{"duration" : 3, "scene" : red_scene})
 	if GameState.is_blue(multiplayer.get_unique_id()):
 		game_end.emit(3, blue_scene)
 	else:

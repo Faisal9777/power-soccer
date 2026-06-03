@@ -553,7 +553,7 @@ func _rpc_set_roster(snapshot: Array) -> void:
 
 @rpc("authority", "call_local", "reliable")
 func _rpc_start_match(scene_path: String) -> void:
-	get_tree().change_scene_to_file(scene_path)
+	SessionManager.session_node.change_state(WORLD_SCENE)
 @rpc("any_peer", "reliable")
 func _rpc_set_my_name(name: String) -> void:
 	if multiplayer.is_server():
@@ -620,8 +620,8 @@ func _try_start_match() -> void:
 		return
 	for pid in GameState.roster.keys():
 		GameState.roster[pid]["ready"] = false
-	SessionManager.session_node.start_game()
 	rpc("_rpc_start_match", WORLD_SCENE)
+	SessionManager.session_node.change_state(WORLD_SCENE)
 
 
 func _broadcast_lobby_state() -> void:
