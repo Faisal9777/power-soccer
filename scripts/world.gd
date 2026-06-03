@@ -265,7 +265,6 @@ func _setup_scoreboard_popup(game_data_holder : Node) -> void:
 	var ps := load(scoreboard_scene_path)
 	if ps is PackedScene:
 		var inst: Node = ps.instantiate()
-
 		# If root is CanvasLayer, unwrap the first Control child
 		var root_ctrl: Control = null
 		if inst is CanvasLayer:

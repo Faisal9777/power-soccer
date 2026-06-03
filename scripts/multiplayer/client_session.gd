@@ -7,9 +7,10 @@ signal server_found(info)
 var cloud_discovery : CloudDiscovery
 var can_discover = false
 var http_service : HttpService
+var scene_data := {}
 var sync : Node
 var ENDPOINTS = preload("res://scripts/shared/endpoints.gd")
-
+const C = preload("res://scripts/shared/scene.gd")
 const REQUEST_TIMEOUT_MS = 10.0  # seconds
 
 var _timeout_timer: SceneTreeTimer = null
@@ -30,7 +31,16 @@ func start_discovery():
 	Network.start_discovery()
 
 func change_state(state_info: String):
-	get_tree().change_scene_to_file(state_info)
+	var scene_to_load = ""
+	if state_info == C.WORLD:
+		scene_to_load = C.WORLD
+	elif state_info == "Scoreboard":
+		scene_to_load = C.SCORE
+		scene_data["next_scene"] = "Lobby"
+	elif state_info == "Lobby":
+		scene_to_load = C.LOBBY
+
+	get_tree().change_scene_to_file(scene_to_load)
 
 func host_cloud_server():
 	BlockingOverlay.show_overlay("Creating Server...") 

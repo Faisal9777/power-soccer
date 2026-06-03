@@ -7,8 +7,10 @@ var _game_data_holder : Node
 var _sc_popup : Control
 enum Team { BLUE, RED }
 var _lobby_scene_path := NodePath('')
+var _next_scene := ""
 var _back_btn: Button
 var _status: Label
+
 
 const TEAM_NAME := { Team.BLUE: "BLUE", Team.RED: "RED" }
 
@@ -45,6 +47,10 @@ func _add_back_to_lobby_ui() -> void:
 		_back_btn.pressed.connect(_on_back_pressed)
 
 func _ready() -> void:
+	var scene_data = SessionManager.session_node.scene_data
+	if scene_data:
+		_next_scene = scene_data['next_scene']
+	
 	_add_back_to_lobby_ui()
 	var result = _get_stats_in_array(GameState.game_results)
 	# Resolve the Tree node (via exported path, or auto-find by name)
@@ -66,7 +72,6 @@ func _ready() -> void:
 
 
 func set_game_data_holder(holder: Node, sc_popup : Control) -> void:
-
 	_game_data_holder = holder
 	_sc_popup = sc_popup
 	# Team he
@@ -164,4 +169,4 @@ func _on_back_pressed() -> void:
 	_back_btn.disabled = true
 	_status.text = "Waiting for other players..."
 
-	SessionManager.session_node.change_state(_lobby_scene_path)
+	SessionManager.session_node.change_state(_next_scene)

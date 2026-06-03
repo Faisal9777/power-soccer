@@ -176,7 +176,9 @@ func _on_all_peers_left() -> void:
 	get_tree().change_scene_to_file("res://scenes/Lobby.tscn")
 
 func _on_game_end(duration, scene) -> void:
-	print('implement on game end')
+	var data = {"duration" : duration, "scene" : scene}
+	_client_game.end_game(data)
+	_network_endpoint.rpc(NetCodes.Rpc.INPUT_STREAM, NetCodes.Msg.GAME_END, data)
 
 func _on_game_started(game_data) -> void:
 	_client_game.start_round(game_data)
