@@ -30,6 +30,10 @@ func start_discovery():
 	Network.server_found.connect(_on_server_found)
 	Network.start_discovery()
 
+func toggle_scene_action(event : int, value):
+	var scene_data = {"id": multiplayer.get_unique_id(),"event" : event,"value" : value}
+	sync.send_data_id(1, NetCodes.Msg.SCENE_ACTION, scene_data)
+
 func change_state(state_info: String):
 	var scene_to_load = ""
 	if state_info == C.WORLD:
@@ -64,6 +68,8 @@ func join(server_info):
 func handle_data(msg, data):
 	if msg == NetCodes.Msg.ROSTER_DATA:
 		_cl_sync_roster(data)
+	if msg == NetCodes.Msg.STATE_DATA:
+		GameState.roster = data["roster"]
 
 func _on_request_completed(result, response_code, headers, body):
 	if _timeout_timer:
@@ -95,8 +101,9 @@ func _on_lobbies_found(lobbies):
 	for lobby in lobbies:
 		_on_server_found(lobby)
 
-func _on_joined_server(sync):
+func _on_joined_server(s):
 	var payload := {"name" : Settings.player_name, "id" : multiplayer.get_unique_id()}
+	sync = s
 	sync.send_data_id(1, NetCodes.Msg.REGISTER_PEER, payload)
 
 func _cl_sync_roster(server_info):

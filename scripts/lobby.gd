@@ -234,6 +234,7 @@ func _refresh_ui() -> void:
 		var e: Dictionary = GameState.roster[pid]
 		var name_str  := String(e.get("name", "Player"))
 		var is_ready  := bool(e.get("ready", false))
+		ready_btn.text = "Unready" if is_ready else "Ready"
 		var team_val  := int(e.get("team", -1))
 		var role_val  := int(e.get("role", GameState.Role.MIDFIELDER))  # ⬅ NEW
 		var is_bot    := bool(e.get("is_bot", false))                   # ⬅ NEW
@@ -398,11 +399,14 @@ func _submit_name_to_host() -> void:
 
 func _on_ready_toggle() -> void:
 	
-	var new_ready := !_my_ready()
-	_set_my_ready_local(new_ready)
+	#var new_ready := !_my_ready()
+	#_set_my_ready_local(new_ready)
+	var new_ready = !bool(GameState.roster[multiplayer.get_unique_id()].get("ready"))
 	ready_btn.text = "Unready" if new_ready else "Ready"
 	# Tell host (authoritative) to update and broadcast
-	rpc_id(1, "_rpc_set_ready", multiplayer.get_unique_id(), new_ready)
+	#rpc_id(1, "_rpc_set_ready", multiplayer.get_unique_id(), new_ready)
+	SessionManager.session_node.toggle_scene_action(NetCodes.Lobby_action.READY, 
+	new_ready)
 	_refresh_ui()
 	_update_start_enabled()
 

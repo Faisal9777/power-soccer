@@ -15,6 +15,7 @@ var GameClient := load("res://scripts/multiplayer/game_client.gd")
 var init_phase_completed := false
 var server_data_completed := false
 var _game : Node
+var _can_network := true
 
 var p_controller : PlayerController
 var controllers : Array = []
@@ -67,6 +68,7 @@ func process_input_dictionary(msg : int, value : Dictionary) -> void:
 		p_controller.start_process()
 	elif msg == NetCodes.Msg.GAME_END:
 		_game.end_game(value)
+		_can_network = false
 	
 	elif msg == NetCodes.Msg.SNAPSHOTS:
 		_store_snapshots(value)
@@ -82,7 +84,7 @@ func register_player(peer_id: int, player: Node) -> void:
 	_players[peer_id] = player
 
 func submit_input(input):
-	_network_endpoint.rpc_id(server_peer_id, NetCodes.Rpc.INPUT_BY_ID, _my_id, input)
+	_send_network_id(server_peer_id, _my_id, NetCodes.Msg.INPUTS, input)
 
 # ---------- Snapshot receive entry points ----------
 # Your network endpoint can forward server snapshots into either of these.
@@ -140,8 +142,7 @@ func _process(_delta: float) -> void:
 func _evaluate_all_phases() -> void:
 	if init_phase_completed and server_data_completed:
 		_resolve_players_from_roster(GameState.roster)
-		_network_endpoint.rpc("receive_network_input_dictionary", NetCodes.Msg.INIT_DONE, {})
-		
+		_send_network(NetCodes.Msg.INIT_DONE, {})
 
 # ---------- Snapshot storage ----------
 func _store_snapshots(snapshots: Dictionary) -> void:
@@ -189,7 +190,14 @@ func _resolve_players_from_roster(rosters) -> void:
 	add_child(_game)
 	_game.setup(state, scoreboard, controllers)
 
+func _send_network(msg, value) -> void:
+	if _can_network:
+		_network_endpoint.rpc(NetCodes.Rpc.INPUT_STREAM, msg, {})
 
+func _send_network_id(target_id, sender_id, msg, value) -> void:
+	if _can_network:
+		_network_endpoint.rpc_id(target_id, NetCodes.Rpc.INPUT_BY_ID, sender_id, msg, value)
+	
 func _on_server_disconnected() -> void:
 	if get_tree():
 		get_tree().change_scene_to_file("res://scenes/title_screen.tscn")

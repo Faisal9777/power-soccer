@@ -49,7 +49,7 @@ func start_init(players: Dictionary,
 		_client_game = NodeUtils.create_game_client(self, GameClient, "GameClient", ingame, score_board, controllers)
 	_network_endpoint.rpc(NetCodes.Rpc.INPUT_STREAM, NetCodes.Msg.INIT_BEGIN, data)
 
-func process_input_by_id(peer_id: int, cmd : Dictionary) -> void:
+func process_input_by_id(peer_id: int, msg, cmd : Dictionary) -> void:
 	var idx = controllers.find_custom(
 	func(c):
 		return c.id == peer_id
@@ -104,6 +104,8 @@ func _simulate_remote_players(delta) -> void:
 		controller.physics_tick(delta)
 
 func _broadcast_snapshots() -> void:
+	if not can_process:
+		return
 	var snapshots := {}
 
 	for controller in controllers:  # your list of Player nodes on server
@@ -176,6 +178,7 @@ func _on_all_peers_left() -> void:
 	get_tree().change_scene_to_file("res://scenes/Lobby.tscn")
 
 func _on_game_end(duration, scene) -> void:
+	can_process = false
 	var data = {"duration" : duration, "scene" : scene}
 	_client_game.end_game(data)
 	_network_endpoint.rpc(NetCodes.Rpc.INPUT_STREAM, NetCodes.Msg.GAME_END, data)
