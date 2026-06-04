@@ -1110,8 +1110,8 @@ func _enable_local_view_now(p: Node) -> void:
 			cam.call_deferred("set", "ball_target_path", ball.get_path())
 
 @rpc("any_peer", "unreliable_ordered")
-func receive_network_input_by_id(peer_id : int, cmd : Dictionary) -> void:
-	net.process_input_by_id(peer_id, cmd)
+func receive_network_input_by_id(peer_id : int, msg, cmd : Dictionary) -> void:
+	net.process_input_by_id(peer_id, msg, cmd)
 	
 
 @rpc("any_peer", "reliable")

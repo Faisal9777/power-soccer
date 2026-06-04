@@ -51,9 +51,15 @@ func host(server_name, scene):
 	Network.server_started.connect(_on_hosting_started)
 	Network.host(server_info)
 
+func toggle_scene_action(event : int, value):
+	var scene_data = {"id": multiplayer.get_unique_id(),"event" : event,"value" : value}
+	handle_data(NetCodes.Msg.SCENE_ACTION, scene_data)
+
 func handle_data(msg, data):
 	if msg == NetCodes.Msg.REGISTER_PEER:
 		_srv_register_player(data)
+	elif msg == NetCodes.Msg.SCENE_ACTION:
+		_handle_state_action(msg, data)
 
 func disable_broadcast():
 	can_broadcast = false
@@ -74,6 +80,18 @@ func _broadcast():
 		server_info["players_connected"] = GameState.get_players_connected()
 		_transport_method.send(server_info)
 
+func _broadcast_states():
+	var state_data = {}
+	state_data["roster"] = GameState.roster
+	sync.send_data_all(NetCodes.Msg.STATE_DATA, state_data)
+
+func _handle_state_action(msg, data):
+	if current_scene == "Lobby":
+		_handle_lobby_action(msg, data)
+
+func _handle_lobby_action(msg, data):
+	if data.event == NetCodes.Lobby_action.READY:
+		GameState.roster[data.get("id")]["ready"] = data.get("value")
 
 func _on_hosting_started():
 	can_broadcast = true
@@ -83,7 +101,7 @@ func _on_hosting_started():
 	timer.autostart = true
 	timer.timeout.connect(_broadcast)
 	add_child(timer)
-	get_tree().change_scene_to_file(scene_after_server)
+	change_state(scene_after_server)
 
 
 func _on_joined_server():
@@ -105,3 +123,4 @@ func _srv_register_player(payload : Dictionary):
 	GameState.roster[id]["name"] = payload.get('name', "Unknown")
 	var server_info := {"roster":GameState.roster, "scene": C.LOBBY}
 	sync.send_data_id(id, NetCodes.Msg.ROSTER_DATA, server_info)
+	TaskScheduler.schedule(60, _broadcast_states)

@@ -14,7 +14,14 @@ enum Msg {
 	REGISTER_PEER = 7,
 	ROSTER_DATA = 8,
 	SNAPSHOTS = 9,
-	ROUND_START = 10
+	ROUND_START = 10,
+	INPUTS = 11,
+	STATE_DATA = 12,
+	SCENE_ACTION = 13
+}
+
+enum Lobby_action {
+	READY = 1
 }
 
 

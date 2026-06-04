@@ -182,7 +182,7 @@ func _on_create_server() -> void:
 	GameState.roster[1] = {"name": GameState.player_name, "ready": false}
 	var id := Crypto.new().generate_random_bytes(16).hex_encode()
 	var session_node = await SessionManager.create_lan_server_session(SCRIPT_PATHS.SERVER_SESSION, id)
-	session_node.host(GameState.player_name, C.LOBBY)
+	session_node.host(GameState.player_name, "Lobby")
 
 func _on_create_cloud_server() -> void:
 	var session_node = await SessionManager.create_client_session(SCRIPT_PATHS.CLIENT_SESSION)
