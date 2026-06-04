@@ -51,8 +51,8 @@ func host(server_name, scene):
 	Network.server_started.connect(_on_hosting_started)
 	Network.host(server_info)
 
-func toggle_scene_action(event : int, value):
-	var scene_data = {"id": multiplayer.get_unique_id(),"event" : event,"value" : value}
+func toggle_scene_action(domain, event : int, value):
+	var scene_data = {"id": multiplayer.get_unique_id(), "domain": domain,"event" : event,"value" : value}
 	handle_data(NetCodes.Msg.SCENE_ACTION, scene_data)
 
 func handle_data(msg, data):
@@ -86,7 +86,7 @@ func _broadcast_states():
 	sync.send_data_all(NetCodes.Msg.STATE_DATA, state_data)
 
 func _handle_state_action(msg, data):
-	if current_scene == "Lobby":
+	if data.get("domain") == "lobby":
 		_handle_lobby_action(msg, data)
 
 func _handle_lobby_action(msg, data):

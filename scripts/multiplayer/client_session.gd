@@ -30,8 +30,8 @@ func start_discovery():
 	Network.server_found.connect(_on_server_found)
 	Network.start_discovery()
 
-func toggle_scene_action(event : int, value):
-	var scene_data = {"id": multiplayer.get_unique_id(),"event" : event,"value" : value}
+func toggle_scene_action(domain, event : int, value):
+	var scene_data = {"id": multiplayer.get_unique_id(), "domain": domain ,"event" : event,"value" : value}
 	sync.send_data_id(1, NetCodes.Msg.SCENE_ACTION, scene_data)
 
 func change_state(state_info: String):

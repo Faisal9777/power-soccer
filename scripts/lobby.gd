@@ -180,6 +180,9 @@ func _ready() -> void:
 	_refresh_ui()
 	_update_start_enabled()
 
+func _process(delta) -> void:
+	_refresh_ui()
+
 func _on_connected_to_server() -> void:
 	# Client: tell server our name right after connect
 	#print("CLIENT ID %d" % GameState.)
@@ -399,13 +402,9 @@ func _submit_name_to_host() -> void:
 
 func _on_ready_toggle() -> void:
 	
-	#var new_ready := !_my_ready()
-	#_set_my_ready_local(new_ready)
 	var new_ready = !bool(GameState.roster[multiplayer.get_unique_id()].get("ready"))
 	ready_btn.text = "Unready" if new_ready else "Ready"
-	# Tell host (authoritative) to update and broadcast
-	#rpc_id(1, "_rpc_set_ready", multiplayer.get_unique_id(), new_ready)
-	SessionManager.session_node.toggle_scene_action(NetCodes.Lobby_action.READY, 
+	SessionManager.session_node.toggle_scene_action("lobby", NetCodes.Lobby_action.READY, 
 	new_ready)
 	_refresh_ui()
 	_update_start_enabled()
