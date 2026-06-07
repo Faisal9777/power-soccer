@@ -56,7 +56,6 @@ func process_input(delta):
 	_apply_inputs(input, delta)
 	input["yaw"] = look_yaw
 	input["pitch"] = look_pitch
-	print("the input player controller: ", input)
 	var stored := input.duplicate(true)
 	_pending_inputs.append(stored)
 	if _pending_inputs.size() > 256:
@@ -82,11 +81,8 @@ func _reconcile_local_best_practice(p: Node3D, snap: Dictionary) -> void:
 	else:
 		p.global_transform = _snap_to_xform(snap, p)
 	freeze(snap["is_frozen"])
-	look_yaw = snap["yaw"]
-	look_pitch = snap["pitch"]
 	# --- C) drop confirmed inputs ---
 	var last_server_seq := int(snap.get("seq", -1))
-	print("pending inputs size: ", _pending_inputs.size())
 	var i := 0
 	while i < _pending_inputs.size():
 		var seq := int((_pending_inputs[i] as Dictionary).get("seq", -1))

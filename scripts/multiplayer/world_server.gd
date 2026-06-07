@@ -99,8 +99,6 @@ func _simulate_remote_players(delta) -> void:
 		controller.physics_tick(delta)
 
 func _broadcast_snapshots() -> void:
-	if Input.is_action_pressed("debug"):
-		print("if can process: ", can_process)
 	if not can_process:
 		return
 	var snapshots := {}

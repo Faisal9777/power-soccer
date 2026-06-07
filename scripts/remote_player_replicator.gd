@@ -57,7 +57,9 @@ func process_tick(delta: float) -> void:
 # APPLY AUTHORITATIVE STATE
 # =========================================================
 func _apply_snapshot(snapshot: Dictionary, delta: float) -> void:
-	
+	var snap = snapshot.get("snap")
+	look_yaw = snap.get("yaw", 0)
+	look_pitch = snap.get("pitch", 0)
 	# Remote interpolation runs every render frame for smoothness
 	var now := Time.get_ticks_msec()
 	var render_time := now - remote_interp_delay_ms
@@ -87,3 +89,5 @@ func _apply_snapshot(snapshot: Dictionary, delta: float) -> void:
 	if not player:
 		print("client error")
 	player.global_transform = xa.interpolate_with(xb, alpha)
+	player.velocity = snap.get("vel")
+	player.set_look_rotation(look_yaw, look_pitch)

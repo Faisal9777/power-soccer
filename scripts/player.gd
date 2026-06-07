@@ -319,7 +319,7 @@ func apply_snapshot(snap: Dictionary) -> void:
 	var yaw := snap.get("yaw", 0) as float
 	var pitch := snap.get("pitch", 0) as float
 	_is_frozen = snap["is_frozen"]
-	_apply_facing_absolute(yaw, pitch)
+	set_look_rotation(yaw, pitch)
 	global_position = snap["pos"]
 
 
