@@ -57,4 +57,8 @@ func _generate_facing_direction_with_input(input) -> void:
 		"pitch" : look_pitch - look_delta.y * mouse_sens}
 		super._generate_facing_direction_with_input(facing)
 		look_pitch = clamp(look_pitch, min_pitch, max_pitch)
+		if id == 1:
+			var log_facing = {"yaw" : look_yaw, 
+		"pitch" : look_pitch}
+			print("the facing in the server side: ", log_facing)
 	
