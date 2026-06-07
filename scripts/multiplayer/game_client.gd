@@ -232,7 +232,7 @@ func start_game(game_data) -> void:
 
 func end_game(value : Dictionary) -> void:
 	var duration := value.get("duration", 3) as int
-	var scene := value.get("scene", NodePath("")) as NodePath
+	var scene := value.get(multiplayer.get_unique_id(), NodePath("")) as NodePath
 	GameState.game_results = state.game_data
 	_end_match("End!", duration, scene)
 
