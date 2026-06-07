@@ -198,11 +198,9 @@ func setup(ingame : Node, scoreboard, controllers) -> void:
 	state = ingame
 	_scoreboard_instance = scoreboard
 	p_controllers = controllers
-	_color_all_players(controllers)
-
-func start_round(game_data) -> void:
 	for controller in p_controllers:
-		controller.freeze(game_data[controller.id])
+		_init_entry(controller.id, controller.name, controller.team)
+	_color_all_players(controllers)
 
 func _ready() -> void:
 	
@@ -238,7 +236,7 @@ func end_game(value : Dictionary) -> void:
 	GameState.game_results = state.game_data
 	_end_match("End!", duration, scene)
 
-func _toggle_player_process(toggle : bool) -> void:
+func ww(toggle : bool) -> void:
 	var switch := false
 	if not toggle:
 		switch = true
@@ -254,11 +252,12 @@ func _toggle_player_process(toggle : bool) -> void:
 func _position_players2(game_data) -> void:
 	var ball_position : Vector3 = game_data["ball_position"]
 	for controller in p_controllers:
-		controller.set_position(game_data[controller.id]["player_position"])
+		controller.set_position(game_data[controller.id]["position"])
 		
 		_init_entry(controller.id, controller.name, controller.team)
 		controller.face_at(ball_position)
-		controller.freeze(game_data[controller.id]["is_frozen"])
+		controller.freeze(game_data[controller.id]["freeze"])
+	
 
 func process_data(data : Dictionary, msg : StringName) -> void:
 	if msg == "init":

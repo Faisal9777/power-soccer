@@ -63,9 +63,10 @@ func process_input_dictionary(msg : int, value : Dictionary) -> void:
 		_evaluate_all_phases()
 
 	if msg == NetCodes.Msg.GAME_BEGIN:
-		_game.start_game(value)
+		#_game.start_game(value)
 		LoadingUI.hide_loading()
 		p_controller.start_process()
+		#_game.start_game(value)
 	elif msg == NetCodes.Msg.GAME_END:
 		_game.end_game(value)
 		_can_network = false
@@ -73,7 +74,7 @@ func process_input_dictionary(msg : int, value : Dictionary) -> void:
 	elif msg == NetCodes.Msg.SNAPSHOTS:
 		_store_snapshots(value)
 	elif msg == NetCodes.Msg.ROUND_START:
-		_game.start_round(value)
+		_game.start_game(value)
 		
 
 # ---------- Public API (call these from your world/spawner) ----------
@@ -159,6 +160,7 @@ func _store_snapshots(snapshots: Dictionary) -> void:
 		# Prefer server_tick if you add it later; fallback to last_server_seq
 
 		controller.store_snapshot(snap)
+	#_game.current_state = snapshots.game_state
 
 func _resolve_players_from_roster(rosters) -> void:
 	# Build unresolved list first

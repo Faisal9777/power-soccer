@@ -12,20 +12,11 @@ func set_position(gb_transform : Transform3D) -> void:
 	super.set_position(gb_transform)
 	cam.snap_to(gb_transform)
 
-func get_snapshot() -> Dictionary:
-	var snap = player.get_snapshot()
-	return snap
-
 func freeze(toggle) -> void:
+	#print("on: ", id)
+	#print("freeze was called on with toggle: ", toggle)
 	super.freeze(toggle)
-	cam.freeze_rotation(toggle)
-
-func process_input(delta):
-	if is_frozen:
-		return
-	var input = input_buffer.get_input()
-	applied_cmd_id += 1
-	_apply_inputs(input, delta)
+	#cam.freeze_rotation(toggle)
 
 func _init(p_player, pid, p_name, team, c_cam, ball, joystick, i_buffer : InputBuffer):
 	cam = c_cam
@@ -46,3 +37,24 @@ func _get_player_movement(input) -> Dictionary:
 	else:
 		mov_input = super._get_player_movement(input)
 	return mov_input
+
+func _generate_facing_direction_with_input(input) -> void:
+	if input.get('rmb'):
+	# Direction FROM camera TO target
+		var dir : Vector3 = (w_ball.global_position - player.global_position).normalized()
+		
+		# Flip the direction to match your yaw/pitch convention
+		look_yaw = atan2(-dir.x, -dir.z)
+		
+		look_pitch = clamp(
+			asin(dir.y),
+			min_pitch,
+			max_pitch
+		)
+	else:
+		var look_delta = input.get("mouse_delta")
+		var facing = {"yaw" : look_yaw - look_delta.x * mouse_sens, 
+		"pitch" : look_pitch - look_delta.y * mouse_sens}
+		super._generate_facing_direction_with_input(facing)
+		look_pitch = clamp(look_pitch, min_pitch, max_pitch)
+	

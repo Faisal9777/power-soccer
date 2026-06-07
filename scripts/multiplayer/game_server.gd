@@ -3,7 +3,7 @@ extends Node
 signal hud_update(score_blue:int, score_red:int, time_left:float, phase:String)
 signal match_ended(winner:int) # -1 draw, 0 blue, 1 red
 signal game_end(duration : float, scene : String)
-signal game_started(game_data)
+signal game_reset(game_data)
 # Injected from Lobby/World before/after _ready:
 @export var win_scene_path: String = "res://scenes/WinScene.tscn"
 @export var lose_scene_path: String = "res://scenes/DefeatScene.tscn"
@@ -28,6 +28,17 @@ var _all_team_assinged_color := false
 var _network_endpoint : Node
 
 var game : Dictionary = {}
+
+enum GamePhase {
+	LOBBY,
+	MATCH_STARTING,
+	PLAYING,
+	GOAL_RESET,
+	KICKOFF_COUNTDOWN,
+	FINISHED
+}
+
+var current_state := GamePhase.KICKOFF_COUNTDOWN
 # ---------- UI ----------
 #var _ui_layer: CanvasLayer
 #var _hud_layer: CanvasLayer
@@ -106,11 +117,11 @@ func get_stats_in_array() -> Array[Dictionary]:
 	stats.sort_custom(func(a, b): return int(a["id"]) < int(b["id"]))
 	return stats
 
-func start_game() -> void:
+func start_game(world : Node) -> void:
 	if multiplayer.is_server():
 		 # server owns it (peer 1)
 		_start_clock_server()
-		_start_match_authoritative()
+		_start_match_authoritative(world)
 
 func _build_position_snapshots() -> Dictionary:
 	var snapshots: Dictionary = {}  # { pid:int : { "path": NodePath, "global_transform": Transform3D } }
@@ -158,10 +169,8 @@ func _start_countdown_server() -> void:
 
 func _start_game() -> void:
 	state.is_paused = false
-	var game_data = {}
 	for controller in p_controllers:
-		game_data[controller.id] = false
-	game_started.emit(game_data)
+		controller.freeze(false)
 	#_toggle_player_process(false)
 
 func _toggle_player_process(toggle : bool) -> void:
@@ -188,6 +197,7 @@ func _set_game() -> void:
 	#}
 	_position_players2()
 	_start_countdown_server()
+
 	#_network_endpoint.rpc("receive_network_input_dictionary", NetCodes.Msg.GAME_BEGIN,{})
 
 
@@ -200,8 +210,7 @@ func _ready() -> void:
 		#_start_match_authoritative()
 
 
-func _start_match_authoritative() -> void:
-	var world := get_parent()
+func _start_match_authoritative(world) -> void:
 	_blue_zone = world.get_node("Teams/TeamBlue/Goal_A/ScoreZone")
 	_red_zone = world.get_node("Teams/TeamRed/Goal_B/ScoreZone")
 	if is_instance_valid(_blue_zone):
@@ -222,6 +231,8 @@ func _physics_process(delta: float) -> void:
 func _physics_process_server(delta: float) -> void:
 	if state.time_left_ms == 0:
 		_process_game_end()
+	#if Input.is_action_pressed("debug"):
+		#_process_game_end()
 	if state.is_paused and state.countdown_ms == 0:
 		_start_game()
 	if not state.is_paused: 
@@ -250,30 +261,40 @@ func _end_match_authoritative(reason: String) -> void:
 
 func _position_players2() -> void:
 	var blue_placed := 1
-	var red_placed  := 1
+	var red_placed := 1
 
-	# Find a target to face: live Ball if it exists, else the BallSpawn
 	var ball := ball_scene
-	#var target_pos := ball.global_transform.origin if ball != null else ball_spawn.global_transform.origin
-	#var target_pos := ball_spawn.global_position
+
+	var game_data = {
+		"ball_position": ball.global_transform.origin
+	}
+
 	for controller in p_controllers:
-		var team : int= controller.team
-	
+		var team: int = controller.team
+
+		# CREATE INNER DICTIONARY FIRST
+		game_data[controller.id] = {}
 
 		if team == GameState.Team.BLUE:
 			var sp := spawns_blue.get_node_or_null("Spawn%d" % blue_placed) as Node3D
 			if sp:
 				controller.set_position(sp.global_transform)
+				game_data[controller.id]["position"] = sp.global_transform
 				blue_placed += 1
 		else:
 			var sp := spawns_red.get_node_or_null("Spawn%d" % red_placed) as Node3D
 			if sp:
 				controller.set_position(sp.global_transform)
+				game_data[controller.id]["position"] = sp.global_transform
 				red_placed += 1
-		# tell that specific client to aim their camera
-		
-		controller.face_at(ball_spawn.global_transform.origin)
+
+		controller.face_at(ball.global_transform.origin)
 		controller.freeze(true)
+
+		game_data[controller.id]["face_at"] = ball.global_transform.origin
+		game_data[controller.id]["freeze"] = true
+	
+	game_reset.emit(game_data)
 
 func _spawn_players_from_roster() -> void:
 	# player_scene should be known (from GameState or exported on World)
@@ -357,7 +378,7 @@ func _rpc_aim_camera(target_pos: Vector3, path: NodePath) -> void:
 		#_scoreboard_instance.set_stats(stats_array)
 
 func _process_game_end() -> void:
-	state.toggle_process(false)
+	_stop_all_process()
 	var blue_scene := ""
 	var red_scene := ""
 	if state.blue_score > state.red_score:
@@ -381,7 +402,9 @@ func _finalize_game_end(pid : int, data : Dictionary) -> void:
 	#if _client and :
 		#_
 
-
+func _stop_all_process() -> void:
+	_goal_lock = true
+	state.toggle_process(false)
 #@rpc("authority", "reliable", "call_local")
 #func _cl_set_team_id(p_path: NodePath, is_blue : bool) -> void:
 	#var p := get_node(p_path)

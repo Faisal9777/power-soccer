@@ -16,8 +16,8 @@ var roster: Dictionary = {}
 var game_results: Dictionary = {}
 var lobby_size := 0
 var pending_spawn_ids: Array[int] = []
-var match_len_sec = 2
-var goal_limit = 10
+var match_len_sec = 200
+var goal_limit = 50
 # --- tie-alternation state ---
 var _next_on_tie: int = Team.BLUE
 func get_team(peer_id: int) -> int:

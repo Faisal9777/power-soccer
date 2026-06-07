@@ -224,7 +224,8 @@ func _setup_player_tree() -> void:
 func _refresh_ui() -> void:
 	player_list.clear()
 	var root := player_list.create_item()  # root is hidden (hide_root = true)
-
+	
+	ready_btn.text = "Unready" if GameState.roster[multiplayer.get_unique_id()].get("ready") else "Ready"
 	# Stable order
 	var ids := GameState.roster.keys()
 	ids.sort()
@@ -237,7 +238,6 @@ func _refresh_ui() -> void:
 		var e: Dictionary = GameState.roster[pid]
 		var name_str  := String(e.get("name", "Player"))
 		var is_ready  := bool(e.get("ready", false))
-		ready_btn.text = "Unready" if is_ready else "Ready"
 		var team_val  := int(e.get("team", -1))
 		var role_val  := int(e.get("role", GameState.Role.MIDFIELDER))  # ⬅ NEW
 		var is_bot    := bool(e.get("is_bot", false))                   # ⬅ NEW
