@@ -209,6 +209,8 @@ func freeze_rotation(trigger) -> void:
 	_is_frozen = trigger
 
 func _process(delta: float) -> void:
+	if Input.is_action_pressed("debug"):
+		print("position of the camera: ", global_position)
 	_update_facing(delta)
 	
 

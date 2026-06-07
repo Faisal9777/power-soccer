@@ -30,11 +30,11 @@ func store_snapshot(snap) -> void:
 		return
 	var snap_id := int(seq)
 	#_calculate_offset_for_local_visual(peer_id, snap)
-	
 	# Local player: keep ONLY newest snapshot
-	if snap_id > _latest_local_snapshot_id:
+	if snap_id >= _latest_local_snapshot_id:
 		_latest_local_snapshot_id = snap_id
 		_latest_local_snapshot = snap
+	
 
 func _init(p_player, pid, p_name, team_name, c_cam, ball, joystick, net, i_buffer : LocalInputBuffer):
 	network = net
@@ -45,17 +45,20 @@ func _process_interval():
 	network.submit_input(value)
 
 func physics_tick(delta: float) -> void:
+	if Input.is_action_pressed("debug"):
+		print("position of the player: ", player.global_position)
 	if can_process:
 		_reconcile_player(player)
 		process_input(delta)
 
 func process_input(delta):
-	if is_frozen:
-		return
 	var input = input_buffer.get_input()
+	_apply_inputs(input, delta)
+	input["yaw"] = look_yaw
+	input["pitch"] = look_pitch
+	print("the input player controller: ", input)
 	var stored := input.duplicate(true)
 	_pending_inputs.append(stored)
-	_apply_inputs(input, delta)
 	if _pending_inputs.size() > 256:
 		_pending_inputs = _pending_inputs.slice(_pending_inputs.size() - 256, _pending_inputs.size())
 	
@@ -76,14 +79,14 @@ func _reconcile_local_best_practice(p: Node3D, snap: Dictionary) -> void:
 	if p.has_method("apply_snapshot"):
 		
 		p.apply_snapshot(snap)
-		look_yaw = snap["yaw"]
-		look_pitch = snap["pitch"]
 	else:
 		p.global_transform = _snap_to_xform(snap, p)
-
+	freeze(snap["is_frozen"])
+	look_yaw = snap["yaw"]
+	look_pitch = snap["pitch"]
 	# --- C) drop confirmed inputs ---
 	var last_server_seq := int(snap.get("seq", -1))
-
+	print("pending inputs size: ", _pending_inputs.size())
 	var i := 0
 	while i < _pending_inputs.size():
 		var seq := int((_pending_inputs[i] as Dictionary).get("seq", -1))

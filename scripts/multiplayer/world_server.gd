@@ -41,7 +41,6 @@ func start_init(players: Dictionary,
 			"roster":       roster,
 		}, blue_spawns, red_spawns, ball_spawn, ball_scene, ingame, roster, controllers)
 	_game.game_end.connect(_on_game_end)
-	_game.game_started.connect(_on_game_started)
 	#_debug_data(roster, ingame, ball_scene, blue_spawns, red_spawns)
 	var data := {"roster" : roster, "ball_path" : ball_scene.get_path()}
 	if _is_also_player:
@@ -70,15 +69,11 @@ func process_input_dictionary(msg: int, value : Dictionary) -> void:
 		_peers_ready += 1
 		#print("_peers_ready: ", _peers_ready)
 		if _peers_ready == GameState.roster.size():
-			_game.start_game()
-			var game_data = {"ball_position" : _game.ball_spawn.global_transform.origin}
-			for controller in controllers:
-				game_data[controller.id] = {"player_position" : controller.player.global_transform,
-				"is_frozen" : controller.is_frozen}
+			_game.game_reset.connect(_on_game_reset)
+			_game.start_game(get_parent())
 			LoadingUI.hide_loading()
 			TaskScheduler.schedule(60, _broadcast_snapshots)
 			can_process = true
-			_network_endpoint.rpc(NetCodes.Rpc.INPUT_STREAM, NetCodes.Msg.GAME_BEGIN, game_data)
 
 func get_node_track() -> Node3D:
 	return
@@ -104,6 +99,8 @@ func _simulate_remote_players(delta) -> void:
 		controller.physics_tick(delta)
 
 func _broadcast_snapshots() -> void:
+	if Input.is_action_pressed("debug"):
+		print("if can process: ", can_process)
 	if not can_process:
 		return
 	var snapshots := {}
@@ -112,6 +109,8 @@ func _broadcast_snapshots() -> void:
 		var snapshot := controller.get_snapshot() as Dictionary
 		snapshot["seq"] = controller.input_buffer.current_input.get("seq")
 		snapshots[controller.id] = snapshot
+	
+	snapshots["game_state"] = _game.current_state
 	_network_endpoint.rpc(NetCodes.Rpc.INPUT_STREAM, NetCodes.Msg.SNAPSHOTS,snapshots)
 
 
@@ -183,9 +182,8 @@ func _on_game_end(duration, scene) -> void:
 	_client_game.end_game(data)
 	_network_endpoint.rpc(NetCodes.Rpc.INPUT_STREAM, NetCodes.Msg.GAME_END, data)
 
-func _on_game_started(game_data) -> void:
-	_client_game.start_round(game_data)
-	_network_endpoint.rpc(NetCodes.Rpc.INPUT_STREAM, NetCodes.Msg.ROUND_START, game_data)
+func _on_game_reset(game_data) -> void:
+	_network_endpoint.rpc(NetCodes.Rpc.INPUT_STREAM, NetCodes.Msg.GAME_BEGIN, game_data)
 
 func _debug_data(roster: Dictionary, ingame: Node, ball_scene: Node, blue_spawns: Node, red_spawns: Node) -> void:
 	print("--- BUILD DATA DEBUG ---")

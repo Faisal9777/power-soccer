@@ -7,7 +7,11 @@ var min_pitch: float = deg_to_rad(-70.0)
 var max_pitch: float = deg_to_rad(75.0)
 
 func get_snapshot() -> Dictionary:
-	return player.get_snapshot()
+	var player_data = player.get_snapshot()
+	player_data["is_frozen"] = is_frozen
+	player_data["yaw"] = look_yaw
+	player_data["pitch"] = look_pitch
+	return player_data
 
 
 func process_input(delta):
@@ -25,38 +29,16 @@ func physics_tick(delta: float) -> void:
 
 
 func _apply_inputs(input, delta) -> void:
+	_generate_facing_direction_with_input(input)
 	var p_input = _get_player_input(input)
-	var yaw = p_input["yaw"]
-	var pitch = p_input["pitch"]
-	player.handle_movement(p_input, delta)
-	player.set_look_rotation(yaw, pitch)
+	if not is_frozen:
+		player.handle_movement(p_input, delta)
+	player.set_look_rotation(look_yaw, look_pitch)
 
 func _get_player_input(input) -> Dictionary:
-	_generate_facing_direction(input)
 	var mov_input = _get_player_movement(input)
-	mov_input["yaw"] = look_yaw
-	mov_input["pitch"] = look_pitch
 	return mov_input
 
-func _generate_facing_direction(input) -> void:
-	if input.get('rmb'):
-	# Direction FROM camera TO target
-		var dir : Vector3 = (w_ball.global_position - player.global_position).normalized()
-		
-		# Flip the direction to match your yaw/pitch convention
-		look_yaw = atan2(-dir.x, -dir.z)
-		
-		look_pitch = clamp(
-			asin(dir.y),
-			min_pitch,
-			max_pitch
-		)
-	else:
-		var look_delta = input.get('mouse_delta', {"x":0, "y":0})
-		look_yaw -= look_delta.x * mouse_sens
-		look_pitch -= look_delta.y * mouse_sens
-
-		look_pitch = clamp(look_pitch, min_pitch, max_pitch)
 
 func _get_player_movement(input) -> Dictionary:
 
@@ -82,3 +64,7 @@ func _get_player_movement(input) -> Dictionary:
 		"mvz": mvz,
 		"sprint": bool(input.get("sprint", false))
 	}
+
+func _generate_facing_direction_with_input(input) -> void:
+	look_yaw = input.get("yaw", 0)
+	look_pitch = input.get("pitch", 0)

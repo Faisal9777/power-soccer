@@ -1,7 +1,7 @@
 class_name Controller
 extends RefCounted
 
-var is_frozen = false
+var is_frozen = true
 var look_yaw := 0.0
 var look_pitch := 0.0
 var player : Node
