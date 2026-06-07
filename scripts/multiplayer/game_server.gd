@@ -2,7 +2,7 @@ extends Node
 
 signal hud_update(score_blue:int, score_red:int, time_left:float, phase:String)
 signal match_ended(winner:int) # -1 draw, 0 blue, 1 red
-signal game_end(duration : float, scene : String)
+signal game_end(game_end_data : Dictionary)
 signal game_reset(game_data)
 # Injected from Lobby/World before/after _ready:
 @export var win_scene_path: String = "res://scenes/WinScene.tscn"
@@ -390,11 +390,13 @@ func _process_game_end() -> void:
 	else:
 		blue_scene = lose_scene_path
 		red_scene = win_scene_path
-
-	if GameState.is_blue(multiplayer.get_unique_id()):
-		game_end.emit(3, blue_scene)
-	else:
-		game_end.emit(3, red_scene)
+	var game_end_data = {"duration" : 3}
+	for controller in p_controllers:
+		if GameState.is_blue(controller.id):
+			game_end_data[controller.id] = blue_scene
+		else:
+			game_end_data[controller.id] = red_scene
+	game_end.emit(game_end_data)
 func _finalize_game_end(pid : int, data : Dictionary) -> void:
 	var _pid = int(pid)
 	if pid != multiplayer.get_unique_id():

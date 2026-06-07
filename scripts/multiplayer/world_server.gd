@@ -91,6 +91,8 @@ func _ready() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	if Input.is_action_pressed("debug"):
+		_game._process_game_end()
 	if can_process:
 		_simulate_remote_players(delta)
 
@@ -174,11 +176,10 @@ func _on_peer_left(id : int) -> void:
 func _on_all_peers_left() -> void:
 	get_tree().change_scene_to_file("res://scenes/Lobby.tscn")
 
-func _on_game_end(duration, scene) -> void:
+func _on_game_end(game_end_data) -> void:
 	can_process = false
-	var data = {"duration" : duration, "scene" : scene}
-	_client_game.end_game(data)
-	_network_endpoint.rpc(NetCodes.Rpc.INPUT_STREAM, NetCodes.Msg.GAME_END, data)
+	_client_game.end_game(game_end_data)
+	_network_endpoint.rpc(NetCodes.Rpc.INPUT_STREAM, NetCodes.Msg.GAME_END, game_end_data)
 
 func _on_game_reset(game_data) -> void:
 	_network_endpoint.rpc(NetCodes.Rpc.INPUT_STREAM, NetCodes.Msg.GAME_BEGIN, game_data)
