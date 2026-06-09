@@ -137,12 +137,7 @@ func _ready() -> void:
 		fill_bots_check.toggled.connect(_on_fill_bots_toggled)
 	
 	# --- P2P events: refresh UI & keep roster tidy (host removes leavers) ---
-	Network.peer_joined.connect(func(_id):
-		_refresh_ui()
-		if GameState.is_host and fill_bots_check and fill_bots_check.button_pressed:
-			_update_bots_for_team_size()
-		_update_start_enabled()
-	)
+	Network.peer_joined.connect(_on_peer_joined)
 
 
 	multiplayer.connected_to_server.connect(_on_connected_to_server)
@@ -152,23 +147,7 @@ func _ready() -> void:
 	multiplayer.server_disconnected.connect(_on_host_gone)
 	multiplayer.connection_failed.connect(_on_host_gone)
 
-	Network.peer_left.connect(func(id):
-		# If the host (peer 1) disappears and we are a client, leave lobby
-		if id == 1 and !GameState.is_host:
-			_on_host_gone()
-			return
-
-		if multiplayer.is_server() and GameState.roster.has(id):
-			GameState.roster.erase(id)
-			_ensure_leader_exists()   # ✅ leader might have left
-			_broadcast_roster()
-
-			if fill_bots_check and fill_bots_check.button_pressed:
-				_update_bots_for_team_size()
-
-		_refresh_ui()
-		_update_start_enabled()
-	)
+	Network.peer_left.connect(_on_peer_left)
 
 	print("before refereshing: ", GameState.roster)
 	
@@ -732,14 +711,6 @@ func _on_joined_server() -> void:
 	print("Lobby: joined server")
 	_update_status()
 
-func _on_peer_joined(id: int) -> void:
-	print("Lobby: peer joined ", id)
-
-func _on_peer_left(id: int) -> void:
-	print("Lobby: peer left ", id)
-	GameState.roster.erase(id)
-	_broadcast_lobby_state()
-
 func _on_connection_failed() -> void:
 	status_label.text = "Connection failed"
 	return
@@ -931,3 +902,57 @@ func _rpc_request_cycle_ability(pid: int) -> void:
 	GameState.roster[pid] = rec
 
 	_broadcast_roster()
+
+func _on_peer_left(id):
+		# If the host (peer 1) disappears and we are a client, leave lobby
+		if id == 1 and !GameState.is_host:
+			_on_host_gone()
+			return
+
+		if multiplayer.is_server() and GameState.roster.has(id):
+			GameState.roster.erase(id)
+			_ensure_leader_exists()   # ✅ leader might have left
+			_broadcast_roster()
+
+			if fill_bots_check and fill_bots_check.button_pressed:
+				_update_bots_for_team_size()
+
+		_refresh_ui()
+		_update_start_enabled()
+
+func _on_peer_joined(id):
+		# If the host (peer 1) disappears and we are a client, leave lobby
+		if id == 1 and !GameState.is_host:
+			_on_host_gone()
+			return
+
+		if multiplayer.is_server() and GameState.roster.has(id):
+			GameState.roster.erase(id)
+			_ensure_leader_exists()   # ✅ leader might have left
+			_broadcast_roster()
+
+			if fill_bots_check and fill_bots_check.button_pressed:
+				_update_bots_for_team_size()
+
+		_refresh_ui()
+		_update_start_enabled()
+
+func _exit_tree():
+	if Network.peer_left.is_connected(_on_peer_left):
+		Network.peer_left.disconnect(_on_peer_left)
+	if Network.peer_joined.is_connected(_on_peer_joined):
+		Network.peer_left.disconnect(_on_peer_joined)
+	
+	# --- Multiplayer / SceneTree signals ---
+	if multiplayer:
+		if multiplayer.connected_to_server.is_connected(_on_connected_to_server):
+			multiplayer.connected_to_server.disconnect(_on_connected_to_server)
+
+		if multiplayer.peer_connected.is_connected(_on_peer_connected):
+			multiplayer.peer_connected.disconnect(_on_peer_connected)
+
+		if multiplayer.server_disconnected.is_connected(_on_host_gone):
+			multiplayer.server_disconnected.disconnect(_on_host_gone)
+
+		if multiplayer.connection_failed.is_connected(_on_host_gone):
+			multiplayer.connection_failed.disconnect(_on_host_gone)

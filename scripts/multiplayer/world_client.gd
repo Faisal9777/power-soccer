@@ -66,10 +66,9 @@ func process_input_dictionary(msg : int, value : Dictionary) -> void:
 		#_game.start_game(value)
 		LoadingUI.hide_loading()
 		p_controller.start_process()
-		#_game.start_game(value)
+		_game.start_game(value)
 	elif msg == NetCodes.Msg.GAME_END:
 		_game.end_game(value)
-		_can_network = false
 	
 	elif msg == NetCodes.Msg.SNAPSHOTS:
 		_store_snapshots(value)
@@ -96,9 +95,6 @@ func process_snapshots(snapshots: Dictionary, server_id: int) -> void:
 
 func receive_network_input(snapshots: Dictionary, server_id: int) -> void:
 	_store_snapshots(snapshots)
-
-func get_node_track() -> Node3D:
-	return _players[multiplayer.get_unique_id()].get_visual_node()
 
 func init(p : Node3D,
 	score_board : Control,
@@ -147,7 +143,7 @@ func _evaluate_all_phases() -> void:
 
 # ---------- Snapshot storage ----------
 func _store_snapshots(snapshots: Dictionary) -> void:
-	_my_id = multiplayer.get_unique_id()
+	_my_id = p_controller.id
 	for k in snapshots.keys():
 		var peer_id := int(k)
 		var c_id = ArrayUtils.find(controllers, peer_id)

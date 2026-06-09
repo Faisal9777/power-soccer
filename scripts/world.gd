@@ -738,8 +738,6 @@ func _reset_inputs() -> void:
 
 
 func _process(delta: float) -> void:
-	if Input.is_action_just_pressed("debug"):
-		print("mid; ", multiplayer.get_unique_id())
 		#_all_players_positions()
 	if Input.is_action_just_pressed("host_key"):
 		if multiplayer.multiplayer_peer is ENetMultiplayerPeer and multiplayer.is_server():
