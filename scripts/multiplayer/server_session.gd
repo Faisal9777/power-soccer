@@ -70,6 +70,18 @@ func toggle_broadcast(trigger):
 func start_game() -> void:
 	current_scene = C.WORLD
 
+func _process(delta):
+	if Input.is_action_pressed("debug"):
+		var node = get_node("World")
+		var indent = "the path of the node is: "
+		if node:
+			print(indent + node.name)
+
+			for child in node.get_children():
+				print("the child is: ", child.name)
+		else:
+			print("node was not found")
+
 func _broadcast():
 	if can_broadcast:
 		if current_scene == C.LOBBY:

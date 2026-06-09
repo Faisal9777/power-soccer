@@ -168,6 +168,7 @@ func _start_countdown_server() -> void:
 	state.countdown_ms = 3 * 1000  # will sync to clients on first tick
 
 func _start_game() -> void:
+	_end_ms = Time.get_ticks_msec() + state.time_left_ms
 	state.is_paused = false
 	for controller in p_controllers:
 		controller.freeze(false)
@@ -231,19 +232,23 @@ func _physics_process(delta: float) -> void:
 func _physics_process_server(delta: float) -> void:
 	if state.time_left_ms == 0:
 		_process_game_end()
-	#if Input.is_action_pressed("debug"):
-		#_process_game_end()
+
 	if state.is_paused and state.countdown_ms == 0:
 		_start_game()
-	if not state.is_paused: 
+
+	# Match timer
+	if not state.is_paused:
 		if _end_ms > 0:
 			var now := Time.get_ticks_msec()
-			state.time_left_ms = max(0, _end_ms - now)  # this write replicates automatically
+			state.time_left_ms = max(0, _end_ms - now)
+
 			if state.time_left_ms == 0:
 				_on_time_up_server()
+
+	# Countdown timer
 	if state.countdown_ms > -2:
 		var now := Time.get_ticks_msec()
-		var remaining := _cd_ms - now   # ms until countdown end
+		var remaining := _cd_ms - now
 		state.countdown_ms = int(ceil(remaining / 1000.0))
 
 
@@ -477,7 +482,7 @@ func _handle_goal(which_goal: String, ball : Node3D) -> void:
 	_add_point(scoring_team, ball)
 	# Wait 3 seconds, then reset
 	# Show "Goal!" on every client (server does NOT run it)
-	state.is_paused = false
+	state.is_paused = true
 	var secs := 3
 	state.goal_scored = true
 	await get_tree().create_timer(secs).timeout

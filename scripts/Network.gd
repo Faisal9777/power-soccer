@@ -155,6 +155,7 @@ func _on_connection_successful() -> void:
 # CLEANUP / QUIT
 # =========================
 func clear() -> void:
+	print("cllear is called in the network.gd")
 	close_connection()
 	get_tree().change_scene_to_file(C.TITLE)
 
