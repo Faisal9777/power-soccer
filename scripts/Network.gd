@@ -95,7 +95,7 @@ func _poll_discovery():
 		var ip = udp_discovery.get_packet_ip()
 
 		var parsed = JSON.parse_string(packet.get_string_from_utf8())
-
+		print(parsed)
 		# JSON.parse_string returns Variant (no .error)
 		if typeof(parsed) != TYPE_DICTIONARY:
 			continue

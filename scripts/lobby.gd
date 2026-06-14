@@ -8,11 +8,12 @@ extends Control
 @onready var ready_btn: Button = $PanelContainer/VBoxContainer/HBoxContainer/ReadyButton
 @onready var match_size_opt: OptionButton = $PanelContainer/VBoxContainer/HBoxContainer/MatchSizeOption
 @onready var fill_bots_check: CheckButton = $PanelContainer/VBoxContainer/HBoxContainer/FillBotsCheck
+@onready var password_label: Label = $PasswordLabel
 
 const C = preload("res://scripts/shared/scene.gd")
 const MIN_TEAM_SIZE := 1
 const MAX_TEAM_SIZE := 10
-
+var _password: int
 var _server_bots_enabled: bool = false
 var _team_size: int = MIN_TEAM_SIZE  # players per team (1..5)
 var _next_bot_id: int = 100000  # fake peer ids for bots
@@ -48,6 +49,9 @@ func _cycle_ability(cur: String) -> String:
 
 
 func _ready() -> void:
+	if GameState.is_host:
+		_password = SessionManager.session_node.server_password
+		password_label.text = "Password: %d" % _password
 	GameState.lobby_size = _team_size*2
 	# --- Build the Tree columns + per-row buttons ---
 	print("YOU ARE SEEING THE NEW UPDATEE")

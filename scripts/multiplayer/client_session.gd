@@ -1,6 +1,7 @@
 extends Node
 class_name ClientSession
 
+signal auth_failed
 signal joined_server
 signal server_found(info)
 
@@ -12,7 +13,7 @@ var sync : Node
 var ENDPOINTS = preload("res://scripts/shared/endpoints.gd")
 const C = preload("res://scripts/shared/scene.gd")
 const REQUEST_TIMEOUT_MS = 10.0  # seconds
-
+var client_password
 var _timeout_timer: SceneTreeTimer = null
 
 func setup(discovery):
@@ -59,18 +60,29 @@ func host_cloud_server():
 	_timeout_timer = get_tree().create_timer(REQUEST_TIMEOUT_MS)
 	_timeout_timer.timeout.connect(_on_request_timeout)
 
-func join(server_info):
+func join(server_info, password):
 	var ip = server_info["ip"]
 	var port = server_info["port"]
-	Network.joined_server.connect(_on_joined_server)
+	client_password = password
+	if server_info["is_public"]:
+		Network.joined_server.connect(_on_joined_server)
+	else:
+		Network.joined_server.connect(_on_joined_private_server)
+
 	Network.join(ip, port)
+
+
 
 func handle_data(msg, data):
 	if msg == NetCodes.Msg.ROSTER_DATA:
 		_cl_sync_roster(data)
 	if msg == NetCodes.Msg.STATE_DATA:
 		GameState.roster = data["roster"]
-
+	if msg == NetCodes.Msg.AUTH_OK:
+		var payload := {"name" : Settings.player_name, "id" : multiplayer.get_unique_id()}
+		sync.send_data_id(1, NetCodes.Msg.REGISTER_PEER, payload)
+	if msg == NetCodes.Msg.AUTH_FAILED:
+		auth_failed.emit()
 func _on_request_completed(result, response_code, headers, body):
 	if _timeout_timer:
 		_timeout_timer.timeout.disconnect(_on_request_timeout)
@@ -82,7 +94,7 @@ func _on_request_completed(result, response_code, headers, body):
 
 	var json = JSON.parse_string(body.get_string_from_utf8())
 
-	join(json)
+	join(json, "")
 
 func _on_request_timeout() -> void:
 	BlockingOverlay.hide_overlay()
@@ -105,8 +117,20 @@ func _on_joined_server(s):
 	var payload := {"name" : Settings.player_name, "id" : multiplayer.get_unique_id()}
 	sync = s
 	sync.send_data_id(1, NetCodes.Msg.REGISTER_PEER, payload)
+func _on_joined_private_server(s):
+	sync = s
+	
+	var payload := {
+		"id" : multiplayer.get_unique_id(),
+		"password": client_password
+	}
+
+	sync.send_data_id(1, NetCodes.Msg.AUTH_REQUEST, payload)
+
 
 func _cl_sync_roster(server_info):
 	BlockingOverlay.hide()
 	GameState.roster = server_info["roster"]
 	get_tree().change_scene_to_file(server_info["scene"])
+func close_connection():
+	Network.close_connection()

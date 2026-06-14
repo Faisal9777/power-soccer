@@ -1,6 +1,6 @@
 [gd_scene load_steps=2 format=3 uid="uid://duglm4trbrvn7"]
 
-[ext_resource type="Script" uid="uid://bjcnejurtbaco" path="res://scripts/lobby.gd" id="1_gv8if"]
+[ext_resource type="Script" uid="uid://dernriorn8ynn" path="res://scripts/lobby.gd" id="1_gv8if"]
 
 [node name="Lobby" type="Control"]
 layout_mode = 3
@@ -63,3 +63,14 @@ text = "Fill with bots"
 [node name="PlayerList" type="Tree" parent="PanelContainer/VBoxContainer"]
 custom_minimum_size = Vector2(0, 50)
 layout_mode = 2
+
+[node name="PasswordLabel" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -55.5
+offset_right = 55.5
+offset_bottom = 49.0
+grow_horizontal = 2
+text = " "

@@ -1,6 +1,6 @@
 [gd_scene load_steps=3 format=3 uid="uid://caxetbdf0uwpr"]
 
-[ext_resource type="Script" uid="uid://cixk2fitgtdis" path="res://scenes/server_entry.gd" id="1_7l45w"]
+[ext_resource type="Script" uid="uid://ddeucv1pl1b83" path="res://scenes/server_entry.gd" id="1_7l45w"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_l5w3b"]
 bg_color = Color(0.164706, 0.164706, 0.164706, 1)
@@ -25,20 +25,40 @@ theme_override_constants/margin_bottom = 6
 layout_mode = 2
 theme_override_constants/separation = 20
 
-[node name="NameLabel" type="Label" parent="MarginContainer/HBoxContainer"]
+[node name="LeftGroup" type="HBoxContainer" parent="MarginContainer/HBoxContainer"]
+layout_mode = 2
+
+[node name="LockIcon" type="TextureRect" parent="MarginContainer/HBoxContainer/LeftGroup"]
+layout_mode = 2
+expand_mode = 3
+stretch_mode = 5
+
+[node name="NameLabel" type="Label" parent="MarginContainer/HBoxContainer/LeftGroup"]
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Server Name"
 
-[node name="PlayersLabel" type="Label" parent="MarginContainer/HBoxContainer"]
+[node name="Spacer" type="Control" parent="MarginContainer/HBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="RightGroup" type="HBoxContainer" parent="MarginContainer/HBoxContainer"]
+layout_mode = 2
+alignment = 2
+
+[node name="PlayersLabel" type="Label" parent="MarginContainer/HBoxContainer/RightGroup"]
 layout_mode = 2
 text = "0/0"
 
-[node name="PingLabel" type="Label" parent="MarginContainer/HBoxContainer"]
+[node name="PingLabel" type="Label" parent="MarginContainer/HBoxContainer/RightGroup"]
 layout_mode = 2
 text = "0 ms"
 
-[node name="JoinButton" type="Button" parent="MarginContainer/HBoxContainer"]
+[node name="JoinButton" type="Button" parent="MarginContainer/HBoxContainer/RightGroup"]
 custom_minimum_size = Vector2(80, 0)
 layout_mode = 2
 text = "Join"
+
+[node name="NetworkLabel" type="Label" parent="MarginContainer/HBoxContainer/RightGroup"]
+layout_mode = 2
+size_flags_horizontal = 3

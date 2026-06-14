@@ -7,6 +7,8 @@ signal server_found(info)
 
 var _transport_method : IAnnounceTransport
 var current_scene = ""
+var server_password: int  = 0
+
 var scene_data = {}
 var scene_after_server = ""
 var server_info = {}
@@ -44,9 +46,11 @@ func setup(transport_method, id, port):
 	_transport_method = transport_method
 	server_info = {"id" : id, "port" : port}
 
-func host(server_name, scene):
+func host(server_name, is_public, scene):
 	scene_after_server = scene
 	server_info["name"] = server_name
+	server_info["is_public"] = is_public
+	server_password = randi_range(100000, 999999)
 	Network.peer_joined.connect(_on_peer_connected)
 	Network.server_started.connect(_on_hosting_started)
 	Network.host(server_info)
@@ -56,6 +60,8 @@ func toggle_scene_action(domain, event : int, value):
 	handle_data(NetCodes.Msg.SCENE_ACTION, scene_data)
 
 func handle_data(msg, data):
+	if msg == NetCodes.Msg.AUTH_REQUEST:
+		_authenticate_password(data)
 	if msg == NetCodes.Msg.REGISTER_PEER:
 		_srv_register_player(data)
 	elif msg == NetCodes.Msg.SCENE_ACTION:
@@ -136,3 +142,12 @@ func _srv_register_player(payload : Dictionary):
 	var server_info := {"roster":GameState.roster, "scene": C.LOBBY}
 	sync.send_data_id(id, NetCodes.Msg.ROSTER_DATA, server_info)
 	TaskScheduler.schedule(60, _broadcast_states)
+
+func _authenticate_password(payload):
+	var id = payload.get("id", 0)
+	var password = payload.get("password", 0)
+	print(password)
+	if password == server_password:
+		sync.send_data_id(id, NetCodes.Msg.AUTH_OK, {})
+	else:
+		sync.send_data_id(id, NetCodes.Msg.AUTH_FAILED, {})

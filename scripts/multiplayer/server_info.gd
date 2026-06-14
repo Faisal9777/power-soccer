@@ -7,3 +7,4 @@ var ip: String
 var port: int
 var ping: int = 0
 var is_lan: bool = true
+var is_public: bool = true

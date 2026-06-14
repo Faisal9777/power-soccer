@@ -159,11 +159,119 @@ func _open_multiplayer_screen() -> void:
 	btn_find.grab_focus()
 
 # ---------------- Multiplayer ----------------
+
+
 func _on_find_server() -> void:
 	_set_connect_ui_enabled(true)
 	get_tree().change_scene_to_file(C.SERVER_LIST)
 
-func _on_create_server() -> void:
+func _open_create_server_popup(is_lan: bool) -> void:
+	popup.hide()
+	var root := Control.new()
+	root.name = "CreateServerPopup"
+	root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(root)
+
+	# dark background
+	var dim := ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.6)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	root.add_child(dim)
+
+	# center panel
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	root.add_child(center)
+
+	var panel := Panel.new()
+	panel.custom_minimum_size = Vector2i(420, 320)
+	center.add_child(panel)
+
+	var margin := MarginContainer.new()
+	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	panel.add_child(margin)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 10)
+	margin.add_child(vbox)
+
+	# ---------------- Server Name ----------------
+	var name_label := Label.new()
+	name_label.text = "Server Name"
+	vbox.add_child(name_label)
+
+	var name_input := LineEdit.new()
+	name_input.placeholder_text = "My Server"
+	vbox.add_child(name_input)
+
+	# ---------------- Public / Private ----------------
+	var public_check := CheckBox.new()
+	public_check.text = "Public Server"
+	public_check.button_pressed = true
+	vbox.add_child(public_check)
+
+	var private_check := CheckBox.new()
+	private_check.text = "Private Server"
+	vbox.add_child(private_check)
+
+
+	# mutual exclusivity
+	public_check.toggled.connect(func(v):
+		if v:
+			private_check.button_pressed = false
+
+		else:
+			if not private_check.button_pressed:
+				public_check.button_pressed = true
+	)
+
+	private_check.toggled.connect(func(v):
+		if v:
+			public_check.button_pressed = false
+
+		else:
+
+			if not public_check.button_pressed:
+				public_check.button_pressed = true
+	)
+
+	# ---------------- Buttons ----------------
+	var btn_row := HBoxContainer.new()
+	btn_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	btn_row.add_theme_constant_override("separation", 20)
+	vbox.add_child(btn_row)
+
+	var create_btn := Button.new()
+	create_btn.text = "Create"
+	btn_row.add_child(create_btn)
+
+	var cancel_btn := Button.new()
+	cancel_btn.text = "Cancel"
+	btn_row.add_child(cancel_btn)
+
+	# ---------------- Actions ----------------
+	cancel_btn.pressed.connect(func():
+		root.queue_free()
+	)
+
+	create_btn.pressed.connect(func():
+		var server_name = name_input.text.strip_edges()
+		var is_public = public_check.button_pressed
+
+
+		if server_name == "":
+			server_name = "Server"
+
+		if is_lan:
+			_on_create_server_with_data(server_name, is_public)
+		else:
+			_on_create_cloud_server_with_data(server_name, is_public)
+
+		root.queue_free()
+	)
+
+func _on_create_server_with_data(name: String, is_public: bool) -> void:
+	print("LAN SERVER:", name, is_public)
 	print('_on_create_server')
 	# Identity
 	GameState.reset_lobby()
@@ -182,27 +290,19 @@ func _on_create_server() -> void:
 	GameState.roster[1] = {"name": GameState.player_name, "ready": false}
 	var id := Crypto.new().generate_random_bytes(16).hex_encode()
 	var session_node = await SessionManager.create_lan_server_session(SCRIPT_PATHS.SERVER_SESSION, id)
-	session_node.host(GameState.player_name, "Lobby")
+	session_node.host(name, is_public, "Lobby")
 
-func _on_create_cloud_server() -> void:
+func _on_create_cloud_server_with_data(name: String, is_public: bool) -> void:
+	print("CLOUD SERVER:", name, is_public)
 	var session_node = await SessionManager.create_client_session(SCRIPT_PATHS.CLIENT_SESSION)
 	session_node.host_cloud_server()
 
-
-#func _on_connect_to_ip() -> void:
-#
-	#GameState.is_host = false
-	#GameState.reset_lobby()
-	#GameState.player_name = Settings.player_name
-	#GameState.id = randi()
-	#GameState.roster[GameState.id] = {"name": GameState.player_name, "ready": false}
-#
-	#_set_status("Connecting to %s…" % ip)
-	#_set_connect_ui_enabled(false)
-#
-	## Use the typed IP here:
-	#Network.join(ip)
-
+func _on_create_server() -> void:
+	_open_create_server_popup(true)
+	
+func _on_create_cloud_server() -> void:
+	_open_create_server_popup(false)
+	
 func get_lan_ip() -> String:
 	for addr in IP.get_local_addresses():  # PackedStringArray of addresses
 		var is_ipv6 := String(addr).find(":") != -1

@@ -17,7 +17,10 @@ enum Msg {
 	ROUND_START = 10,
 	INPUTS = 11,
 	STATE_DATA = 12,
-	SCENE_ACTION = 13
+	SCENE_ACTION = 13,
+	AUTH_REQUEST = 14,
+	AUTH_OK = 15,
+	AUTH_FAILED = 16
 }
 
 enum Lobby_action {
