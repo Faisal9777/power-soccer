@@ -174,12 +174,12 @@ func _on_create_server() -> void:
 	# Start ENet server and go to lobby
 	GameState.player_name = Settings.player_name
 	GameState.id = 1
-	GameState.roster[1] = {"name": GameState.player_name, "ready": false, "team": GameState.Team.BLUE} # team optional
+	GameState.roster[1] = {"name": GameState.player_name, "ready": false,
+	"is_active" : true} # team optional
 	
 	var lan := get_lan_ip()
 	print("Hosting on UDP 24565, LAN IP =", lan)
 	# Register host in roster (peer 1) with ready=false
-	GameState.roster[1] = {"name": GameState.player_name, "ready": false}
 	var id := Crypto.new().generate_random_bytes(16).hex_encode()
 	var session_node = await SessionManager.create_lan_server_session(SCRIPT_PATHS.SERVER_SESSION, id)
 	session_node.host(GameState.player_name, "Lobby")

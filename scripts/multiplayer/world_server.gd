@@ -7,7 +7,7 @@ var _players_input: Dictionary = {}
 var _input_accum: float = 0.0
 var _network_endpoint : Node
 var _peers_ready := 0
-var _is_also_player := true
+var _is_also_player := false
 var _game : Node
 var _client_game : Node
 var GameClient := load("res://scripts/multiplayer/game_client.gd")
@@ -29,6 +29,8 @@ func start_init(players: Dictionary,
 	goal_limit: int,
 	roster: Dictionary,
 	joystick : Node) -> void:
+	if GameState.roster.has(1):
+		_is_also_player = true
 	_players = players
 	ingame.set_roster(GameState.roster)
 	_player_controller_setup(players, ball_scene, joystick, controllers)
@@ -91,8 +93,8 @@ func _ready() -> void:
 
 
 func _physics_process(delta: float) -> void:
-	#if Input.is_action_pressed("debug"):
-		#_game._process_game_end()
+	if Input.is_action_pressed("debug"):
+		_game._process_game_end()
 	if can_process:
 		_simulate_remote_players(delta)
 

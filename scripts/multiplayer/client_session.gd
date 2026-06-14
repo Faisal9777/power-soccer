@@ -6,6 +6,7 @@ signal server_found(info)
 
 var cloud_discovery : CloudDiscovery
 var can_discover = false
+var is_connected = false
 var http_service : HttpService
 var scene_data := {}
 var sync : Node
@@ -21,9 +22,17 @@ func setup(discovery):
 
 func stop_discovery():
 	Network.stop_discovery()
+	if Network.server_found.is_connected(_on_server_found):
+		Network.server_found.disconnect(_on_server_found)
+	if cloud_discovery.lobbies_received.is_connected(_on_lobbies_found):
+		cloud_discovery.lobbies_received.disconnect(_on_lobbies_found)
+	if cloud_discovery.discovery_failed.is_connected(_on_discovery_failed):
+		cloud_discovery.discovery_failed.disconnect(_on_discovery_failed)
 	cloud_discovery.stop_search()
 
 func start_discovery():
+	if is_connected:
+		return
 	cloud_discovery.lobbies_received.connect(_on_lobbies_found)
 	cloud_discovery.discovery_failed.connect(_on_discovery_failed)
 	cloud_discovery.start_search(2.0)
@@ -43,6 +52,8 @@ func change_state(state_info: String):
 		scene_data["next_scene"] = "Lobby"
 	elif state_info == "Lobby":
 		scene_to_load = C.LOBBY
+	elif state_info == "Title":
+		_disconnect()
 
 	get_tree().change_scene_to_file(scene_to_load)
 
@@ -63,6 +74,8 @@ func join(server_info):
 	var ip = server_info["ip"]
 	var port = server_info["port"]
 	Network.joined_server.connect(_on_joined_server)
+	Network.connection_failed.connect(_on_connection_failed)
+	Network.server_disconnected.connect(_on_server_disconnected)
 	Network.join(ip, port)
 
 func handle_data(msg, data):
@@ -102,11 +115,37 @@ func _on_lobbies_found(lobbies):
 		_on_server_found(lobby)
 
 func _on_joined_server(s):
+	is_connected = true
 	var payload := {"name" : Settings.player_name, "id" : multiplayer.get_unique_id()}
 	sync = s
 	sync.send_data_id(1, NetCodes.Msg.REGISTER_PEER, payload)
+
+func _on_server_disconnected() -> void:
+	_disconnect()
+
+func _on_connection_failed() -> void:
+	_disconnect()
+
+func _disconnect() -> void:
+	is_connected = false
+	_disconnect_from_events()
+	GameState.clear()
+	Network.close_connection()
+	SessionManager.close_session()
 
 func _cl_sync_roster(server_info):
 	BlockingOverlay.hide()
 	GameState.roster = server_info["roster"]
 	get_tree().change_scene_to_file(server_info["scene"])
+
+func _disconnect_from_events():
+	if Network.joined_server.is_connected(_on_joined_server):
+		Network.joined_server.disconnect(_on_joined_server)
+
+	if Network.connection_failed.is_connected(_on_connection_failed):
+		Network.connection_failed.disconnect(_on_connection_failed)
+
+	if Network.server_disconnected.is_connected(_on_server_disconnected):
+		Network.server_disconnected.disconnect(_on_server_disconnected)
+func _exit_tree():
+	_disconnect_from_events()

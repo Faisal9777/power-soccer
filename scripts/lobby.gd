@@ -107,7 +107,7 @@ func _ready() -> void:
 # --- Ensure a lobby leader exists (server side) ---
 	if multiplayer.is_server():
 		_ensure_leader_exists()
-		_broadcast_roster()  # so everyone immediately sees leader + roster
+		#_broadcast_roster()  # so everyone immediately sees leader + roster
 
 	# --- Buttons + initial state ---
 	# Start button enabled/disabled will be decided by _update_start_enabled()
@@ -141,7 +141,6 @@ func _ready() -> void:
 
 
 	multiplayer.connected_to_server.connect(_on_connected_to_server)
-	multiplayer.peer_connected.connect(_on_peer_connected)
 
 	# If the server (host) goes away, clients should bounce to title
 	multiplayer.server_disconnected.connect(_on_host_gone)
@@ -170,16 +169,6 @@ func _on_connected_to_server() -> void:
 
 func _peer_name(pid: int) -> String:
 	return GameState.roster.get(pid, {}).get("name", "Player %d" % pid)
-
-
-
-# When any peer connects (server side), you can request their name if you prefer pull:
-func _on_peer_connected(pid: int) -> void:
-	if multiplayer.is_server():
-		# Optionally pre-create an entry to avoid has() failure later
-		if !GameState.roster.has(pid):
-			GameState.roster[pid] = {"name": "Player %d" % pid, "ready": false}
-		# (Then either wait for their _rpc_submit_name, or actively request it)
 
 # -------------------- Tree setup / UI --------------------
 
@@ -289,7 +278,6 @@ func _on_tree_button_clicked(item: TreeItem, column: int, id: int, mouse_button_
 			var cur := int(rec.get("team", GameState.Team.BLUE))
 			rec["team"] = (GameState.Team.RED if cur == GameState.Team.BLUE else GameState.Team.BLUE)
 			GameState.roster[pid] = rec
-			_broadcast_roster()
 			_update_start_enabled()
 		elif column == 3:
 			var rec: Dictionary = GameState.roster[pid]
@@ -299,13 +287,11 @@ func _on_tree_button_clicked(item: TreeItem, column: int, id: int, mouse_button_
 				var cur_role := int(rec.get("role", GameState.Role.MIDFIELDER))
 				rec["role"] = (cur_role + 1) % 3
 				GameState.roster[pid] = rec
-				_broadcast_roster()
 				_update_start_enabled()
 			else:
 				# human => cycle ability
 				rec["ability"] = _cycle_ability(String(rec.get("ability", "grapple")))
 				GameState.roster[pid] = rec
-				_broadcast_roster()
 				_update_start_enabled()
 
 	else:
@@ -473,10 +459,11 @@ func _rpc_submit_name(name: String) -> void:
 
 	var from := multiplayer.get_remote_sender_id()
 	var team := GameState.pick_balanced_team()
-	GameState.roster[from] = {"name": name, "ready": false, "team": team, "ability": "grapple"}
+	GameState.roster[from]["name"] = name
+	GameState.roster[from]["team"] = team
+	#GameState.roster[from] = {"name": name, "ready": false, "team": team, "ability": "grapple"}
 
 	_ensure_leader_exists()   # ✅ IMPORTANT
-	_broadcast_roster()
 
 @rpc("any_peer", "call_local")
 func _rpc_set_ready(peer_id: int, ready: bool) -> void:
@@ -485,36 +472,17 @@ func _rpc_set_ready(peer_id: int, ready: bool) -> void:
 	if from != peer_id: return
 	if GameState.roster.has(peer_id):
 		GameState.roster[peer_id]["ready"] = ready
-	_broadcast_roster()
 
 @rpc("any_peer", "call_local")
 func _rpc_host_is_leaving() -> void:
 	if !GameState.is_host:
 		_on_host_gone()
 
-func _broadcast_roster() -> void:
-	if !GameState.is_host:
-		return
-
-	var snapshot: Array = []
-	for id in GameState.roster.keys():
-		var e = GameState.roster[id]
-		snapshot.append({
-			"id": id,
-			"name": e.get("name", "Player"),
-			"ready": e.get("ready", false),
-			"team": e.get("team", Team.BLUE),
-			"is_bot": e.get("is_bot", false),  # <--- keep bot flag
-			"role": e.get("role", GameState.Role.MIDFIELDER),  # ⬅ NEW
-			"ability": e.get("ability", "grapple"),  # ✅ NEW
-		})
-
-
-	rpc("_rpc_set_roster", snapshot)
-	_refresh_ui()
 
 @rpc("authority", "call_local", "reliable")
 func _rpc_set_roster(snapshot: Array) -> void:
+	if multiplayer.is_server():
+		return
 	var dict := {}
 	for e in snapshot:
 		dict[int(e["id"])] = {
@@ -524,6 +492,7 @@ func _rpc_set_roster(snapshot: Array) -> void:
 			"is_bot": bool(e.get("is_bot", false)),
 			"role": int(e.get("role", GameState.Role.MIDFIELDER)),  # ⬅ NEW
 			"ability": String(e.get("ability", "grapple")), # ✅ NEW
+			"is_active" : e.get("is_active", false)
 		}
 
 	print("ROSTERRRRRR")
@@ -624,7 +593,6 @@ func _rpc_request_team_size(size: int) -> void:
 	_team_size = clamp(size, MIN_TEAM_SIZE, MAX_TEAM_SIZE)
 	rpc("_rpc_set_team_size", _team_size)
 	_update_bots_for_team_size()
-	_broadcast_roster()
 
 @rpc("any_peer", "reliable")
 func _rpc_request_swap_team(pid: int) -> void:
@@ -636,7 +604,6 @@ func _rpc_request_swap_team(pid: int) -> void:
 	var cur := int(rec.get("team", GameState.Team.BLUE))
 	rec["team"] = (GameState.Team.RED if cur == GameState.Team.BLUE else GameState.Team.BLUE)
 	GameState.roster[pid] = rec
-	_broadcast_roster()
 
 @rpc("any_peer", "reliable")
 func _rpc_request_cycle_role(pid: int) -> void:
@@ -650,7 +617,6 @@ func _rpc_request_cycle_role(pid: int) -> void:
 	var cur_role := int(rec.get("role", GameState.Role.MIDFIELDER))
 	rec["role"] = (cur_role + 1) % 3
 	GameState.roster[pid] = rec
-	_broadcast_roster()
 
 @rpc("any_peer", "reliable")
 func _rpc_request_start_match() -> void:
@@ -673,7 +639,6 @@ func _rpc_request_fill_bots(pressed: bool) -> void:
 
 	# 3. Run logic
 	_update_bots_for_team_size()
-	_broadcast_roster()
 # ---------- CLIENT BUTTON HANDLERS ----------
 
 func _on_ready_pressed() -> void:
@@ -751,7 +716,6 @@ func _on_match_size_selected(index: int) -> void:
 		rpc("_rpc_set_team_size", _team_size)
 		if fill_bots_check and fill_bots_check.button_pressed:
 			_update_bots_for_team_size()
-		_broadcast_roster()
 	else:
 		rpc_id(1, "_rpc_request_team_size", new_size)
 
@@ -792,15 +756,14 @@ func _remove_all_bots() -> void:
 		var e: Dictionary = GameState.roster[id]
 		if _is_bot_entry(e):
 			to_remove.append(int(id))
-	for id in to_remove:
-		GameState.roster.erase(id)
+	#for id in to_remove:
+		#GameState.roster.erase(id)
 func _update_bots_for_team_size() -> void:
 	if !GameState.is_host:
 		return
 # CHANGE: Check the variable, not the UI element
 	if !_server_bots_enabled:
 		_remove_all_bots()
-		_broadcast_roster()
 		_refresh_ui()
 		_update_start_enabled()
 		return
@@ -832,7 +795,7 @@ func _update_bots_for_team_size() -> void:
 		var bot_list := bot_ids_blue if team == Team.BLUE else bot_ids_red
 		while counts[team] > need and bot_list.size() > 0:
 			var remove_id: int = bot_list.pop_back()
-			GameState.roster.erase(remove_id)
+			#GameState.roster.erase(remove_id)
 			counts[team] -= 1
 
 	# 2) Add bots until each team reaches 'need'
@@ -852,7 +815,6 @@ func _update_bots_for_team_size() -> void:
 
 			counts[team] += 1
 
-	_broadcast_roster()
 	_refresh_ui()
 	_update_start_enabled()
 
@@ -867,7 +829,6 @@ func _on_fill_bots_toggled(pressed: bool) -> void:
 		_server_bots_enabled = pressed 
 		
 		_update_bots_for_team_size()
-		_broadcast_roster()
 	else:
 		rpc_id(1, "_rpc_request_fill_bots", pressed)
 @rpc("authority", "call_local", "reliable")
@@ -901,7 +862,6 @@ func _rpc_request_cycle_ability(pid: int) -> void:
 	rec["ability"] = _cycle_ability(cur)
 	GameState.roster[pid] = rec
 
-	_broadcast_roster()
 
 func _on_peer_left(id):
 		# If the host (peer 1) disappears and we are a client, leave lobby
@@ -910,9 +870,7 @@ func _on_peer_left(id):
 			return
 
 		if multiplayer.is_server() and GameState.roster.has(id):
-			GameState.roster.erase(id)
 			_ensure_leader_exists()   # ✅ leader might have left
-			_broadcast_roster()
 
 			if fill_bots_check and fill_bots_check.button_pressed:
 				_update_bots_for_team_size()
@@ -921,38 +879,27 @@ func _on_peer_left(id):
 		_update_start_enabled()
 
 func _on_peer_joined(id):
-		# If the host (peer 1) disappears and we are a client, leave lobby
-		if id == 1 and !GameState.is_host:
-			_on_host_gone()
-			return
-
-		if multiplayer.is_server() and GameState.roster.has(id):
-			GameState.roster.erase(id)
-			_ensure_leader_exists()   # ✅ leader might have left
-			_broadcast_roster()
-
-			if fill_bots_check and fill_bots_check.button_pressed:
-				_update_bots_for_team_size()
-
-		_refresh_ui()
+		if GameState.is_host and fill_bots_check and fill_bots_check.button_pressed:
+			_update_bots_for_team_size()
 		_update_start_enabled()
 
 func _exit_tree():
 	if Network.peer_left.is_connected(_on_peer_left):
 		Network.peer_left.disconnect(_on_peer_left)
 	if Network.peer_joined.is_connected(_on_peer_joined):
-		Network.peer_left.disconnect(_on_peer_joined)
+		Network.peer_joined.disconnect(_on_peer_joined)
 	
 	# --- Multiplayer / SceneTree signals ---
 	if multiplayer:
 		if multiplayer.connected_to_server.is_connected(_on_connected_to_server):
 			multiplayer.connected_to_server.disconnect(_on_connected_to_server)
 
-		if multiplayer.peer_connected.is_connected(_on_peer_connected):
-			multiplayer.peer_connected.disconnect(_on_peer_connected)
-
 		if multiplayer.server_disconnected.is_connected(_on_host_gone):
 			multiplayer.server_disconnected.disconnect(_on_host_gone)
 
 		if multiplayer.connection_failed.is_connected(_on_host_gone):
 			multiplayer.connection_failed.disconnect(_on_host_gone)
+
+func _notification(what):
+	if what == NOTIFICATION_PREDELETE:
+		print("Lobby deleted:", get_instance_id())

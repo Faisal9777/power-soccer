@@ -38,12 +38,9 @@ func get_session() -> Node:
 func get_network_sync() -> Node:
 	return sync_node
 
-func exit(scene) -> void:
-	if scene == C.LOBBY:
-		GameState.clear()
-		session_node.queue_free()
-		Network.close_connection()
-		get_tree().change_scene_to_file(C.TITLE)
+func close_session() -> void:
+	session_node.queue_free()
+	get_tree().change_scene_to_file(C.TITLE)
 
 func _create_node(node_path: String, node_name : String) -> Node:
 	var root = get_tree().root

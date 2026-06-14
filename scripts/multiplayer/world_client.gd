@@ -119,12 +119,12 @@ func _ready() -> void:
 	_my_id = multiplayer.get_unique_id()
 	var hz := float(ProjectSettings.get_setting("physics/common/physics_ticks_per_second"))
 	_fixed_dt = 1.0 / max(1.0, hz)
-	Network.connection_failed.connect(_on_connection_failed)
-	Network.server_disconnected.connect(_on_server_disconnected)
 
 
 # ---------- Main loop ----------
 func _physics_process(delta: float) -> void:
+	if Input.is_action_pressed("debug"):
+		print("debug is pressed")
 	if p_controller:
 		p_controller.physics_tick(delta)
 
@@ -196,10 +196,3 @@ func _send_network_id(target_id, sender_id, msg, value) -> void:
 	if _can_network:
 		_network_endpoint.rpc_id(target_id, NetCodes.Rpc.INPUT_BY_ID, sender_id, msg, value)
 	
-func _on_server_disconnected() -> void:
-	if get_tree():
-		get_tree().change_scene_to_file("res://scenes/title_screen.tscn")
-
-func _on_connection_failed() -> void:
-	if get_tree():
-		get_tree().change_scene_to_file("res://scenes/title_screen.tscn")
