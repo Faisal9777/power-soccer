@@ -43,10 +43,6 @@ func _ready() -> void:
 	# -------- normal client flow below --------
 	# (show title screen buttons, etc.)
 	
-	
-	Settings.ensure_player_name()
-	if Settings.player_name == "" or Settings.player_name.begins_with("Player_"):
-		await _prompt_for_player_name()
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 	if OS.has_feature("mobile") and quit_btn:
 		quit_btn.visible = false
@@ -75,6 +71,10 @@ func _ready() -> void:
 	btn_create.pressed.connect(_on_create_cloud_server)
 	#btn_connect.pressed.connect(_on_connect_to_ip)
 	btn_lan_create.pressed.connect(_on_create_server)
+	
+	# Start Google Authentication flow
+	_setup_login_flow()
+
 
 	# Network callbacks while we are on the title screen
 	Network.connection_failed.connect(_on_connection_failed)
@@ -554,3 +554,110 @@ func _apply_graphics_settings(fullscreen: bool, vsync: bool, quality: int, tex_q
 func _on_center_container_gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed:
 		popup.hide()
+
+# ==========================================
+# GOOGLE SIGN-IN INTERFACES
+# ==========================================
+var _login_ui: Control = null
+var _login_status_label: Label = null
+var _login_btn: Button = null
+
+func _setup_login_flow() -> void:
+	# Hide main UI
+	$CenterContainer.visible = false
+	
+	# Create login overlay
+	_login_ui = Control.new()
+	_login_ui.name = "LoginOverlay"
+	_login_ui.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(_login_ui)
+	
+	# Dark background
+	var bg := ColorRect.new()
+	bg.color = Color(0.1, 0.1, 0.1, 0.95)
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_login_ui.add_child(bg)
+	
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_login_ui.add_child(center)
+	
+	var card := PanelContainer.new()
+	card.custom_minimum_size = Vector2(400, 250)
+	center.add_child(card)
+	
+	var margin := MarginContainer.new()
+	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	margin.add_theme_constant_override("margin_left", 20)
+	margin.add_theme_constant_override("margin_right", 20)
+	margin.add_theme_constant_override("margin_top", 20)
+	margin.add_theme_constant_override("margin_bottom", 20)
+	card.add_child(margin)
+	
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 15)
+	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	margin.add_child(vbox)
+	
+	var title := Label.new()
+	title.text = "Soccer Game"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 32)
+	vbox.add_child(title)
+	
+	var desc := Label.new()
+	desc.text = "Please sign in with Google to continue."
+	desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	vbox.add_child(desc)
+	
+	_login_btn = Button.new()
+	_login_btn.text = "Sign in with Google"
+	_login_btn.custom_minimum_size = Vector2(250, 50)
+	_login_btn.pressed.connect(func():
+		_login_btn.disabled = true
+		AuthManager.login()
+	)
+	vbox.add_child(_login_btn)
+	
+	_login_status_label = Label.new()
+	_login_status_label.text = ""
+	_login_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_login_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_login_status_label.add_theme_font_size_override("font_size", 20)
+	vbox.add_child(_login_status_label)
+	
+	# Connect to AuthManager signals
+	AuthManager.auth_status_changed.connect(_on_auth_status_changed)
+	AuthManager.auth_completed.connect(_on_auth_completed)
+	
+	# Auto-login check
+	if AuthManager.session_token != "":
+		_login_btn.disabled = true
+		AuthManager.login()
+
+func _on_auth_status_changed(msg: String) -> void:
+	if _login_status_label:
+		_login_status_label.text = msg
+
+func _on_auth_completed(success: bool, player_info: Dictionary) -> void:
+	if success:
+		# Update Settings & GameState player name
+		Settings.set_player_name_and_save(player_info["player_name"])
+		GameState.player_name = player_info["player_name"]
+		
+		# Disconnect signals to prevent double-connects on scene reload
+		if AuthManager.auth_status_changed.is_connected(_on_auth_status_changed):
+			AuthManager.auth_status_changed.disconnect(_on_auth_status_changed)
+		if AuthManager.auth_completed.is_connected(_on_auth_completed):
+			AuthManager.auth_completed.disconnect(_on_auth_completed)
+			
+		# Clean up login UI and show main menu
+		if _login_ui:
+			_login_ui.queue_free()
+		$CenterContainer.visible = true
+	else:
+		if _login_btn:
+			_login_btn.disabled = false
+		# The specific error was already printed to the label via auth_status_changed
+		# just leave it there so the player knows what actually went wrong!

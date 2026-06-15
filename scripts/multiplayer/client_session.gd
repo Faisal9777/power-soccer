@@ -117,15 +117,19 @@ func _on_joined_server(s):
 	var payload := {"name" : Settings.player_name, "id" : multiplayer.get_unique_id()}
 	sync = s
 	sync.send_data_id(1, NetCodes.Msg.REGISTER_PEER, payload)
+
+
 func _on_joined_private_server(s):
 	sync = s
 	
 	var payload := {
 		"id" : multiplayer.get_unique_id(),
-		"password": client_password
+		"password": client_password,
+		"session_token": AuthManager.session_token
 	}
 
 	sync.send_data_id(1, NetCodes.Msg.AUTH_REQUEST, payload)
+
 
 
 func _cl_sync_roster(server_info):

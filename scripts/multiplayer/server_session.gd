@@ -128,6 +128,8 @@ func _on_joined_server():
 func _on_server_found(info):
 	server_found.emit(info)
 
+var peer_identities := {}
+
 func _on_peer_connected(id):
 	GameState.roster[id] = {"name": "", "ready": false}
 
@@ -137,17 +139,76 @@ func _srv_register_player(payload : Dictionary):
 		return
 
 	var id = payload.get("id", 0)
+	var player_info = peer_identities.get(id, {})
+	var actual_name = player_info.get("player_name", payload.get('name', "Unknown"))
+	var tag = player_info.get("player_tag", "")
 
-	GameState.roster[id]["name"] = payload.get('name', "Unknown")
+	GameState.roster[id]["name"] = actual_name
+	GameState.roster[id]["player_tag"] = tag
+
 	var server_info := {"roster":GameState.roster, "scene": C.LOBBY}
 	sync.send_data_id(id, NetCodes.Msg.ROSTER_DATA, server_info)
 	TaskScheduler.schedule(60, _broadcast_states)
 
 func _authenticate_password(payload):
 	var id = payload.get("id", 0)
-	var password = payload.get("password", 0)
-	print(password)
-	if password == server_password:
-		sync.send_data_id(id, NetCodes.Msg.AUTH_OK, {})
-	else:
+	var password = payload.get("password", "")
+	var session_token = payload.get("session_token", "")
+	
+	# 1. Password check if lobby is private (server_password != 0)
+	if server_password != 0:
+		var pass_int = 0
+		if password is String:
+			pass_int = password.to_int()
+		else:
+			pass_int = int(password)
+		if pass_int != server_password:
+			sync.send_data_id(id, NetCodes.Msg.AUTH_FAILED, {})
+			return
+			
+	# 2. Session validation via Node.js
+	var player_info = await _verify_token_with_backend(session_token)
+	if player_info.is_empty():
 		sync.send_data_id(id, NetCodes.Msg.AUTH_FAILED, {})
+		return
+		
+	peer_identities[id] = player_info
+	sync.send_data_id(id, NetCodes.Msg.AUTH_OK, {})
+
+func _verify_token_with_backend(token: String) -> Dictionary:
+	if token == "":
+		return {}
+		
+	Config.load_config()
+	var backend_url = Config.get_value("cloud_server_endpoint", "http://127.0.0.1:3000")
+	var verify_url = backend_url + "/api/auth/verify"
+	
+	var http_client = HTTPRequest.new()
+	add_child(http_client)
+	
+	var headers = [
+		"Content-Type: application/json",
+		"Authorization: Bearer " + token
+	]
+	
+	var err = http_client.request(verify_url, headers, HTTPClient.METHOD_GET)
+	if err != OK:
+		http_client.queue_free()
+		return {}
+		
+	var response = await http_client.request_completed
+	http_client.queue_free()
+	
+	var response_code = response[1]
+	var body = response[3]
+	
+	if response_code == 200:
+		var json = JSON.new()
+		if json.parse(body.get_string_from_utf8()) == OK:
+			var data = json.data
+			if data.has("player_tag"):
+				return {
+					"player_tag": data["player_tag"],
+					"player_name": data.get("player_name", "Player")
+				}
+	return {}

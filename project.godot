@@ -27,6 +27,7 @@ SessionManager="*res://scripts/autoload/session_manager.gd"
 Config="*res://scripts/autoload/config.gd"
 BlockingOverlay="*res://scenes/BlockingOverlay.tscn"
 TaskScheduler="*res://scripts/utility/task_scheduler.gd"
+AuthManager="*res://scripts/autoload/auth_manager.gd"
 
 [display]
 

@@ -2,5 +2,6 @@
   "env": "prod",
   "heartbeat_endpoint": "http://140.245.210.219:3000/heartbeat",
   "cloud_server_endpoint": "http://140.245.210.219:3000",
-  "discovery": "http://140.245.210.219:3000/lobbies"
+  "discovery": "http://140.245.210.219:3000/lobbies",
+  "google_client_id": "767520986035-ijg4hp9pf38c85leakdpic4s57qucqbi.apps.googleusercontent.com"
 }

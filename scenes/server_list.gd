@@ -258,7 +258,7 @@ func _passes_filters(data) -> bool:
 
 	# Has Players
 	if filter_has_players and data.get("players", 0) <= 0:
-		return true
+		return false
 
 	return true
 func _refresh_filters():
