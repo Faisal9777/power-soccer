@@ -5,7 +5,7 @@ signal on_reconciled(new_position)
 signal on_predicted(new_position)
 
 var network : Node
-
+var _next_input_seq : int = 0
 var _latest_local_snapshot: Dictionary = {}   # newest snapshot waiting to reconcile
 var _latest_local_snapshot_id: int = -1       # ordering guard (server_tick or last_server_seq)
 var _pending_inputs: Array[Dictionary] = []   # only for LOCAL player
@@ -25,6 +25,8 @@ func stop_process() -> void:
 	TaskScheduler.cancel(task_id)
 
 func store_snapshot(snap) -> void:
+	if GameState.is_paused:
+		return
 	var seq = snap.get("seq", snap.get("last_server_seq", -1))
 	if not seq:
 		return
@@ -41,7 +43,12 @@ func _init(p_player, pid, p_name, team_name, c_cam, ball, joystick, net, i_buffe
 	super._init(p_player, pid, p_name, team_name, c_cam, ball, joystick, i_buffer)
 
 func _process_interval():
+	if GameState.is_paused:
+		return
 	var value := {"inputs" : _pending_inputs.duplicate()}
+	print("SENDING:", value)
+	if _pending_inputs.size() > 0:
+		_next_input_seq = _pending_inputs.duplicate()[0]["seq"] + 1
 	network.submit_input(value)
 
 func physics_tick(delta: float) -> void:
@@ -52,6 +59,8 @@ func physics_tick(delta: float) -> void:
 		process_input(delta)
 
 func process_input(delta):
+	if GameState.is_paused:
+		return
 	var input = input_buffer.get_input()
 	_apply_inputs(input, delta)
 	input["yaw"] = look_yaw
@@ -64,6 +73,8 @@ func process_input(delta):
 	on_predicted.emit(player.global_transform)
 
 func _reconcile_player(me : Node) -> void:
+	if GameState.is_paused:
+		return
 	# 1) Reconcile (if snapshot exists)
 	if not _latest_local_snapshot.is_empty():
 		var snap := _latest_local_snapshot

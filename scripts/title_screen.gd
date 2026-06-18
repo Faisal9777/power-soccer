@@ -22,7 +22,7 @@ extends Control
 const C = preload("res://scripts/shared/scene.gd")
 const SCRIPT_PATHS = preload("res://scripts/shared/script_path.gd")
 var _gfx_ui: Control = null
-
+var _is_public : bool 
 const LOBBY_SCENE := "res://scenes/Lobby.tscn"
 
 func _ready() -> void:
@@ -37,7 +37,7 @@ func _ready() -> void:
 		var id = _get_arg_value("--id", args)
 		var port = _get_arg_value("--port", args)
 		var session = await SessionManager.create_cloud_server_session(SCRIPT_PATHS.SERVER_SESSION, id, port)
-		session.host(Settings.player_name, C.LOBBY)
+		session.host(Settings.player_name, _is_public, C.LOBBY)
 		return
 
 	# -------- normal client flow below --------
@@ -294,6 +294,7 @@ func _on_create_server_with_data(name: String, is_public: bool) -> void:
 
 func _on_create_cloud_server_with_data(name: String, is_public: bool) -> void:
 	print("CLOUD SERVER:", name, is_public)
+	_is_public = is_public
 	var session_node = await SessionManager.create_client_session(SCRIPT_PATHS.CLIENT_SESSION)
 	session_node.host_cloud_server()
 

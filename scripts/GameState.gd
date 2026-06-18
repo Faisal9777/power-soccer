@@ -6,6 +6,7 @@ enum Role { GOALKEEPER = 0, MIDFIELDER = 1, FORWARD = 2 }  # ⬅ NEW
 const TEAM_NONE := -1
 var player_name: String = ""
 var is_host: bool = false
+var is_paused: bool = false
 signal player_name_changed(id: int, name: String)
 var id:int
 var is_dedicated: bool = false 

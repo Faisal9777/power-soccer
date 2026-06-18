@@ -3,6 +3,8 @@ var GameClient := load("res://scripts/multiplayer/game_client.gd")
 # --- networking config ---
 @export var server_peer_id: int = 1
 
+signal local_controller_created
+
 # Name of the RPC on your network endpoint that sends a single input command to the server.
 # Change this string to match whatever your server endpoint exposes.
 # (Many people use: "receive_network_input" or "receive_client_input" or "sv_receive_input")
@@ -16,7 +18,7 @@ var init_phase_completed := false
 var server_data_completed := false
 var _game : Node
 var _can_network := true
-
+var _local_pause: bool = false
 var p_controller : PlayerController
 var controllers : Array = []
 
@@ -49,6 +51,9 @@ var _my_id: int = -1
 var _fixed_dt: float = 1.0 / 60.0
 
 @onready var _network_endpoint: Node = get_parent()
+
+func set_local_pause(p):
+	_local_pause = p
 
 func process_input(cmd: Dictionary, peer_id : int) -> void:
 	_store_snapshots(cmd)
@@ -125,10 +130,28 @@ func _ready() -> void:
 
 # ---------- Main loop ----------
 func _physics_process(delta: float) -> void:
+	if GameState.is_paused:
+		var neutral := {
+			"mouse_delta": Vector2.ZERO,
+			"move_right": 0.0,
+			"move_left": 0.0,
+			"move_forward": 0.0,
+			"move_back": 0.0,
+			"sprint": false,
+			"rmb": false,
+			"seq": p_controller._next_input_seq
+		}
+		var value := {"inputs" : [neutral]}
+
+		submit_input(value)
+		return
 	if p_controller:
 		p_controller.physics_tick(delta)
 
 
+func get_local_controller() -> LocalController:
+	return p_controller
+	
 func _process(_delta: float) -> void:
 	if controllers and controllers.size() > 0:
 		for controller in controllers:
@@ -187,7 +210,7 @@ func _resolve_players_from_roster(rosters) -> void:
 	_game = GameClient.new()
 	add_child(_game)
 	_game.setup(state, scoreboard, controllers)
-
+	local_controller_created.emit()
 func _send_network(msg, value) -> void:
 	if _can_network:
 		_network_endpoint.rpc(NetCodes.Rpc.INPUT_STREAM, msg, {})

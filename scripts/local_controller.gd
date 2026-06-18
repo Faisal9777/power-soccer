@@ -7,6 +7,13 @@ var cam : Node
 var joystick: Node
 var is_mobile: bool = OS.has_feature("mobile")
 var applied_cmd_id := -1
+var _paused := false
+
+func set_paused(state: bool) -> void:
+	print("SET PAUSED CALLED: ", id, " -> ", state)
+
+	_paused = state
+	cam.freeze_rotation(state)
 
 func set_position(gb_transform : Transform3D) -> void:
 	super.set_position(gb_transform)
@@ -24,6 +31,8 @@ func _init(p_player, pid, p_name, team, c_cam, ball, joystick, i_buffer : InputB
 	super._init(p_player, pid, p_name, team, ball, i_buffer)
 
 func _get_player_movement(input) -> Dictionary:
+	if _paused:
+		return {"mvx": 0.0, "mvz": 0.0, "sprint": false}
 	var mvx : float = 0.0
 	var mvz : float = 0.0
 	var mov_input = {}
@@ -39,6 +48,8 @@ func _get_player_movement(input) -> Dictionary:
 	return mov_input
 
 func _generate_facing_direction_with_input(input) -> void:
+	if _paused:
+		return
 	if input.get('rmb'):
 	# Direction FROM camera TO target
 		var dir : Vector3 = (w_ball.global_position - player.global_position).normalized()

@@ -101,7 +101,7 @@ var _external_pull_active := false
 var _external_pull_to := Vector3.ZERO
 var _external_pull_speed := 0.0
 var _external_pull_stop_dist := 1.2
-
+var input_locked := false
 # --- Abilities ---
 const ABILITY_REGISTRY := {
 	"grapple": "res://scripts/Abilities/GrappleAbility.gd",
@@ -609,6 +609,8 @@ func _resolve_ball() -> RigidBody3D:
 func _is_local_owner() -> bool:
 	return get_tree().get_multiplayer().get_unique_id() == owner_peer_id
 func _local_process(delta: float) -> void:
+
+
 	if _charge_bar:
 		_update_charge_ui_from_replication()
 	if _stam_bar:

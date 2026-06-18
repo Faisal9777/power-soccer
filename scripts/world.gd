@@ -48,6 +48,7 @@ var _grapple_crosshair: GrappleCrosshair
 # Keep a typed map of peer-id -> Player node
 var _players: Dictionary[int, CharacterBody3D] = {}    # { int: Node }
 
+
 # --- Pause dialog (created at runtime) ---
 var _pause_ui: Control
 var _gfx_ui: Control
@@ -103,6 +104,8 @@ var assist_pass_edge_latched := false
 var _pass_cd_label: Label
 var _pass_cd_local: float = 0.0
 var _pass_cd_last_from_player: float = -999.0
+var _local_controller: LocalController
+
 
 func _ready() -> void:
 	LoadingUI.show_loading()
@@ -163,6 +166,7 @@ func _ready() -> void:
 		net = WorldClientScript.new()
 		_initialize_multiplayer("NetClient", net)
 		net.init(local_view_proxy, _scoreboard_instance, ingame, blue_spawns, red_spawns, ball_spawn, get_node(joystick_path))
+
 	else:
 		_create_ball_server()
 		var ids: Array[int] = []
@@ -173,7 +177,8 @@ func _ready() -> void:
 		_initialize_multiplayer("NetServer", net)
 		net.start_init(_players, _scoreboard_instance, ingame, blue_spawns, red_spawns, ball_spawn,
 		ball_scene, GameState.match_len_sec, GameState.goal_limit, GameState.roster, get_node(joystick_path))
-		
+		_local_controller = net.get_local_controller()
+		print("Host controller ",_local_controller)
 
 
 	# 1) Connect to the Network autoload signals (do it here so it works even if not wired in editor)
@@ -329,7 +334,7 @@ func _setup_pause_dialog() -> void:
 	_pause_ui = Control.new()
 	_pause_ui.name = "PauseOverlay"
 	_pause_ui.mouse_filter = Control.MOUSE_FILTER_STOP
-	_pause_ui.process_mode = Node.PROCESS_MODE_WHEN_PAUSED
+	_pause_ui.process_mode = Node.PROCESS_MODE_ALWAYS
 	_pause_ui.visible = false
 	_pause_ui.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(_pause_ui)  # or add to your CanvasLayer
@@ -401,26 +406,34 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_released("scoreboard"):
 		_close_scoreboard()
 
+
+
 func _toggle_pause_menu() -> void:
 	if _pause_ui and _pause_ui.visible:
 		_on_pause_resume()
 		return
-	get_tree().paused = true
+	_pause_ui.visible = true
 	if !OS.has_feature("mobile"):
 		Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
-	_pause_ui.visible = true
+	GameState.is_paused = true
+	if _local_controller:
+		_local_controller.set_paused(true)
 	if _btn_resume:
 		_btn_resume.grab_focus()  # keyboard/controller friendly
 
 func _on_pause_resume() -> void:
 	if _pause_ui:
 		_pause_ui.visible = false
-	get_tree().paused = false
+	GameState.is_paused = false
+	if _local_controller:
+		_local_controller.set_paused(false)
 	if !OS.has_feature("mobile"):  # don’t hide mouse on touch devices
 		Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+
+
+
 func _on_pause_exit() -> void:
-	if get_tree().paused:
-		get_tree().paused = false
+
 	if !OS.has_feature("mobile"):
 		Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 	# Quit or go to title:
@@ -445,7 +458,7 @@ func _create_graphics_settings_ui() -> Control:
 	root.name = "GraphicsSettings"
 	root.visible = false
 	root.mouse_filter = Control.MOUSE_FILTER_STOP
-	root.process_mode = Node.PROCESS_MODE_WHEN_PAUSED
+	root.process_mode = Node.PROCESS_MODE_ALWAYS
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
 
 	# background dim

@@ -473,7 +473,9 @@ func _set_my_ready_local(v: bool) -> void:
 
 @rpc("any_peer")
 func _rpc_submit_name(name: String) -> void:
-	if !multiplayer.is_server(): return
+	if !multiplayer.is_server(): 
+		return
+	print("SUBMI5 NAME REACHED HERE Yes")
 
 	var from := multiplayer.get_remote_sender_id()
 	var team := GameState.pick_balanced_team()

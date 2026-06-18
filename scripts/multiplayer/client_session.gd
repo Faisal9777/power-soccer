@@ -61,10 +61,10 @@ func host_cloud_server():
 	_timeout_timer.timeout.connect(_on_request_timeout)
 
 func join(server_info, password):
-	var ip = server_info["ip"]
-	var port = server_info["port"]
+	var ip = server_info.get("ip", "")
+	var port = server_info.get("port", 0)
 	client_password = password
-	if server_info["is_public"]:
+	if server_info.get("is_public", true):
 		Network.joined_server.connect(_on_joined_server)
 	else:
 		Network.joined_server.connect(_on_joined_private_server)
@@ -84,6 +84,11 @@ func handle_data(msg, data):
 	if msg == NetCodes.Msg.AUTH_FAILED:
 		auth_failed.emit()
 func _on_request_completed(result, response_code, headers, body):
+	print("HTTP Result: ", result)
+	print("HTTP Response Code: ", response_code)
+	print("Body: ", body.get_string_from_utf8())
+
+	
 	if _timeout_timer:
 		_timeout_timer.timeout.disconnect(_on_request_timeout)
 		_timeout_timer = null

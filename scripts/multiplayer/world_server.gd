@@ -169,6 +169,8 @@ func _player_controller_setup(rosters : Dictionary, ball : Node, joystick: Node,
 			## no next input yet -> do nothing for now (later: hold last / idle)
 			#pass
 
+func get_local_controller() -> LocalController:
+	return p_controller
 
 func _on_peer_left(id : int) -> void:
 	pass
