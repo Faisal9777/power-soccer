@@ -12,7 +12,7 @@ func setup(data):
 	if not name_label:
 		print("name label is null")
 	name_label.text = data.get("name", "Unknown Server")
-	players_label.text = "%d/%d" % [data.get("players_connected", 0), data.get("lobby_size", 0)]
+	players_label.text = data.get("status", "0/0")
 	ping_label.text = "%d ms" % data.get("ping", 0)
 
 func update_status(data):

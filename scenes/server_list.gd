@@ -83,7 +83,4 @@ func _remove_server(key):
 
 func _on_connect_button_pressed(data) -> void:
 	GameState.reset_lobby()
-
-	# Use the typed IP here:
-	session_node.stop_discovery()
 	session_node.join(data)

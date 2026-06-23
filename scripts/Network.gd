@@ -23,6 +23,10 @@ const C = preload("res://scripts/shared/scene.gd")
 # =========================
 # HOST
 # =========================
+
+func disconnect_peer(id) -> void:
+	multiplayer.multiplayer_peer.disconnect_peer(id)
+
 func host(info: Dictionary) -> void:
 	if multiplayer.multiplayer_peer is ENetMultiplayerPeer and multiplayer.is_server():
 		server_started.emit()
@@ -161,7 +165,7 @@ func clear() -> void:
 
 
 func close_connection() -> void:
-
+	#stop_discovery()
 	var peer := multiplayer.multiplayer_peer
 	if peer != null and peer is ENetMultiplayerPeer:
 		(peer as ENetMultiplayerPeer).close()

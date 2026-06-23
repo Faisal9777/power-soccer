@@ -7,7 +7,7 @@ signal game_reset(game_data)
 # Injected from Lobby/World before/after _ready:
 @export var win_scene_path: String = "res://scenes/WinScene.tscn"
 @export var lose_scene_path: String = "res://scenes/DefeatScene.tscn"
-@onready var state: Node = get_node("../ingame_state") as Node
+@onready var state: Node
 
 @onready var _blue_zone: Area3D #= get_node("Teams/TeamBlue/Goal_A/ScoreZone")
 @onready var _red_zone:  Area3D #= get_node("Teams/TeamRed/Goal_B/ScoreZone")

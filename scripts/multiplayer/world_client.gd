@@ -123,8 +123,6 @@ func _ready() -> void:
 
 # ---------- Main loop ----------
 func _physics_process(delta: float) -> void:
-	if Input.is_action_pressed("debug"):
-		print("debug is pressed")
 	if p_controller:
 		p_controller.physics_tick(delta)
 

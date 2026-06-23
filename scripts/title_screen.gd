@@ -34,10 +34,11 @@ func _ready() -> void:
 		GameState.is_host = true
 		GameState.is_dedicated = true
 		Config.load_config()
+		
 		var id = _get_arg_value("--id", args)
 		var port = _get_arg_value("--port", args)
 		var session = await SessionManager.create_cloud_server_session(SCRIPT_PATHS.SERVER_SESSION, id, port)
-		session.host(Settings.player_name, C.LOBBY)
+		session.host(Settings.player_name, "Lobby")
 		return
 
 	# -------- normal client flow below --------

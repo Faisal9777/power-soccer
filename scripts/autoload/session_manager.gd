@@ -42,13 +42,29 @@ func close_session() -> void:
 	session_node.queue_free()
 	get_tree().change_scene_to_file(C.TITLE)
 
+func change_state(state_info: String):
+	session_node.change_state(state_info)
+	var scene_to_load = ""
+	if state_info == "Lobby":
+		scene_to_load = C.LOBBY
+	if state_info == "World":
+		scene_to_load = C.WORLD
+	elif state_info == "Scoreboard":
+		scene_to_load = C.SCORE
+	elif state_info == "Title":
+		scene_to_load = C.TITLE
+		session_node.queue_free()
+		Network.close_connection()
+	print("after checking the all the elif the scene to load: ", scene_to_load)
+	get_tree().change_scene_to_file(scene_to_load)
+
 func _create_node(node_path: String, node_name : String) -> Node:
 	var root = get_tree().root
 
 	# If already exists, reuse it
 	if root.has_node(node_name):
 		root.remove_child(root.get_node(node_name))
-
+	print("loading: ", node_path)
 	# Create new session
 	var script = load(node_path)
 	if script == null:

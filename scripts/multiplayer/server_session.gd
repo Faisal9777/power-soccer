@@ -12,7 +12,9 @@ var scene_after_server = ""
 var server_info = {}
 var can_broadcast := false
 var can_world_state_broadcast := true
+var can_track_player := false
 var sync : Node
+var can_other_join := true
 const C = preload("res://scripts/shared/scene.gd")
 const server_phase = {
 	STARTING = "starting",
@@ -27,24 +29,14 @@ func set_current_scene(scene : String):
 	current_scene = scene
 
 func change_state(state_info: String):
+	can_track_player = false
 	server_info.state = state_info
-	var scene_to_load = ""
 	if state_info == "Lobby":
 		toggle_broadcast(true)
-		scene_to_load = C.LOBBY
-		_check_all_players()
-	if state_info == C.WORLD:
-		scene_to_load = C.WORLD
-		toggle_broadcast(false)
+		can_track_player = true
 	elif state_info == "Scoreboard":
-		scene_to_load = C.SCORE
 		scene_data["next_scene"] = "Lobby"
-	elif state_info == "Title":
-		Network.close_connection()
-		SessionManager.close_session()
-		
 	current_scene = state_info
-	get_tree().change_scene_to_file(scene_to_load)
 
 func setup(transport_method, id, port):
 	_transport_method = transport_method
@@ -53,7 +45,6 @@ func setup(transport_method, id, port):
 func host(server_name, scene):
 	scene_after_server = scene
 	server_info["name"] = server_name
-	Network.peer_joined.connect(_on_peer_connected)
 	Network.peer_left.connect(_on_peer_left)
 	Network.server_started.connect(_on_hosting_started)
 	Network.host(server_info)
@@ -82,18 +73,24 @@ func start_game() -> void:
 	current_scene = C.WORLD
 
 func _process(delta):
-	return
-	if Input.is_action_pressed("debug"):
-		print("is it the server; ", multiplayer.get_unique_)
+	if can_track_player:
+		_check_all_players()
+	_check_server_status()
 
 func _broadcast():
 	if can_broadcast:
-		if current_scene == C.LOBBY:
-			server_info["status"] = server_phase.RUNNING
-		elif current_scene == C.WORLD:
+		if current_scene == "Lobby":
+			server_info["status"] = "%d/%d" % [
+				GameState.get_players_connected(),
+				GameState.get_lobby_size()
+			]
+		elif current_scene == "World":
 			server_info["status"] = server_phase.INGAME
+
 		server_info["lobby_size"] = GameState.get_lobby_size()
 		server_info["players_connected"] = GameState.get_players_connected()
+		server_info["can_other_join"] = can_other_join
+
 		_transport_method.send(server_info)
 
 func _broadcast_states():
@@ -117,6 +114,12 @@ func _check_all_players():
 		if not is_active:
 			GameState.roster.erase(key)
 
+func _check_server_status():
+	if GameState.get_players_connected() == GameState.get_lobby_size() or current_scene == "World":
+		can_other_join = false
+	else:
+		can_other_join = true
+
 func _on_hosting_started():
 	can_broadcast = true
 	sync = await SessionManager.create_network_sync()
@@ -125,7 +128,7 @@ func _on_hosting_started():
 	timer.autostart = true
 	timer.timeout.connect(_broadcast)
 	add_child(timer)
-	change_state(scene_after_server)
+	SessionManager.change_state(scene_after_server)
 
 
 func _on_joined_server():
@@ -134,21 +137,21 @@ func _on_joined_server():
 func _on_server_found(info):
 	server_found.emit(info)
 
-func _on_peer_connected(id):
-	GameState.roster[id] = {"name": "", "ready": false, "is_active" : true}
-
 func _on_peer_left(id):
 	print("peer left detected in the server for id: ", id)
 	if GameState.roster.has(id):
 		GameState.roster[id]["is_active"] = false
 
 func _srv_register_player(payload : Dictionary):
-	print("_srv_register_player")
+	var id = payload.get("id", 0)
+	if not can_other_join:
+		Network.disconnect_peer(id)
+		sync.send_data_id(id, NetCodes.Msg.REJECT, {"message" : "The Lobby is full"})
+		return
 	if not multiplayer.is_server():
 		return
 
-	var id = payload.get("id", 0)
-
+	GameState.roster[id] = {"name": "", "ready": false, "is_active" : true}
 	GameState.roster[id]["name"] = payload.get('name', "Unknown")
 	var server_info := {"roster":GameState.roster, "scene": C.LOBBY}
 	sync.send_data_id(id, NetCodes.Msg.ROSTER_DATA, server_info)

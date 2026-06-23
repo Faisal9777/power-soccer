@@ -9,6 +9,7 @@ var can_discover = false
 var is_connected = false
 var http_service : HttpService
 var scene_data := {}
+var current_scene := ""
 var sync : Node
 var ENDPOINTS = preload("res://scripts/shared/endpoints.gd")
 const C = preload("res://scripts/shared/scene.gd")
@@ -44,18 +45,9 @@ func toggle_scene_action(domain, event : int, value):
 	sync.send_data_id(1, NetCodes.Msg.SCENE_ACTION, scene_data)
 
 func change_state(state_info: String):
-	var scene_to_load = ""
-	if state_info == C.WORLD:
-		scene_to_load = C.WORLD
-	elif state_info == "Scoreboard":
-		scene_to_load = C.SCORE
+	current_scene = state_info
+	if state_info == "Scoreboard":
 		scene_data["next_scene"] = "Lobby"
-	elif state_info == "Lobby":
-		scene_to_load = C.LOBBY
-	elif state_info == "Title":
-		_disconnect()
-
-	get_tree().change_scene_to_file(scene_to_load)
 
 func host_cloud_server():
 	BlockingOverlay.show_overlay("Creating Server...") 
@@ -74,8 +66,6 @@ func join(server_info):
 	var ip = server_info["ip"]
 	var port = server_info["port"]
 	Network.joined_server.connect(_on_joined_server)
-	Network.connection_failed.connect(_on_connection_failed)
-	Network.server_disconnected.connect(_on_server_disconnected)
 	Network.join(ip, port)
 
 func handle_data(msg, data):
@@ -115,6 +105,8 @@ func _on_lobbies_found(lobbies):
 		_on_server_found(lobby)
 
 func _on_joined_server(s):
+	Network.connection_failed.connect(_on_connection_failed)
+	Network.server_disconnected.connect(_on_server_disconnected)
 	is_connected = true
 	var payload := {"name" : Settings.player_name, "id" : multiplayer.get_unique_id()}
 	sync = s
@@ -131,11 +123,13 @@ func _disconnect() -> void:
 	_disconnect_from_events()
 	GameState.clear()
 	Network.close_connection()
-	SessionManager.close_session()
+	if current_scene == "Lobby":
+		SessionManager.change_state("Title")
 
 func _cl_sync_roster(server_info):
 	BlockingOverlay.hide()
 	GameState.roster = server_info["roster"]
+	stop_discovery()
 	get_tree().change_scene_to_file(server_info["scene"])
 
 func _disconnect_from_events():

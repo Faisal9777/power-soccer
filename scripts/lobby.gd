@@ -193,7 +193,6 @@ func _refresh_ui() -> void:
 	player_list.clear()
 	var root := player_list.create_item()  # root is hidden (hide_root = true)
 	
-	ready_btn.text = "Unready" if GameState.roster[multiplayer.get_unique_id()].get("ready") else "Ready"
 	# Stable order
 	var ids := GameState.roster.keys()
 	ids.sort()
@@ -202,10 +201,11 @@ func _refresh_ui() -> void:
 	for k in ids:
 		var pid := int(k)
 		_ui_ids.append(pid)
-
 		var e: Dictionary = GameState.roster[pid]
 		var name_str  := String(e.get("name", "Player"))
 		var is_ready  := bool(e.get("ready", false))
+		if pid == int(multiplayer.get_unique_id()):
+			ready_btn.text = "Unready" if is_ready else "Ready"
 		var team_val  := int(e.get("team", -1))
 		var role_val  := int(e.get("role", GameState.Role.MIDFIELDER))  # ⬅ NEW
 		var is_bot    := bool(e.get("is_bot", false))                   # ⬅ NEW
@@ -388,7 +388,7 @@ func _on_leave() -> void:
 		# Tell everyone we're going away; then close.
 		rpc("_rpc_host_is_leaving")
 	GameState.reset_lobby()
-	SessionManager.exit(C.LOBBY)
+	SessionManager.change_state("Title")
 
 func _on_host_gone() -> void:
 	print("[lobby] host disconnected or left")
@@ -504,7 +504,7 @@ func _rpc_set_roster(snapshot: Array) -> void:
 
 @rpc("authority", "call_local", "reliable")
 func _rpc_start_match(scene_path: String) -> void:
-	SessionManager.session_node.change_state(WORLD_SCENE)
+	SessionManager.change_state("World")
 @rpc("any_peer", "reliable")
 func _rpc_set_my_name(name: String) -> void:
 	if multiplayer.is_server():
@@ -572,7 +572,7 @@ func _try_start_match() -> void:
 	for pid in GameState.roster.keys():
 		GameState.roster[pid]["ready"] = false
 	rpc("_rpc_start_match", WORLD_SCENE)
-	SessionManager.session_node.change_state(WORLD_SCENE)
+	SessionManager.change_state("World")
 
 
 func _broadcast_lobby_state() -> void:
