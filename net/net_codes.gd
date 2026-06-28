@@ -25,6 +25,10 @@ enum Lobby_action {
 	READY = 1
 }
 
+enum MatchAction {
+	END = 1
+}
+
 
 class Rpc:
 	const INPUT_STREAM := "receive_network_input_dictionary"

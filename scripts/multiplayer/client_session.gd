@@ -65,6 +65,7 @@ func host_cloud_server():
 func join(server_info):
 	var ip = server_info["ip"]
 	var port = server_info["port"]
+	
 	Network.joined_server.connect(_on_joined_server)
 	Network.join(ip, port)
 
@@ -105,6 +106,7 @@ func _on_lobbies_found(lobbies):
 		_on_server_found(lobby)
 
 func _on_joined_server(s):
+	print("joined server")
 	Network.connection_failed.connect(_on_connection_failed)
 	Network.server_disconnected.connect(_on_server_disconnected)
 	is_connected = true

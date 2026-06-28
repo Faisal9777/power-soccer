@@ -169,4 +169,4 @@ func _on_back_pressed() -> void:
 	_back_btn.disabled = true
 	_status.text = "Waiting for other players..."
 
-	SessionManager.change_state(_next_scene)
+	SessionManager.change_state("Lobby")

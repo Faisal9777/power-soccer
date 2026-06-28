@@ -1939,7 +1939,3 @@ func get_ability_icons() -> Dictionary:
 	}
 func refresh_ability_ui() -> void:
 	_emit_ability_ui()
-
-func _exit_tree():
-	print("PLAYER EXIT TREE:", get_path())
-	print_stack()

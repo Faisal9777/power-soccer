@@ -16,8 +16,8 @@ func _ready():
 
 func _process(delta : float):
 	_check_server_status()
-	if Input.is_action_pressed("debug"):
-		Network.join("127.0.0.1", 24565)
+	if Input.is_action_pressed("debug") and session_node:
+		session_node.join({"ip":"172.21.222.53", "port":6000})
 
 func _on_server_found(data):
 	if not data.has("ip") or not data.has("port"):

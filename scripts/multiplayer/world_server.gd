@@ -13,6 +13,7 @@ var _client_game : Node
 var GameClient := load("res://scripts/multiplayer/game_client.gd")
 var p_controller : LocalController
 var controllers : Array = []
+var broadcast_id : int = -1
 # Input pump
 const NET_INPUT_HZ: float = 30.0
 var last_server_seq:= {}
@@ -30,7 +31,6 @@ func start_init(players: Dictionary,
 	roster: Dictionary,
 	joystick : Node) -> void:
 	if GameState.roster.has(1):
-		print("the server is also the player")
 		_is_also_player = true
 	_players = players
 	ingame.set_roster(GameState.roster)
@@ -47,7 +47,6 @@ func start_init(players: Dictionary,
 	#_debug_data(roster, ingame, ball_scene, blue_spawns, red_spawns)
 	var data := {"roster" : roster, "ball_path" : ball_scene.get_path()}
 	if _is_also_player:
-		print("creating client usage in the server")
 		_peers_ready +=1
 		_client_game = NodeUtils.create_game_client(self, GameClient, "GameClient", ingame, score_board, controllers)
 	_network_endpoint.rpc(NetCodes.Rpc.INPUT_STREAM, NetCodes.Msg.INIT_BEGIN, data)
@@ -76,7 +75,7 @@ func process_input_dictionary(msg: int, value : Dictionary) -> void:
 			_game.game_reset.connect(_on_game_reset)
 			_game.start_game(get_parent())
 			LoadingUI.hide_loading()
-			TaskScheduler.schedule(60, _broadcast_snapshots)
+			broadcast_id = TaskScheduler.schedule(60, _broadcast_snapshots)
 			can_process = true
 
 func get_node_track() -> Node3D:
@@ -182,8 +181,13 @@ func _on_all_peers_left() -> void:
 	SessionManager.change_state("Lobby")
 
 func _on_game_end(game_end_data) -> void:
-	_client_game.end_game(game_end_data)
 	_network_endpoint.rpc(NetCodes.Rpc.INPUT_STREAM, NetCodes.Msg.GAME_END, game_end_data)
+	
+	if _is_also_player:
+		_client_game.end_game(game_end_data)
+	else:
+		await get_tree().create_timer(3).timeout
+		SessionManager.session_node.manage_event(NetCodes.MatchAction.END)
 
 func _on_game_reset(game_data) -> void:
 	_network_endpoint.rpc(NetCodes.Rpc.INPUT_STREAM, NetCodes.Msg.GAME_BEGIN, game_data)
@@ -217,3 +221,7 @@ func _get_latest_input(inputs: Array) -> Dictionary:
 		if a.seq > b.seq:
 			return a
 		return b)
+
+
+func _exit_tree():
+	TaskScheduler.cancel(broadcast_id)

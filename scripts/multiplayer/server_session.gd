@@ -72,6 +72,13 @@ func toggle_world_state_broadcast(trigger):
 func start_game() -> void:
 	current_scene = C.WORLD
 
+func manage_event(msg) -> void:
+	print("manage event is called with the message: ", msg)
+	print("current scene is: ", current_scene)
+	if current_scene == "World":
+		if msg == NetCodes.MatchAction.END:
+			SessionManager.change_state("Lobby")
+
 func _process(delta):
 	if can_track_player:
 		_check_all_players()

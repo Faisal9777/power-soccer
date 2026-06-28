@@ -28,7 +28,6 @@ const LOBBY_SCENE := "res://scenes/Lobby.tscn"
 func _ready() -> void:
 	GameState.player_name = Settings.player_name
 	var args := OS.get_cmdline_args()
-
 	# Dedicated headless server mode
 	if "--server" in args:
 		GameState.is_host = true
@@ -80,6 +79,20 @@ func _ready() -> void:
 	# Network callbacks while we are on the title screen
 	Network.connection_failed.connect(_on_connection_failed)
 	Network.server_disconnected.connect(_on_server_disconnected)
+
+func _get_arg_value2(flag: String, args: Array) -> String:
+	var prefix := flag + "="
+
+	for arg in args:
+		if arg == flag:
+			var idx := args.find(arg)
+			if idx + 1 < args.size():
+				return args[idx + 1]
+
+		if arg.begins_with(prefix):
+			return arg.substr(prefix.length())
+
+	return ""
 
 func _get_arg_value(flag: String, args: Array) -> String:
 	var idx = args.find(flag)

@@ -55,7 +55,6 @@ func change_state(state_info: String):
 		scene_to_load = C.TITLE
 		session_node.queue_free()
 		Network.close_connection()
-	print("after checking the all the elif the scene to load: ", scene_to_load)
 	get_tree().change_scene_to_file(scene_to_load)
 
 func _create_node(node_path: String, node_name : String) -> Node:

@@ -48,8 +48,9 @@ func physics_tick(delta: float) -> void:
 	if Input.is_action_pressed("debug"):
 		print("position of the player: ", player.global_position)
 	if can_process:
-		_reconcile_player(player)
-		process_input(delta)
+		if is_instance_valid(player):
+			_reconcile_player(player)
+			process_input(delta)
 
 func process_input(delta):
 	var input = input_buffer.get_input()

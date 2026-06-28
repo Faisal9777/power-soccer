@@ -43,6 +43,7 @@ func host(info: Dictionary) -> void:
 
 	if !_signals_hooked_server:
 		multiplayer.peer_connected.connect(_on_peer_connected)
+		print("server listening to the peer connected event")
 		multiplayer.peer_disconnected.connect(_on_peer_disconnected)
 		_signals_hooked_server = true
 	# Start broadcasting
@@ -62,8 +63,9 @@ func join(ip: String, port: int) -> void:
 		return
 
 	var enet := ENetMultiplayerPeer.new()
+	print("creating client enet with the port: ", port)
+	print("with the ip: ", ip)
 	var err := enet.create_client(ip, port)
-
 	if err != OK:
 		push_error("Join failed: %s" % err)
 		return
@@ -124,6 +126,7 @@ func _process(delta):
 # PEER EVENTS
 # =========================
 func _on_peer_connected(id: int) -> void:
+	print("a peer has connected with the id: ", id)
 	if not multiplayer.is_server():
 		return
 	peer_joined.emit(id)
@@ -144,13 +147,16 @@ func _on_peer_disconnected(id: int) -> void:
 # CONNECTION EVENTS
 # =========================
 func _on_connection_failed() -> void:
+	print("connection failed")
 	connection_failed.emit()
 
 
 func _on_server_disconnected() -> void:
+	print("server disconneted")
 	server_disconnected.emit()
 
 func _on_connection_successful() -> void:
+	print("connection was successful")
 	var sync = await SessionManager.create_network_sync()
 	joined_server.emit(sync)
 
