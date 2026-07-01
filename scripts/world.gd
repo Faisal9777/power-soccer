@@ -425,7 +425,7 @@ func _on_pause_exit() -> void:
 		Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 	# Quit or go to title:
 	# get_tree().quit()
-	SessionManager.change_state("Title")
+	SessionManager.change_state(NetCodes.States.TITLE)
 
 func _open_graphics_settings() -> void:
 	if _gfx_ui and _gfx_ui.visible:

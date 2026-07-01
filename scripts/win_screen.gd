@@ -50,10 +50,9 @@ func _update_countdown_label(secs: int) -> void:
 func _on_next_pressed() -> void:
 	
 	next_pressed.emit()
-	if next_scene_path != "":
-		Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
-		get_tree().paused = false
-		SessionManager.change_state("Scoreboard")
+	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+	get_tree().paused = false
+	SessionManager.change_state(NetCodes.States.SCOREBOARD)
 
 func _on_exit_pressed() -> void:
 	exit_pressed.emit()

@@ -38,6 +38,11 @@ var ABILITY_NAME := {
 	"grapple": "Grapple",
 }
 
+func handle_data(msg, data):
+	if multiplayer.is_server():
+		if msg == NetCodes.Lobby_action.READY:
+			GameState.roster[data.get("id")]["ready"] = data.get("value")
+
 func _get_ability_id(e: Dictionary) -> String:
 	return String(e.get("ability", "grapple"))
 
@@ -48,6 +53,7 @@ func _cycle_ability(cur: String) -> String:
 
 
 func _ready() -> void:
+	SessionManager.register_state(self)
 	GameState.lobby_size = _team_size*2
 	# --- Build the Tree columns + per-row buttons ---
 	print("YOU ARE SEEING THE NEW UPDATEE")
@@ -142,9 +148,9 @@ func _ready() -> void:
 
 	multiplayer.connected_to_server.connect(_on_connected_to_server)
 
-	# If the server (host) goes away, clients should bounce to title
-	multiplayer.server_disconnected.connect(_on_host_gone)
-	multiplayer.connection_failed.connect(_on_host_gone)
+	## If the server (host) goes away, clients should bounce to title
+	#multiplayer.server_disconnected.connect(_on_host_gone)
+	#multiplayer.connection_failed.connect(_on_host_gone)
 
 	Network.peer_left.connect(_on_peer_left)
 
@@ -369,7 +375,7 @@ func _on_ready_toggle() -> void:
 	
 	var new_ready = !bool(GameState.roster[multiplayer.get_unique_id()].get("ready"))
 	ready_btn.text = "Unready" if new_ready else "Ready"
-	SessionManager.session_node.toggle_scene_action("lobby", NetCodes.Lobby_action.READY, 
+	SessionManager.session_node.toggle_scene_action(NetCodes.States.LOBBY, NetCodes.Lobby_action.READY, 
 	new_ready)
 	_refresh_ui()
 	_update_start_enabled()
@@ -388,7 +394,7 @@ func _on_leave() -> void:
 		# Tell everyone we're going away; then close.
 		rpc("_rpc_host_is_leaving")
 	GameState.reset_lobby()
-	SessionManager.change_state("Title")
+	SessionManager.change_state(NetCodes.States.TITLE)
 
 func _on_host_gone() -> void:
 	print("[lobby] host disconnected or left")
@@ -504,7 +510,7 @@ func _rpc_set_roster(snapshot: Array) -> void:
 
 @rpc("authority", "call_local", "reliable")
 func _rpc_start_match(scene_path: String) -> void:
-	SessionManager.change_state("World")
+	SessionManager.change_state(NetCodes.States.WORLD)
 @rpc("any_peer", "reliable")
 func _rpc_set_my_name(name: String) -> void:
 	if multiplayer.is_server():
@@ -572,7 +578,7 @@ func _try_start_match() -> void:
 	for pid in GameState.roster.keys():
 		GameState.roster[pid]["ready"] = false
 	rpc("_rpc_start_match", WORLD_SCENE)
-	SessionManager.change_state("World")
+	SessionManager.change_state(NetCodes.States.WORLD)
 
 
 func _broadcast_lobby_state() -> void:

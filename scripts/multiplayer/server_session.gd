@@ -7,6 +7,7 @@ signal server_found(info)
 
 var _transport_method : IAnnounceTransport
 var current_scene = ""
+var current_state : Node
 var scene_data = {}
 var scene_after_server = ""
 var server_info = {}
@@ -28,13 +29,14 @@ const server_phase = {
 func set_current_scene(scene : String):
 	current_scene = scene
 
-func change_state(state_info: String):
+func change_state(state_info: int):
+	current_state = null
 	can_track_player = false
 	server_info.state = state_info
-	if state_info == "Lobby":
+	if state_info == NetCodes.States.LOBBY:
 		toggle_broadcast(true)
 		can_track_player = true
-	elif state_info == "Scoreboard":
+	elif state_info == NetCodes.States.SCOREBOARD:
 		scene_data["next_scene"] = "Lobby"
 	current_scene = state_info
 
@@ -50,14 +52,27 @@ func host(server_name, scene):
 	Network.host(server_info)
 
 func toggle_scene_action(domain, event : int, value):
-	var scene_data = {"id": multiplayer.get_unique_id(), "domain": domain,"event" : event,"value" : value}
-	handle_data(NetCodes.Msg.SCENE_ACTION, scene_data)
+	var scene_data = {"id": multiplayer.get_unique_id(), "state": domain, "value" : value}
+	handle_data(event, scene_data)
 
 func handle_data(msg, data):
-	if msg == NetCodes.Msg.REGISTER_PEER:
-		_srv_register_player(data)
-	elif msg == NetCodes.Msg.SCENE_ACTION:
-		_handle_state_action(msg, data)
+	var state = data["state"]
+	if state == NetCodes.States.SESSION:
+		if msg == NetCodes.Msg.REGISTER_PEER:
+			_srv_register_player(data)
+	elif not state == current_scene:
+		return
+	else:
+		if current_state:
+			current_state.handle_data(msg, data)
+
+func send_data_id(target_id, msg, value):
+	value["state"] = current_scene
+	sync.send_data_id(target_id, msg, value)
+
+func send_data(msg, value):
+	value["state"] = current_scene
+	sync.send_data_all(msg, value)
 
 func disable_broadcast():
 	can_broadcast = false
@@ -73,11 +88,9 @@ func start_game() -> void:
 	current_scene = C.WORLD
 
 func manage_event(msg) -> void:
-	print("manage event is called with the message: ", msg)
-	print("current scene is: ", current_scene)
 	if current_scene == "World":
 		if msg == NetCodes.MatchAction.END:
-			SessionManager.change_state("Lobby")
+			SessionManager.change_state(NetCodes.States.LOBBY)
 
 func _process(delta):
 	if can_track_player:
@@ -86,12 +99,12 @@ func _process(delta):
 
 func _broadcast():
 	if can_broadcast:
-		if current_scene == "Lobby":
+		if current_scene == NetCodes.States.LOBBY:
 			server_info["status"] = "%d/%d" % [
 				GameState.get_players_connected(),
 				GameState.get_lobby_size()
 			]
-		elif current_scene == "World":
+		elif current_scene == NetCodes.States.WORLD:
 			server_info["status"] = server_phase.INGAME
 
 		server_info["lobby_size"] = GameState.get_lobby_size()
@@ -105,6 +118,7 @@ func _broadcast_states():
 		return
 	var state_data = {}
 	state_data["roster"] = GameState.roster
+	state_data["state"] = NetCodes.States.SESSION
 	sync.send_data_all(NetCodes.Msg.STATE_DATA, state_data)
 
 func _handle_state_action(msg, data):
@@ -122,7 +136,7 @@ func _check_all_players():
 			GameState.roster.erase(key)
 
 func _check_server_status():
-	if GameState.get_players_connected() == GameState.get_lobby_size() or current_scene == "World":
+	if GameState.get_players_connected() == GameState.get_lobby_size() or current_scene == NetCodes.States.WORLD:
 		can_other_join = false
 	else:
 		can_other_join = true
@@ -135,7 +149,7 @@ func _on_hosting_started():
 	timer.autostart = true
 	timer.timeout.connect(_broadcast)
 	add_child(timer)
-	SessionManager.change_state(scene_after_server)
+	SessionManager.change_state(NetCodes.States.LOBBY)
 
 
 func _on_joined_server():
@@ -160,6 +174,6 @@ func _srv_register_player(payload : Dictionary):
 
 	GameState.roster[id] = {"name": "", "ready": false, "is_active" : true}
 	GameState.roster[id]["name"] = payload.get('name', "Unknown")
-	var server_info := {"roster":GameState.roster, "scene": C.LOBBY}
+	var server_info := {"roster":GameState.roster, "scene": C.LOBBY, "state" : NetCodes.States.SESSION}
 	sync.send_data_id(id, NetCodes.Msg.ROSTER_DATA, server_info)
 	TaskScheduler.schedule(60, _broadcast_states)

@@ -9,7 +9,8 @@ var can_discover = false
 var is_connected = false
 var http_service : HttpService
 var scene_data := {}
-var current_scene := ""
+var current_scene := -1
+var current_state : Node
 var sync : Node
 var ENDPOINTS = preload("res://scripts/shared/endpoints.gd")
 const C = preload("res://scripts/shared/scene.gd")
@@ -41,13 +42,22 @@ func start_discovery():
 	Network.start_discovery()
 
 func toggle_scene_action(domain, event : int, value):
-	var scene_data = {"id": multiplayer.get_unique_id(), "domain": domain ,"event" : event,"value" : value}
-	sync.send_data_id(1, NetCodes.Msg.SCENE_ACTION, scene_data)
+	var scene_data = {"id": multiplayer.get_unique_id(), "state": domain ,"value" : value}
+	sync.send_data_id(1, event, scene_data)
 
-func change_state(state_info: String):
+func change_state(state_info: int):
+	current_state = null
 	current_scene = state_info
-	if state_info == "Scoreboard":
-		scene_data["next_scene"] = "Lobby"
+	if state_info == NetCodes.States.SCOREBOARD:
+		scene_data["next_scene"] = NetCodes.States.LOBBY
+
+func send_data_id(target_id, msg, value):
+	value["state"] = current_scene
+	sync.send_data_id(target_id, msg, value)
+
+func send_data(msg, value):
+	value["state"] = current_scene
+	sync.send_data_all(msg, value)
 
 func host_cloud_server():
 	BlockingOverlay.show_overlay("Creating Server...") 
@@ -70,10 +80,16 @@ func join(server_info):
 	Network.join(ip, port)
 
 func handle_data(msg, data):
-	if msg == NetCodes.Msg.ROSTER_DATA:
-		_cl_sync_roster(data)
-	if msg == NetCodes.Msg.STATE_DATA:
-		GameState.roster = data["roster"]
+	var state = data.get("state")
+	if state == NetCodes.States.SESSION:
+		if msg == NetCodes.Msg.ROSTER_DATA:
+			_cl_sync_roster(data)
+		if msg == NetCodes.Msg.STATE_DATA:
+			GameState.roster = data["roster"]
+	elif not state == current_scene:
+		return
+	elif current_state:
+		current_state.handle_data(msg, data)
 
 func _on_request_completed(result, response_code, headers, body):
 	if _timeout_timer:
@@ -110,7 +126,8 @@ func _on_joined_server(s):
 	Network.connection_failed.connect(_on_connection_failed)
 	Network.server_disconnected.connect(_on_server_disconnected)
 	is_connected = true
-	var payload := {"name" : Settings.player_name, "id" : multiplayer.get_unique_id()}
+	var payload := {"name" : Settings.player_name, "id" : multiplayer.get_unique_id(),
+	"state" : NetCodes.States.SESSION}
 	sync = s
 	sync.send_data_id(1, NetCodes.Msg.REGISTER_PEER, payload)
 
@@ -125,8 +142,7 @@ func _disconnect() -> void:
 	_disconnect_from_events()
 	GameState.clear()
 	Network.close_connection()
-	if current_scene == "Lobby":
-		SessionManager.change_state("Title")
+	SessionManager.change_state(NetCodes.States.TITLE)
 
 func _cl_sync_roster(server_info):
 	BlockingOverlay.hide()

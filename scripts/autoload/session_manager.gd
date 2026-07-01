@@ -42,20 +42,30 @@ func close_session() -> void:
 	session_node.queue_free()
 	get_tree().change_scene_to_file(C.TITLE)
 
-func change_state(state_info: String):
+func change_state(state_info: int):
 	session_node.change_state(state_info)
 	var scene_to_load = ""
-	if state_info == "Lobby":
+	if state_info == NetCodes.States.LOBBY:
 		scene_to_load = C.LOBBY
-	if state_info == "World":
+	if state_info == NetCodes.States.WORLD:
 		scene_to_load = C.WORLD
-	elif state_info == "Scoreboard":
+	elif state_info == NetCodes.States.SCOREBOARD:
 		scene_to_load = C.SCORE
-	elif state_info == "Title":
+	elif state_info == NetCodes.States.TITLE:
 		scene_to_load = C.TITLE
 		session_node.queue_free()
 		Network.close_connection()
 	get_tree().change_scene_to_file(scene_to_load)
+
+func send_data_id(target_id, msg, value):
+	session_node.send_data_id(target_id, msg, value)
+
+func send_data(msg, value):
+	session_node.send_data(msg, value)
+
+func register_state(state : Node):
+	if session_node:
+		session_node.current_state = state
 
 func _create_node(node_path: String, node_name : String) -> Node:
 	var root = get_tree().root

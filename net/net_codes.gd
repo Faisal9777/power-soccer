@@ -29,6 +29,14 @@ enum MatchAction {
 	END = 1
 }
 
+enum States {
+	SESSION = -1,
+	TITLE = 0,
+	LOBBY = 1,
+	WORLD = 2,
+	SCOREBOARD = 3
+}
+
 
 class Rpc:
 	const INPUT_STREAM := "receive_network_input_dictionary"

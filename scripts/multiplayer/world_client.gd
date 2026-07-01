@@ -74,7 +74,9 @@ func process_input_dictionary(msg : int, value : Dictionary) -> void:
 		_store_snapshots(value)
 	elif msg == NetCodes.Msg.ROUND_START:
 		_game.start_game(value)
-		
+
+func handle_data(msg, value):
+	process_input_dictionary(msg, value)
 
 # ---------- Public API (call these from your world/spawner) ----------
 func set_players(players: Dictionary) -> void:
@@ -96,6 +98,7 @@ func process_snapshots(snapshots: Dictionary, server_id: int) -> void:
 func receive_network_input(snapshots: Dictionary, server_id: int) -> void:
 	_store_snapshots(snapshots)
 
+
 func init(p : Node3D,
 	score_board : Control,
 	ingame: Node,
@@ -116,6 +119,7 @@ func init(p : Node3D,
 
 
 func _ready() -> void:
+	SessionManager.register_state(self)
 	_my_id = multiplayer.get_unique_id()
 	var hz := float(ProjectSettings.get_setting("physics/common/physics_ticks_per_second"))
 	_fixed_dt = 1.0 / max(1.0, hz)
@@ -191,6 +195,7 @@ func _send_network(msg, value) -> void:
 		_network_endpoint.rpc(NetCodes.Rpc.INPUT_STREAM, msg, {})
 
 func _send_network_id(target_id, sender_id, msg, value) -> void:
+	value["id"] = sender_id
 	if _can_network:
-		_network_endpoint.rpc_id(target_id, NetCodes.Rpc.INPUT_BY_ID, sender_id, msg, value)
+		SessionManager.send_data_id(target_id, msg, value)
 	

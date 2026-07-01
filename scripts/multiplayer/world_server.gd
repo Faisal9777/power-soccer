@@ -51,6 +51,10 @@ func start_init(players: Dictionary,
 		_client_game = NodeUtils.create_game_client(self, GameClient, "GameClient", ingame, score_board, controllers)
 	_network_endpoint.rpc(NetCodes.Rpc.INPUT_STREAM, NetCodes.Msg.INIT_BEGIN, data)
 
+func handle_data(msg, value):
+	if msg == NetCodes.Msg.INPUTS:
+		process_input_by_id(value["id"], msg, value)
+
 func process_input_by_id(peer_id: int, msg, cmd : Dictionary) -> void:
 	var idx = controllers.find_custom(
 	func(c):
@@ -82,6 +86,7 @@ func get_node_track() -> Node3D:
 	return
 
 func _ready() -> void:
+	SessionManager.register_state(self)
 	_network_endpoint = get_parent()
 	if GameState.is_dedicated_server():
 		_is_also_player = false
@@ -114,7 +119,7 @@ func _broadcast_snapshots() -> void:
 		snapshots[controller.id] = snapshot
 	
 	snapshots["game_state"] = _game.current_state
-	_network_endpoint.rpc(NetCodes.Rpc.INPUT_STREAM, NetCodes.Msg.SNAPSHOTS,snapshots)
+	SessionManager.send_data(NetCodes.Msg.SNAPSHOTS,snapshots)
 
 
 func _build_player_paths() -> Dictionary:
@@ -178,7 +183,7 @@ func _on_peer_left(id : int) -> void:
 
 func _on_all_peers_left() -> void:
 	print("all peers has lleft has been called in the world server")
-	SessionManager.change_state("Lobby")
+	SessionManager.change_state(NetCodes.States.LOBBY)
 
 func _on_game_end(game_end_data) -> void:
 	_network_endpoint.rpc(NetCodes.Rpc.INPUT_STREAM, NetCodes.Msg.GAME_END, game_end_data)

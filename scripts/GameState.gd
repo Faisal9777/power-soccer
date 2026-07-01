@@ -16,7 +16,7 @@ var roster: Dictionary = {}
 var game_results: Dictionary = {}
 var lobby_size := 0
 var pending_spawn_ids: Array[int] = []
-var match_len_sec = 5
+var match_len_sec = 50
 var goal_limit = 50
 # --- tie-alternation state ---
 var _next_on_tie: int = Team.BLUE
