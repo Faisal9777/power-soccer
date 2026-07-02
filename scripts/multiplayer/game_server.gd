@@ -384,6 +384,7 @@ func _rpc_aim_camera(target_pos: Vector3, path: NodePath) -> void:
 
 func _process_game_end() -> void:
 	_stop_all_process()
+	state.current_phase = state.WorldPhase.POST_MATCH
 	var blue_scene := ""
 	var red_scene := ""
 	if state.blue_score > state.red_score:
@@ -395,7 +396,7 @@ func _process_game_end() -> void:
 	else:
 		blue_scene = lose_scene_path
 		red_scene = win_scene_path
-	var game_end_data = {"duration" : 3}
+	var game_end_data = {}
 	for controller in p_controllers:
 		if GameState.is_blue(controller.id):
 			game_end_data[controller.id] = blue_scene

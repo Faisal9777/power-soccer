@@ -1,4 +1,15 @@
 extends Node
+
+enum WorldPhase { COUNTDOWN, PLAYING, GOAL_CELEBRATION, POST_MATCH }
+
+signal phase_changed(old_phase: WorldPhase, new_phase: WorldPhase)
+
+var current_phase: WorldPhase = WorldPhase.COUNTDOWN :
+	set(value):
+		var old = current_phase
+		current_phase = value
+		phase_changed.emit(old, value)
+
 var can_process := false;
 var is_paused := true
 var countdown_started := false
@@ -19,6 +30,7 @@ func _install_synchronizer() -> void:
 	add_child(sync)
 
 	var cfg := SceneReplicationConfig.new()
+	cfg.add_property(NodePath(".:current_phase"))
 	cfg.add_property(NodePath(".:time_left_ms"))
 	cfg.add_property(NodePath(".:blue_score"))
 	cfg.add_property(NodePath(".:red_score"))
@@ -38,6 +50,7 @@ func _install_synchronizer() -> void:
 	cfg.property_set_replication_mode(NodePath(".:scene_path_to_load"), SceneReplicationConfig.REPLICATION_MODE_ALWAYS)
 	cfg.property_set_replication_mode(NodePath(".:game_data"), SceneReplicationConfig.REPLICATION_MODE_ALWAYS)
 	cfg.property_set_replication_mode(NodePath(".:goal_scored"), SceneReplicationConfig.REPLICATION_MODE_ALWAYS)
+	cfg.property_set_replication_mode(NodePath(".:current_phase"), SceneReplicationConfig.REPLICATION_MODE_ON_CHANGE)
 
 	sync.replication_config = cfg
 	sync.replication_interval = 0.0

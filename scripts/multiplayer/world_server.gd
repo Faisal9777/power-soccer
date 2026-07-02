@@ -186,13 +186,10 @@ func _on_all_peers_left() -> void:
 	SessionManager.change_state(NetCodes.States.LOBBY)
 
 func _on_game_end(game_end_data) -> void:
+	await get_tree().create_timer(3).timeout
 	_network_endpoint.rpc(NetCodes.Rpc.INPUT_STREAM, NetCodes.Msg.GAME_END, game_end_data)
-	
 	if _is_also_player:
 		_client_game.end_game(game_end_data)
-	else:
-		await get_tree().create_timer(3).timeout
-		SessionManager.session_node.manage_event(NetCodes.MatchAction.END)
 
 func _on_game_reset(game_data) -> void:
 	_network_endpoint.rpc(NetCodes.Rpc.INPUT_STREAM, NetCodes.Msg.GAME_BEGIN, game_data)

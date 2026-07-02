@@ -196,6 +196,7 @@ func _tint_recursive(n: Node, col: Color) -> void:
 func setup(ingame : Node, scoreboard, controllers) -> void:
 
 	state = ingame
+	state.phase_changed.connect(_on_phase_changed)
 	_scoreboard_instance = scoreboard
 	p_controllers = controllers
 	for controller in p_controllers:
@@ -231,10 +232,9 @@ func start_game(game_data) -> void:
 	_position_players2(game_data)
 
 func end_game(value : Dictionary) -> void:
-	var duration := value.get("duration", 3) as int
 	var scene := value.get(multiplayer.get_unique_id(), NodePath("")) as NodePath
 	GameState.game_results = state.game_data
-	_end_match("End!", duration, scene)
+	_end_match(scene)
 
 func ww(toggle : bool) -> void:
 	var switch := false
@@ -289,11 +289,7 @@ func _init_entry(pid: int, name: String, team: int) -> void:
 	#if _scoreboard_instance:
 		#var stats_array = get_stats_in_array()
 		#_scoreboard_instance.set_stats(stats_array)
-func _end_match(text: String, seconds: float, scene_path_to_load: String) -> void:
-	await _show_banner_for(text, seconds)
-	print("mid: ", multiplayer.get_unique_id())
-	print("scene path to load: ", scene_path_to_load)
-	
+func _end_match(scene_path_to_load: String) -> void:
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 	get_tree().change_scene_to_file(scene_path_to_load)
 
@@ -305,3 +301,8 @@ func _show_banner_for(text: String, seconds: float) -> void:
 	var t := get_tree().create_timer(seconds)  # local, per-client
 	await t.timeout
 	_countdown_label.hide()
+
+func _on_phase_changed(old, new) -> void:
+	if state.WorldPhase.POST_MATCH:
+		_countdown_label.text = "End!"
+		_countdown_label.show()
