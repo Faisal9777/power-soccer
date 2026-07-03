@@ -40,6 +40,10 @@ window/stretch/mode="canvas_items"
 movie_writer/movie_file="C:/Users/ryann/Documents/Soccer/Soccer.avi"
 movie_writer/fps=30
 
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/GoogleSignInPlugin/plugin.cfg")
+
 [input]
 
 move_forward={

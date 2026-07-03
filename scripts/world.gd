@@ -604,6 +604,12 @@ func _create_graphics_settings_ui() -> Control:
 		_update_scale_text.call()
 	)
 
+	# --- Network Indicators toggle ---
+	var net_indicators := CheckBox.new()
+	net_indicators.text = "Network Indicators"
+	net_indicators.button_pressed = bool(Settings.net_indicators)
+	main_v.add_child(net_indicators)
+
 	# --------------------
 	# Bottom buttons (always visible)
 	# --------------------
@@ -636,15 +642,16 @@ func _create_graphics_settings_ui() -> Control:
 			vsync.button_pressed,
 			quality.selected,
 			tex_quality.selected,
-			float(scale_slider.value)
+			float(scale_slider.value),
+			net_indicators.button_pressed
 		)
 	)
 
 	return root
 
 
-func _apply_graphics_settings(fullscreen: bool, vsync: bool, quality: int, tex_quality: int, scale_3d: float) -> void:
-	Settings.set_and_save(fullscreen, vsync, quality, tex_quality, scale_3d)
+func _apply_graphics_settings(fullscreen: bool, vsync: bool, quality: int, tex_quality: int, scale_3d: float, net_ind: bool = true) -> void:
+	Settings.set_and_save(fullscreen, vsync, quality, tex_quality, scale_3d, net_ind)
 
 func _initialize_multiplayer(name: String, net : Node) -> void:
 	net.name = name

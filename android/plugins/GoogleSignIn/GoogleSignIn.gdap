@@ -1,0 +1,7 @@
+[config]
+
+name="GoogleSignIn"
+
+binary_type="local"
+
+binary="res://addons/GoogleSignIn/GoogleSignIn-release.aar"

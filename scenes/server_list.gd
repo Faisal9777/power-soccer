@@ -18,6 +18,8 @@ var known_servers := {}
 var cleanup_timer := 0.0
 var session_node : Node
 var pending_join_data = null
+var discovery_times := {}
+var _probe_udp := PacketPeerUDP.new()
 var filter_lan := true
 var filter_cloud := true
 
@@ -32,6 +34,7 @@ func _ready():
 	session_node.server_found.connect(_on_server_found)
 	session_node.auth_failed.connect(_on_auth_failed)
 	session_node.start_discovery()
+	scan_network()
 	filter_options.visible = false
 
 	lan_cb.button_pressed = true
@@ -55,10 +58,46 @@ func _process(delta : float):
 	if Input.is_action_pressed("debug"):
 		Network.join("127.0.0.1", 24565)
 
+func get_local_subnet() -> String:
+	var ip = IP.get_local_addresses()
+	for addr in ip:
+		if addr.begins_with("192.168.") or addr.begins_with("10."):
+			var parts = addr.split(".")
+			return parts[0] + "." + parts[1] + "." + parts[2] + "."
+	return ""
+
+func scan_network():
+	var subnet = get_local_subnet()
+	print("SCAN STARTED. Subnet:", subnet)
+	if subnet == "":
+		print("No valid subnet found")
+		return
+	for i in range(90, 121):
+		var ip = subnet + str(i)
+		print("Scanning:", ip)
+		discovery_times[ip] = Time.get_ticks_msec()
+		_try_connect(ip)
+		await get_tree().create_timer(0.02).timeout
+		
+func _try_connect(ip: String):
+	# Send a small UDP probe packet directly to the target IP on the LAN discovery port.
+	# If a hosted game server is running there it will reply via its UDP broadcast,
+	# which the existing _poll_discovery loop in Network.gd will pick up.
+	var probe_data := JSON.stringify({"probe": true}).to_utf8_buffer()
+	_probe_udp.set_dest_address(ip, NetConfig.DISCOVERY_PORT)
+	_probe_udp.put_packet(probe_data)
+
 func _on_server_found(data):
 	if not data.has("ip") or not data.has("port"):
 		return  # invalid packet
 
+	var ping := int(data.get("ping", -1))
+	var ip := String(data.get("ip", ""))
+
+	if discovery_times.has(ip):
+		ping = Time.get_ticks_msec() - discovery_times[ip]
+
+	data["ping"] = ping
 	var key = str(data.id)
 	#print("data: ", data) 
 	#print("known_servers: ", known_servers)

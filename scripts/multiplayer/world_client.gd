@@ -50,6 +50,16 @@ var _remote_buf: Dictionary[int, Array] = {}
 var _my_id: int = -1
 var _fixed_dt: float = 1.0 / 60.0
 
+var show_net_debug_overlay := true
+var net_debug_ping_interval_sec := 1.0
+var net_debug_update_interval_sec := 0.25
+var _net_debug_layer: CanvasLayer
+var _net_debug_root: Control
+var _net_debug_label: Label
+var _net_debug_ping_accum := 0.0
+var _net_debug_ui_accum := 0.0
+var _net_debug_ping_ms := -1.0
+
 @onready var _network_endpoint: Node = get_parent()
 
 func set_local_pause(p):
@@ -157,7 +167,61 @@ func _process(_delta: float) -> void:
 		for controller in controllers:
 			controller.process_tick(_delta)
 	#_smooth_local_visual(_delta)
-	
+	_tick_net_debug(_delta)
+
+func _tick_net_debug(delta: float) -> void:
+	if not show_net_debug_overlay:
+		if is_instance_valid(_net_debug_root):
+			_net_debug_root.visible = false
+		return
+
+	_ensure_net_debug_overlay()
+	if is_instance_valid(_net_debug_root):
+		_net_debug_root.visible = true
+
+	_net_debug_ping_accum += delta
+	if _net_debug_ping_accum >= net_debug_ping_interval_sec:
+		_net_debug_ping_accum = 0.0
+		if not multiplayer.is_server() and is_instance_valid(_network_endpoint):
+			_network_endpoint.rpc_id(server_peer_id, "_rpc_net_ping", Time.get_ticks_msec())
+
+	_net_debug_ui_accum += delta
+	if _net_debug_ui_accum >= net_debug_update_interval_sec:
+		_net_debug_ui_accum = 0.0
+		_update_net_debug_overlay()
+
+func _ensure_net_debug_overlay() -> void:
+	if not show_net_debug_overlay or is_instance_valid(_net_debug_label):
+		return
+
+	_net_debug_layer = CanvasLayer.new()
+	_net_debug_layer.name = "NetDebugLayer"
+	_net_debug_layer.layer = 500
+	add_child(_net_debug_layer)
+
+	_net_debug_root = MarginContainer.new()
+	_net_debug_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_net_debug_root.offset_left = 10
+	_net_debug_root.offset_top = 10
+	_net_debug_layer.add_child(_net_debug_root)
+
+	var panel := PanelContainer.new()
+	_net_debug_root.add_child(panel)
+
+	_net_debug_label = Label.new()
+	_net_debug_label.add_theme_font_size_override("font_size", 13)
+	panel.add_child(_net_debug_label)
+
+func _update_net_debug_overlay() -> void:
+	if not is_instance_valid(_net_debug_label):
+		return
+	var ping_text := "--" if _net_debug_ping_ms < 0.0 else "%.0f" % _net_debug_ping_ms
+	_net_debug_label.text = "NET STATUS\nPing: %s ms" % ping_text
+
+func record_ping_pong(client_msec: int, _server_msec: int) -> void:
+	var now := Time.get_ticks_msec()
+	var rtt := maxf(0.0, float(now - client_msec))
+	_net_debug_ping_ms = rtt if _net_debug_ping_ms < 0.0 else lerpf(_net_debug_ping_ms, rtt, 0.25)
 
 func _evaluate_all_phases() -> void:
 	if init_phase_completed and server_data_completed:

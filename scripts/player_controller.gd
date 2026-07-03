@@ -11,6 +11,12 @@ var _latest_local_snapshot_id: int = -1       # ordering guard (server_tick or l
 var _pending_inputs: Array[Dictionary] = []   # only for LOCAL player
 var _fixed_dt: float = 1.0 / 60.0
 
+var local_reconcile_deadzone := 0.25
+var local_reconcile_blend := 0.18
+var local_reconcile_snap_dist := 3.0
+var max_prediction_replay_msec: int = 500
+var max_prediction_replay_inputs: int = 40
+
 var send_interval := 1.0 / 20.0  # 20 Hz
 var send_accumulator := 0.0
 var can_process := false
@@ -65,10 +71,10 @@ func process_input(delta):
 	_apply_inputs(input, delta)
 	input["yaw"] = look_yaw
 	input["pitch"] = look_pitch
+	input["client_msec"] = Time.get_ticks_msec()
 	var stored := input.duplicate(true)
 	_pending_inputs.append(stored)
-	if _pending_inputs.size() > 256:
-		_pending_inputs = _pending_inputs.slice(_pending_inputs.size() - 256, _pending_inputs.size())
+	_trim_pending_inputs()
 	
 	on_predicted.emit(player.global_transform)
 
@@ -86,6 +92,7 @@ func _reconcile_player(me : Node) -> void:
 func _reconcile_local_best_practice(p: Node3D, snap: Dictionary) -> void:
 
 	# --- B) apply authoritative snap (server state) ---
+	var predicted_pos := p.global_position
 	if p.has_method("apply_snapshot"):
 		
 		p.apply_snapshot(snap)
@@ -101,8 +108,33 @@ func _reconcile_local_best_practice(p: Node3D, snap: Dictionary) -> void:
 			_pending_inputs.remove_at(i)
 		else:
 			i += 1
+	_trim_pending_inputs()
 
 	# --- D) replay remaining inputs using FIXED dt (determinism) ---
 	for cmd in _pending_inputs:
 		_apply_inputs(cmd, _fixed_dt)
+		
+	var corrected_pos := p.global_position
+	var reconcile_error := predicted_pos.distance_to(corrected_pos)
+	if reconcile_error <= local_reconcile_deadzone:
+		p.global_position = predicted_pos
+	elif reconcile_error < local_reconcile_snap_dist:
+		p.global_position = predicted_pos.lerp(corrected_pos, clampf(local_reconcile_blend, 0.0, 1.0))
+		
 	on_reconciled.emit(player.global_transform)
+
+func _trim_pending_inputs() -> void:
+	var now := Time.get_ticks_msec()
+	var cutoff := now - max_prediction_replay_msec
+
+	var i := 0
+	while i < _pending_inputs.size():
+		var cmd := _pending_inputs[i] as Dictionary
+		var sent_msec := int(cmd.get("client_msec", now))
+		if sent_msec < cutoff:
+			_pending_inputs.remove_at(i)
+		else:
+			i += 1
+
+	while _pending_inputs.size() > max_prediction_replay_inputs:
+		_pending_inputs.pop_front()

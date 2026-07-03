@@ -7,6 +7,7 @@ signal auth_status_changed(message: String)
 const LOCAL_PORT := 8080
 const SECURE_KEY := "SuperSecretEncryptionKey123!" # Ideally derived or user-unique, used for FileAccess encryption
 const SESSION_FILE := "user://session.enc"
+var google_plugin = null
 
 var session_token: String = ""
 var player_tag: String = ""
@@ -34,8 +35,72 @@ func login() -> void:
 	if session_token != "":
 		auth_status_changed.emit("Verifying saved session...")
 		verify_session_token(session_token)
+		return
+
+	if OS.has_feature("android") or OS.has_feature("ios"):
+		print(Engine.has_singleton("GoogleSignInPlugin"))
+
+ 
+		mobile_login()
 	else:
+		print(Engine.has_singleton("GoogleSignInPlugin"))
+		for s in Engine.get_singleton_list():
+			print(s)
 		start_oauth_flow()
+
+func mobile_login() -> void:
+	auth_status_changed.emit("Starting Google Sign-In...")
+	auth_started.emit()
+
+	if not Engine.has_singleton("GoogleSignInPlugin"):
+		auth_status_changed.emit("Google Sign-In plugin not found.")
+		auth_completed.emit(false, {})
+		return
+
+	google_plugin = Engine.get_singleton("GoogleSignInPlugin")
+
+	# Connect only once
+	if not google_plugin.sign_in_completed.is_connected(_on_google_sign_in_completed):
+		google_plugin.sign_in_completed.connect(_on_google_sign_in_completed)
+
+	if not google_plugin.sign_in_failed.is_connected(_on_google_sign_in_failed):
+		google_plugin.sign_in_failed.connect(_on_google_sign_in_failed)
+
+	google_plugin.sign_in()
+
+func _on_google_sign_in_completed(id_token: String) -> void:
+	auth_status_changed.emit("Google Sign-In successful.")
+
+	exchange_mobile_token(id_token)
+
+
+func _on_google_sign_in_failed(error: String) -> void:
+	auth_status_changed.emit(error)
+	auth_completed.emit(false, {})
+
+
+func exchange_mobile_token(id_token: String) -> void:
+	auth_status_changed.emit("Verifying account...")
+
+	Config.load_config()
+	var backend_url = Config.get_value("cloud_server_endpoint", "http://127.0.0.1:3000")
+	var url = backend_url + "/api/auth/login-mobile"
+
+	var headers = ["Content-Type: application/json"]
+
+	var body = JSON.stringify({
+		"id_token": id_token
+	})
+
+	var err = http_client_node.request(url, headers, HTTPClient.METHOD_POST, body)
+
+	if err != OK:
+		auth_status_changed.emit("Network error")
+		auth_completed.emit(false, {})
+		return
+
+	var response = await http_client_node.request_completed
+	_on_exchange_response(response[0], response[1], response[2], response[3])
 
 # Logs out and clears session
 func logout() -> void:
@@ -172,7 +237,8 @@ func exchange_code_for_session(code: String) -> void:
 		"platform": "pc",
 		"redirect_uri": "http://127.0.0.1:%d" % LOCAL_PORT
 	})
-	
+	print("Backend URL = ", backend_url)
+	print("Login endpoint = ", login_endpoint)
 	var err = http_client_node.request(login_endpoint, headers, HTTPClient.METHOD_POST, body)
 	if err != OK:
 		auth_status_changed.emit("Connection to server failed.")
