@@ -14,14 +14,17 @@ var GameClient := load("res://scripts/multiplayer/game_client.gd")
 var p_controller : LocalController
 var controllers : Array = []
 var broadcast_id : int = -1
+var ball: Node
 # Input pump
 const NET_INPUT_HZ: float = 30.0
 var last_server_seq:= {}
 var can_process := false
+var _replication_manager : ReplicationManager
 
 func start_init(players: Dictionary,
 	score_board : Control,
 	ingame: Node,
+	replication_manager : ReplicationManager,
 	blue_spawns: Node3D,
 	red_spawns: Node3D,
 	ball_spawn: Node3D,
@@ -30,10 +33,12 @@ func start_init(players: Dictionary,
 	goal_limit: int,
 	roster: Dictionary,
 	joystick : Node) -> void:
+	ball = ball_scene
 	if GameState.roster.has(1):
 		_is_also_player = true
 	_players = players
 	ingame.set_roster(GameState.roster)
+	_replication_manager = replication_manager
 	_player_controller_setup(players, ball_scene, joystick, controllers)
 	_game = GameServer.new()
 	add_child(_game)
@@ -187,9 +192,11 @@ func _on_all_peers_left() -> void:
 
 func _on_game_end(game_end_data) -> void:
 	await get_tree().create_timer(3).timeout
+	_replication_manager.stop()
 	_network_endpoint.rpc(NetCodes.Rpc.INPUT_STREAM, NetCodes.Msg.GAME_END, game_end_data)
 	if _is_also_player:
 		_client_game.end_game(game_end_data)
+	SessionManager.change_state(NetCodes.States.LOBBY)
 
 func _on_game_reset(game_data) -> void:
 	_network_endpoint.rpc(NetCodes.Rpc.INPUT_STREAM, NetCodes.Msg.GAME_BEGIN, game_data)

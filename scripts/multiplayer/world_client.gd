@@ -174,10 +174,13 @@ func _resolve_players_from_roster(rosters) -> void:
 
 		var node := get_node_or_null(ppath)
 		if peer_id == multiplayer.get_unique_id():
+			var scheduler = JobScheduler.new()
+			scheduler.name = "JobScheduler"
+			add_child(scheduler)
 			var cam = get_node_or_null("/root/World/Scene/Camera3D") as Camera3D
 			cam.init(proxy, joystick)
 			var input_buffer = LocalInputBuffer.new(NodeUtils.init_input_source(self))
-			p_controller = PlayerController.new(node, peer_id, name, team, cam, ball, joystick, self, input_buffer)
+			p_controller = PlayerController.new(node, peer_id, name, team, cam, ball, joystick, self, input_buffer, scheduler)
 			p_controller.get_body_mesh().visible = false
 			proxy.init(node, p_controller)
 			controllers.append(p_controller)

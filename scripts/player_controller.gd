@@ -10,7 +10,8 @@ var _latest_local_snapshot: Dictionary = {}   # newest snapshot waiting to recon
 var _latest_local_snapshot_id: int = -1       # ordering guard (server_tick or last_server_seq)
 var _pending_inputs: Array[Dictionary] = []   # only for LOCAL player
 var _fixed_dt: float = 1.0 / 60.0
-
+var _scheduler : JobScheduler
+var _task : Node
 var send_interval := 1.0 / 20.0  # 20 Hz
 var send_accumulator := 0.0
 var can_process := false
@@ -18,11 +19,11 @@ var task_id := 0
 
 func start_process() -> void:
 	can_process = true
-	task_id = TaskScheduler.schedule(20, _process_interval)
+	_task = _scheduler.schedule_repeating(_process_interval, 1.0 / 20.0)
 
 func stop_process() -> void:
 	can_process = false
-	TaskScheduler.cancel(task_id)
+	_scheduler.cancel(_task)
 
 func store_snapshot(snap) -> void:
 	var seq = snap.get("seq", snap.get("last_server_seq", -1))
@@ -36,7 +37,9 @@ func store_snapshot(snap) -> void:
 		_latest_local_snapshot = snap
 	
 
-func _init(p_player, pid, p_name, team_name, c_cam, ball, joystick, net, i_buffer : LocalInputBuffer):
+func _init(p_player, pid, p_name, team_name, c_cam, ball, joystick, net, i_buffer : LocalInputBuffer, 
+scheduler : JobScheduler):
+	_scheduler = scheduler
 	network = net
 	super._init(p_player, pid, p_name, team_name, c_cam, ball, joystick, i_buffer)
 

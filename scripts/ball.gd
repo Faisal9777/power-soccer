@@ -24,6 +24,9 @@ func get_player(last_hit_index: int) -> int:
 		return -1
 	return _last_player_hits[last_hit_index]
 
+func stop_replication() -> void:
+	$MultiplayerSynchronizer.public_visibility = false
+
 func _physics_process(delta: float) -> void:
 	# Enable CCD only when the ball is moving fast (prevents tunneling through walls)
 	var speed := linear_velocity.length()

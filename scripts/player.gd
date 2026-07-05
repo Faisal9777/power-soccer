@@ -387,6 +387,8 @@ func handle_movement(inp, delta) -> void:
 		var is_sprinting : bool = inp.get("sprint")
 		_move_server(input_dir, delta, is_sprinting)
 
+func stop_replication() -> void:
+	$MultiplayerSynchronizer.public_visibility = false
 
 func _mark_self_layer_recursive(n: Node) -> void:
 	for ch in n.get_children():

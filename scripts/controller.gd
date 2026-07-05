@@ -31,6 +31,9 @@ func get_body_mesh() -> MeshInstance3D:
 func process_tick(delta: float) -> void:
 	return
 
+func stop_replication():
+	player.stop_replication()
+
 func _init(target_player: Node3D, p_name, p_id, team_name) -> void:
 	player = target_player
 	name = p_name

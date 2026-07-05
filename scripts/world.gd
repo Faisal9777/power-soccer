@@ -105,6 +105,9 @@ var _pass_cd_local: float = 0.0
 var _pass_cd_last_from_player: float = -999.0
 
 func _ready() -> void:
+	var replication_manager = ReplicationManager.new()
+	replication_manager.name = "ReplicationManager"
+	add_child(replication_manager)
 	LoadingUI.show_loading()
 	if multiplayer.is_server():
 		out_bounds.body_entered.connect(_on_ball_out_of_bounds)
@@ -171,7 +174,7 @@ func _ready() -> void:
 			_server_begin_match(ids)
 		net = WorldServerScript.new()
 		_initialize_multiplayer("NetServer", net)
-		net.start_init(_players, _scoreboard_instance, ingame, blue_spawns, red_spawns, ball_spawn,
+		net.start_init(_players, _scoreboard_instance, ingame, replication_manager, blue_spawns, red_spawns, ball_spawn,
 		ball_scene, GameState.match_len_sec, GameState.goal_limit, GameState.roster, get_node(joystick_path))
 		
 
@@ -425,7 +428,7 @@ func _on_pause_exit() -> void:
 		Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 	# Quit or go to title:
 	# get_tree().quit()
-	SessionManager.change_state(NetCodes.States.TITLE)
+	SessionManager.session_node.disconnect_connection()
 
 func _open_graphics_settings() -> void:
 	if _gfx_ui and _gfx_ui.visible:

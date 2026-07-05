@@ -91,6 +91,9 @@ func handle_data(msg, data):
 	elif current_state:
 		current_state.handle_data(msg, data)
 
+func disconnect_connection() -> void:
+	_disconnect()
+
 func _on_request_completed(result, response_code, headers, body):
 	if _timeout_timer:
 		_timeout_timer.timeout.disconnect(_on_request_timeout)
