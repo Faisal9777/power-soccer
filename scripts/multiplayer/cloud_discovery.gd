@@ -34,17 +34,27 @@ func _on_request_completed(result, response_code, headers, body):
 		return
 
 	var json = JSON.new()
-	var parse_err = json.parse(body.get_string_from_utf8())
-
-	if parse_err != OK:
+	if json.parse(body.get_string_from_utf8()) != OK:
 		discovery_failed.emit("JSON parse error")
 		return
 
 	var data = json.data
 
-	# Expecting something like: [{id, name, players}, ...]
-	if typeof(data) != TYPE_ARRAY:
+	var lobbies: Array = []
+
+	if typeof(data) == TYPE_ARRAY:
+		# Old server.py format
+		lobbies = data
+
+	elif typeof(data) == TYPE_DICTIONARY:
+		if data.has("servers") and data["servers"] is Array:
+			lobbies = data["servers"]
+		else:
+			discovery_failed.emit("Missing 'servers' array")
+			return
+
+	else:
 		discovery_failed.emit("Invalid lobby format")
 		return
 
-	lobbies_received.emit(data)
+	lobbies_received.emit(lobbies)

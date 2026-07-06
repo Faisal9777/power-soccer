@@ -50,6 +50,11 @@ func _ready() -> void:
 	_self_layer_mask = 1 << (self_layer_ui - 1)
 	_target = get_node_or_null(target_path)
 	_target_ball = get_node_or_null("Ball")
+	if joystick == null:
+		if not joystick_path.is_empty():
+			joystick = get_node_or_null(joystick_path) as Control
+		else:
+			joystick = get_node_or_null("/root/World/CanvasLayer/UI/JoyStick") as Control
 	activate()
 	_apply_fp_tp_self_visibility()  # ✅ ensure correct on start
 

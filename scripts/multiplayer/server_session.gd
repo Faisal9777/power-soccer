@@ -143,9 +143,21 @@ func _srv_register_player(payload : Dictionary):
 	var actual_name = player_info.get("player_name", payload.get('name', "Unknown"))
 	var tag = player_info.get("player_tag", "")
 
-	GameState.roster[id]["name"] = actual_name
-	GameState.roster[id]["player_tag"] = tag
+	var rec = GameState.roster.get(id, {})
 
+	rec["name"] = actual_name
+	rec["player_tag"] = tag
+
+	if !rec.has("team"):
+		rec["team"] = GameState.pick_balanced_team()
+
+	if !rec.has("ready"):
+		rec["ready"] = false
+
+	if !rec.has("ability"):
+		rec["ability"] = "grapple"
+
+	GameState.roster[id] = rec
 	var server_info := {"roster":GameState.roster, "scene": C.LOBBY}
 	sync.send_data_id(id, NetCodes.Msg.ROSTER_DATA, server_info)
 	TaskScheduler.schedule(60, _broadcast_states)

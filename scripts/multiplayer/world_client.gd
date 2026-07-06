@@ -140,7 +140,7 @@ func _ready() -> void:
 
 # ---------- Main loop ----------
 func _physics_process(delta: float) -> void:
-	if GameState.is_paused:
+	if GameState.is_paused and p_controller != null:
 		var neutral := {
 			"mouse_delta": Vector2.ZERO,
 			"move_right": 0.0,

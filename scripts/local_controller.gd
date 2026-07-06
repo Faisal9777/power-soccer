@@ -28,6 +28,8 @@ func freeze(toggle) -> void:
 func _init(p_player, pid, p_name, team, c_cam, ball, joystick, i_buffer : InputBuffer):
 	cam = c_cam
 	cam.set_rotation_source(self)
+	self.joystick = joystick   # ← add this
+
 	super._init(p_player, pid, p_name, team, ball, i_buffer)
 
 func _get_player_movement(input) -> Dictionary:
