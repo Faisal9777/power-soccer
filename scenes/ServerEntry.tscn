@@ -1,6 +1,6 @@
 [gd_scene load_steps=3 format=3 uid="uid://caxetbdf0uwpr"]
 
-[ext_resource type="Script" uid="uid://ddeucv1pl1b83" path="res://scenes/server_entry.gd" id="1_7l45w"]
+[ext_resource type="Script" uid="uid://be7ns0y4kjo53" path="res://scenes/server_entry.gd" id="1_7l45w"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_l5w3b"]
 bg_color = Color(0.164706, 0.164706, 0.164706, 1)
@@ -44,6 +44,7 @@ size_flags_horizontal = 3
 
 [node name="RightGroup" type="HBoxContainer" parent="MarginContainer/HBoxContainer"]
 layout_mode = 2
+theme_override_constants/separation = 16
 alignment = 2
 
 [node name="PlayersLabel" type="Label" parent="MarginContainer/HBoxContainer/RightGroup"]

@@ -68,6 +68,7 @@ text = "Filter"
 
 [node name="FilterOptions" type="HBoxContainer" parent="FilterBox"]
 layout_mode = 2
+theme_override_constants/separation = 20
 alignment = 1
 
 [node name="LAN" type="CheckBox" parent="FilterBox/FilterOptions"]
@@ -89,6 +90,11 @@ text = "Private"
 [node name="Public" type="CheckBox" parent="FilterBox/FilterOptions"]
 layout_mode = 2
 text = "Public"
+
+[node name="ServerSearch" type="LineEdit" parent="FilterBox/FilterOptions"]
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "Server Name"
 
 [node name="BackButton" type="Button" parent="."]
 layout_mode = 1

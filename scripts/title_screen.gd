@@ -73,7 +73,7 @@ func _ready() -> void:
 	btn_lan_create.pressed.connect(_on_create_server)
 	
 	# Start Google Authentication flow
-	_setup_login_flow()
+	#_setup_login_flow()
 
 
 	# Network callbacks while we are on the title screen

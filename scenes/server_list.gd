@@ -3,7 +3,7 @@ extends Control
 # Reference to the VBoxContainer
 @onready var filter_box = $FilterBox
 @onready var filter_button = $FilterBox/FilterBar/FilterServers
-
+@onready var server_search = $FilterBox/FilterOptions/ServerSearch
 @onready var filter_options = $FilterBox/FilterOptions
 @onready var back_button: Button = $BackButton
 
@@ -17,6 +17,7 @@ const C = preload("res://scripts/shared/scene.gd")
 const SCRIPT_PATHS = preload("res://scripts/shared/script_path.gd")
 var known_servers := {}
 var cleanup_timer := 0.0
+var filter_name := ""
 var session_node : Node
 var pending_join_data = null
 var discovery_times := {}
@@ -53,7 +54,7 @@ func _ready():
 	public_cb.toggled.connect(_on_filter_changed)
 	has_players_cb.toggled.connect(_on_filter_changed)
 	back_button.pressed.connect(_on_back_pressed)
-
+	server_search.text_changed.connect(_on_search_changed)
 func _process(delta : float):
 	_check_server_status()
 	if Input.is_action_pressed("debug"):
@@ -279,7 +280,13 @@ func _passes_filters(data) -> bool:
 	# Has Players
 	if filter_has_players and data.get("players", 0) <= 0:
 		return false
+	# Name filter
+	if filter_name != "":
+		var server_name := String(data.get("name", "")).to_lower()
+		var search := filter_name.to_lower()
 
+		if !server_name.begins_with(search):
+			return false
 	return true
 func _refresh_filters():
 	for key in known_servers:
@@ -304,3 +311,6 @@ func _on_filter_changed(_pressed: bool):
 func _on_back_pressed():
 	session_node.stop_discovery()
 	get_tree().change_scene_to_file(C.TITLE)
+func _on_search_changed(new_text: String):
+	filter_name = new_text.strip_edges()
+	_refresh_filters()
