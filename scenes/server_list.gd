@@ -5,6 +5,7 @@ extends Control
 @onready var filter_button = $FilterBox/FilterBar/FilterServers
 
 @onready var filter_options = $FilterBox/FilterOptions
+@onready var back_button: Button = $BackButton
 
 @onready var lan_cb = $FilterBox/FilterOptions/LAN
 @onready var cloud_cb = $FilterBox/FilterOptions/Cloud
@@ -51,6 +52,7 @@ func _ready():
 	private_cb.toggled.connect(_on_filter_changed)
 	public_cb.toggled.connect(_on_filter_changed)
 	has_players_cb.toggled.connect(_on_filter_changed)
+	back_button.pressed.connect(_on_back_pressed)
 
 func _process(delta : float):
 	_check_server_status()
@@ -299,3 +301,6 @@ func _on_filter_changed(_pressed: bool):
 	filter_has_players = has_players_cb.button_pressed
 
 	_refresh_filters()
+func _on_back_pressed():
+	session_node.stop_discovery()
+	get_tree().change_scene_to_file(C.TITLE)

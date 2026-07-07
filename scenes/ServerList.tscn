@@ -1,6 +1,7 @@
-[gd_scene load_steps=2 format=3 uid="uid://dcy4agh5qcqs7"]
+[gd_scene load_steps=3 format=3 uid="uid://dcy4agh5qcqs7"]
 
-[ext_resource type="Script" uid="uid://ch316brfu773i" path="res://scenes/server_list.gd" id="1_4xksb"]
+[ext_resource type="Script" uid="uid://1t3rtoslcsgk" path="res://scenes/server_list.gd" id="1_4xksb"]
+[ext_resource type="Script" uid="uid://7diq48uxaes" path="res://scripts/back_button.gd" id="2_jl44o"]
 
 [node name="ServerList" type="Control"]
 layout_mode = 3
@@ -88,3 +89,12 @@ text = "Private"
 [node name="Public" type="CheckBox" parent="FilterBox/FilterOptions"]
 layout_mode = 2
 text = "Public"
+
+[node name="BackButton" type="Button" parent="."]
+layout_mode = 1
+anchors_preset = -1
+anchor_right = 0.05
+anchor_bottom = 0.05
+offset_right = 8.0
+offset_bottom = 8.0
+script = ExtResource("2_jl44o")
