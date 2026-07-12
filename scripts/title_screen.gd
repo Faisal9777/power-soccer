@@ -73,7 +73,7 @@ func _ready() -> void:
 	btn_lan_create.pressed.connect(_on_create_server)
 	
 	# Start Google Authentication flow
-	#_setup_login_flow()
+	_setup_login_flow()
 
 
 	# Network callbacks while we are on the title screen
@@ -640,9 +640,9 @@ func _setup_login_flow() -> void:
 	AuthManager.auth_completed.connect(_on_auth_completed)
 	
 	# Auto-login check
-	if AuthManager.session_token != "":
+	if AuthManager.load_session_token():
 		_login_btn.disabled = true
-		AuthManager.login()
+		AuthManager.verify_session_token(AuthManager.session_token)
 
 func _on_auth_status_changed(msg: String) -> void:
 	if _login_status_label:

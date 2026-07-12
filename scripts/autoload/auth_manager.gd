@@ -9,6 +9,7 @@ const SECURE_KEY := "SuperSecretEncryptionKey123!" # Ideally derived or user-uni
 const SESSION_FILE := "user://session.enc"
 var google_plugin = null
 
+var player_id: int = 0
 var session_token: String = ""
 var player_tag: String = ""
 var player_name: String = ""
@@ -22,9 +23,7 @@ func _ready() -> void:
 	# Add a helper HTTPRequest node
 	http_client_node = HTTPRequest.new()
 	add_child(http_client_node)
-	
-	# Load existing session if present
-	load_saved_session()
+	load_session_token()
 
 # ==========================================
 # PUBLIC API
@@ -32,20 +31,10 @@ func _ready() -> void:
 
 # Starts the sign-in flow (or validates saved session)
 func login() -> void:
-	if session_token != "":
-		auth_status_changed.emit("Verifying saved session...")
-		verify_session_token(session_token)
-		return
 
 	if OS.has_feature("android") or OS.has_feature("ios"):
-		print(Engine.has_singleton("GoogleSignInPlugin"))
-
- 
 		mobile_login()
 	else:
-		print(Engine.has_singleton("GoogleSignInPlugin"))
-		for s in Engine.get_singleton_list():
-			print(s)
 		start_oauth_flow()
 
 func mobile_login() -> void:
@@ -104,15 +93,12 @@ func exchange_mobile_token(id_token: String) -> void:
 
 # Logs out and clears session
 func logout() -> void:
-	session_token = ""
+	clear_session_token()
+	player_id = 0
 	player_tag = ""
 	player_name = ""
-	if FileAccess.file_exists(SESSION_FILE):
-		var dir = DirAccess.open("user://")
-		if dir:
-			dir.remove("session.enc")
-	auth_completed.emit(false, {})
 
+	auth_completed.emit(false, {})
 # ==========================================
 # OAUTH2 LOOPBACK (PC FLOW)
 # ==========================================
@@ -258,17 +244,18 @@ func _on_exchange_response(result: int, response_code: int, headers: PackedStrin
 	var json = JSON.new()
 	if json.parse(response_text) == OK:
 		var data = json.data
-		if data.has("session_token") and data.has("player_tag"):
+		if data.has("session_token") and data.has("player_id"):
 			session_token = data["session_token"]
+			player_id = data["player_id"]
 			player_tag = data["player_tag"]
 			player_name = data.get("player_name", "Player")
 			
-			# Save session locally
-			save_session()
+			save_session_token()
 			
 			auth_status_changed.emit("Welcome, %s!" % player_name)
 			auth_completed.emit(true, {
 				"session_token": session_token,
+				"player_id": player_id,
 				"player_tag": player_tag,
 				"player_name": player_name
 			})
@@ -302,11 +289,13 @@ func _on_verify_response(result: int, response_code: int, headers: PackedStringA
 		var json = JSON.new()
 		if json.parse(response_text) == OK:
 			var data = json.data
+			player_id = data["player_id"]
 			player_tag = data["player_tag"]
 			player_name = data.get("player_name", "Player")
 			auth_status_changed.emit("Session active: %s" % player_name)
 			auth_completed.emit(true, {
 				"session_token": session_token,
+				"player_id": player_id,
 				"player_tag": player_tag,
 				"player_name": player_name
 			})
@@ -314,35 +303,42 @@ func _on_verify_response(result: int, response_code: int, headers: PackedStringA
 			
 	# Clear session if invalid/expired
 	logout()
-
-# ==========================================
-# SECURE STORAGE
-# ==========================================
-
-func save_session() -> void:
-	var file = FileAccess.open_encrypted_with_pass(SESSION_FILE, FileAccess.WRITE, SECURE_KEY)
-	if file != null:
-		var data = {
-			"session_token": session_token,
-			"player_tag": player_tag,
-			"player_name": player_name
-		}
-		file.store_string(JSON.stringify(data))
-		file.close()
-
-func load_saved_session() -> void:
-	if not FileAccess.file_exists(SESSION_FILE):
+func save_session_token() -> void:
+	if session_token.is_empty():
 		return
-		
-	var file = FileAccess.open_encrypted_with_pass(SESSION_FILE, FileAccess.READ, SECURE_KEY)
-	if file != null:
-		var content = file.get_as_text()
+
+	var file := FileAccess.open_encrypted_with_pass(
+		SESSION_FILE,
+		FileAccess.WRITE,
+		SECURE_KEY
+	)
+
+	if file:
+		file.store_string(session_token)
 		file.close()
-		
-		var json = JSON.new()
-		if json.parse(content) == OK:
-			var data = json.data
-			if data.has("session_token") and data.has("player_tag"):
-				session_token = data["session_token"]
-				player_tag = data["player_tag"]
-				player_name = data.get("player_name", "Player")
+
+
+func load_session_token() -> bool:
+	if not FileAccess.file_exists(SESSION_FILE):
+		return false
+
+	var file := FileAccess.open_encrypted_with_pass(
+		SESSION_FILE,
+		FileAccess.READ,
+		SECURE_KEY
+	)
+
+	if file == null:
+		return false
+
+	session_token = file.get_as_text().strip_edges()
+	file.close()
+
+	return not session_token.is_empty()
+
+
+func clear_session_token() -> void:
+	session_token = ""
+
+	if FileAccess.file_exists(SESSION_FILE):
+		DirAccess.remove_absolute(SESSION_FILE)
