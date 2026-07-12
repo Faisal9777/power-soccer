@@ -1,7 +1,7 @@
 # Settings.gd (Autoload)
 extends Node
 
-const CFG_PATH := "user://settings.cfg"
+const CFG_PATH := "user://settingss.cfg"
 
 var player_name := ""   # shown in lobbies
 

@@ -487,10 +487,20 @@ func _rpc_submit_name(name: String) -> void:
 	if !multiplayer.is_server(): return
 
 	var from := multiplayer.get_remote_sender_id()
-	_remove_duplicate_name(name, from)
+	#_remove_duplicate_name(name, from)
 	var team := GameState.pick_balanced_team()
-	GameState.roster[from] = {"name": name, "ready": false, "team": team, "ability": "grapple"}
+	var rec: Dictionary = GameState.roster.get(from, {})
 
+	rec["name"] = name
+	rec["ready"] = false
+
+	if !rec.has("team"):
+		rec["team"] = GameState.pick_balanced_team()
+
+	if !rec.has("ability"):
+		rec["ability"] = "grapple"
+
+	GameState.roster[from] = rec
 	_ensure_leader_exists()   # ✅ IMPORTANT
 	_broadcast_roster()
 

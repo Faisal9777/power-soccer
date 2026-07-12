@@ -1113,8 +1113,22 @@ func _kick_at_contact_server() -> bool:
 		hit_point = C + dir_to.normalized() * R
 
 	# Impulse direction from contact → center (pure geometry)
-	var dir: Vector3 = (C - hit_point).normalized()
+# ------------------------------------------------------------
+# Kick direction
+# ------------------------------------------------------------
+# Priority:
+# 1. If player is moving -> kick in movement direction
+# 2. If player is stationary -> use aim arrow direction
+# ------------------------------------------------------------
 
+	var dir: Vector3
+
+	var move_dir: Vector3 = _get_input_dir_server()
+
+	if move_dir.length_squared() > 0.001:
+		dir = move_dir.normalized()
+	else:
+		dir = (C - hit_point).normalized()
 	# Strength from charge (tweak exponent as you like)
 	var q: float = clampf(_charge, 0.0, 1.0)
 	var exponent: float = 2.0
