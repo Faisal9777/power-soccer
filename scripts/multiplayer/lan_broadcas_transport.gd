@@ -12,3 +12,6 @@ func send(payload: Dictionary) -> void:
 	var json = JSON.stringify(payload)
 	udp.set_dest_address(NetConfig.BROADCAST_IP, NetConfig.DISCOVERY_PORT)
 	udp.put_packet(json.to_utf8_buffer())
+
+func validate(user_id) -> bool:
+	return true

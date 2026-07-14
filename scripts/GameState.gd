@@ -8,6 +8,7 @@ var player_name: String = ""
 var is_host: bool = false
 signal player_name_changed(id: int, name: String)
 var id:int
+var user_id:int = randi()
 var is_dedicated: bool = false 
 var lobby_leader_id: int = 0
 signal lobby_leader_changed(id: int)

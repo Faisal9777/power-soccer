@@ -110,6 +110,7 @@ func _broadcast():
 		server_info["lobby_size"] = GameState.get_lobby_size()
 		server_info["players_connected"] = GameState.get_players_connected()
 		server_info["can_other_join"] = can_other_join
+		server_info["players"] = _get_all_user_ids()
 
 		_transport_method.send(server_info)
 
@@ -133,6 +134,11 @@ func _check_all_players():
 	for key in GameState.roster.keys():
 		var is_active = GameState.roster[key].get("is_active", false)
 		if not is_active:
+			var body = JSON.stringify({
+			"user_id": GameState.roster[key].get("user_id"),
+			"server_id": server_info.get("id")
+			})
+			await _transport_method.post(NetCodes.backend.PLAYER_DISCONNECTED, body) == HTTPClient.RESPONSE_OK
 			GameState.roster.erase(key)
 
 func _check_server_status():
@@ -165,15 +171,29 @@ func _on_peer_left(id):
 
 func _srv_register_player(payload : Dictionary):
 	var id = payload.get("id", 0)
-	if not can_other_join:
+	var user_id = payload.get("user_id", 0)
+	var is_validated : bool = await _transport_method.validate(user_id)
+	
+	if not can_other_join or not is_validated or not await _notify_player_joined(user_id): 
 		Network.disconnect_peer(id)
-		sync.send_data_id(id, NetCodes.Msg.REJECT, {"message" : "The Lobby is full"})
+		sync.send_data_id(id, NetCodes.Msg.REJECT, {"message" : "Cannot join"})
 		return
 	if not multiplayer.is_server():
 		return
-
-	GameState.roster[id] = {"name": "", "ready": false, "is_active" : true}
+	GameState.roster[id] = {"name": "", "ready": false, "is_active" : true,
+	"user_id" : user_id}
 	GameState.roster[id]["name"] = payload.get('name', "Unknown")
 	var server_info := {"roster":GameState.roster, "scene": C.LOBBY, "state" : NetCodes.States.SESSION}
 	sync.send_data_id(id, NetCodes.Msg.ROSTER_DATA, server_info)
 	TaskScheduler.schedule(60, _broadcast_states)
+
+
+func _notify_player_joined(user_id: int) -> bool:
+	var body = JSON.stringify({
+		"user_id": user_id,
+		"server_id": server_info.get("id")
+	})
+	return await _transport_method.post(NetCodes.backend.PLAYER_JOINED, body) == HTTPClient.RESPONSE_OK
+
+func _get_all_user_ids() -> Array:
+	return GameState.roster.values().map(func(player): return player["user_id"])

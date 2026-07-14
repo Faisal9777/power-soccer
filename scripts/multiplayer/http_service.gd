@@ -28,6 +28,7 @@ func http_get(url: String, headers):
 	if err != OK:
 		is_request_active = false
 
+
 func _on_request_completed(result, response_code, headers, body):
 	print("response after the request: ", result)
 	is_request_active = false

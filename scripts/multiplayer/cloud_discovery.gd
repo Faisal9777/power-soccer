@@ -26,7 +26,7 @@ func stop_search():
 
 func _find_data():
 	if can_search:
-		http_service.http_get(endpoint, [])
+		http_service.http_get(endpoint + "?userId=" + str(GameState.user_id), [])
 
 func _on_request_completed(result, response_code, headers, body):
 	if response_code != 200:

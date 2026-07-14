@@ -25,6 +25,11 @@ enum Lobby_action {
 	READY = 1
 }
 
+const backend = {
+	PLAYER_JOINED = "/player-joined",
+	PLAYER_DISCONNECTED = "/player-disconnected"
+}
+
 enum MatchAction {
 	END = 1
 }

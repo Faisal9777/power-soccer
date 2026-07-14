@@ -13,3 +13,25 @@ func send(payload: Dictionary) -> void:
 	var json = JSON.stringify(payload)
 	var headers = ["Content-Type: application/json"]
 	_http_service.post(_endpoint, headers, json)
+
+func validate(user_id) -> bool:
+	var url = Config.get_value("cloud_server_endpoint")
+	var val_url = url + "/validate?user_id=" + str(user_id)
+	var headers = ["Content-Type: application/json"]
+	_http_service.http_get(val_url, headers)
+	var res = await _http_service.request_completed
+	var response_code = res[1]
+	var body = JSON.parse_string(res[3].get_string_from_utf8())
+	
+	if response_code == 200 and body.get("success", false):
+		return true
+
+	return false
+
+func post(endpoint, body) -> int:
+	var cloud_url = Config.get_value("cloud_server_endpoint")
+	var url = cloud_url + endpoint
+	var headers = ["Content-Type: application/json"]
+	_http_service.post(url, headers, body)
+	var res = await _http_service.request_completed
+	return res[1]

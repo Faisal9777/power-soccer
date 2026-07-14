@@ -65,9 +65,8 @@ func host_cloud_server():
 	Config.load_config() 
 	var url = Config.get_value("cloud_server_endpoint") + ENDPOINTS.CREATE_LOBBY 
 	var headers = ["Content-Type: application/json"] 
-	var body = "{}"
 	http_service.request_completed.connect(_on_request_completed) 
-	http_service.post(url, headers, body)
+	http_service.post(url, headers, JSON.stringify({ "user_id": GameState.user_id }))
 
 	_timeout_timer = get_tree().create_timer(REQUEST_TIMEOUT_MS)
 	_timeout_timer.timeout.connect(_on_request_timeout)
@@ -125,12 +124,11 @@ func _on_lobbies_found(lobbies):
 		_on_server_found(lobby)
 
 func _on_joined_server(s):
-	print("joined server")
 	Network.connection_failed.connect(_on_connection_failed)
 	Network.server_disconnected.connect(_on_server_disconnected)
 	is_connected = true
 	var payload := {"name" : Settings.player_name, "id" : multiplayer.get_unique_id(),
-	"state" : NetCodes.States.SESSION}
+	"state" : NetCodes.States.SESSION, "user_id" : GameState.user_id}
 	sync = s
 	sync.send_data_id(1, NetCodes.Msg.REGISTER_PEER, payload)
 
