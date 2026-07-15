@@ -187,7 +187,7 @@ func _physics_process(delta: float) -> void:
 	while _input_accum >= step:
 		_input_accum -= step
 		_broadcast_snapshots()
-
+		
 func _broadcast_snapshots() -> void:
 	var snapshots := {}
 	_server_tick += 1
@@ -291,6 +291,7 @@ func _camera_setup(ball_path : NodePath, joystick_path : NodePath) -> void:
 
 func _update_local_player_states(delta : float) -> void:
 	var now := Time.get_ticks_msec()
+
 	for peer_id in _players_input.keys():
 		if not _players.has(peer_id):
 			continue

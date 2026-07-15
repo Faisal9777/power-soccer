@@ -136,12 +136,14 @@ func _ready() -> void:
 	# We can pick the goal on all peers; only the server will actually drive the bot.
 	_pick_goal_point()
 
-
 func _physics_process(delta: float) -> void:
+
 	if multiplayer.is_server():
 		_update_bot_input(delta)
-		super._physics_process(delta)
 
+		super._physics_process(delta)
+		if not _is_frozen and not tackle_active and not _external_pull_active and _cooldowns["move"] == 0.0:
+			_move_server(_get_input_dir_server(), delta, bool(_net.get("sprint", false)))
 
 
 # ---------- TEAM RESOLUTION ----------
@@ -298,6 +300,7 @@ func _update_bot_input(delta: float) -> void:
 
 	var role := _get_my_role()
 
+
 	if role == ROLE_GOALKEEPER:
 		_update_goalkeeper_input(delta)
 	else:
@@ -349,11 +352,11 @@ func _update_goalkeeper_input(delta: float) -> void:
 
 		# decompose that direction into mvx/mvz using our own yaw
 		var yaw := rotation.y
-		var fwd := Vector3.FORWARD.rotated(Vector3.UP, yaw)
+		var fwd := Vector3.BACK.rotated(Vector3.UP, yaw)
 		fwd.y = 0.0
 		fwd = fwd.normalized()
 
-		var right := Vector3.RIGHT.rotated(Vector3.UP, yaw)
+		var right := Vector3.LEFT.rotated(Vector3.UP, yaw)
 		right.y = 0.0
 		right = right.normalized()
 
@@ -378,11 +381,11 @@ func _update_goalkeeper_input(delta: float) -> void:
 	var dir_move3: Vector3 = to_home3 / max(dist_home, 0.0001)
 
 	var yaw2 := rotation.y
-	var fwd2 := Vector3.FORWARD.rotated(Vector3.UP, yaw2)
+	var fwd2 := Vector3.BACK.rotated(Vector3.UP, yaw2)
 	fwd2.y = 0.0
 	fwd2 = fwd2.normalized()
 
-	var right2 := Vector3.RIGHT.rotated(Vector3.UP, yaw2)
+	var right2 := Vector3.LEFT.rotated(Vector3.UP, yaw2)
 	right2.y = 0.0
 	right2 = right2.normalized()
 
@@ -427,14 +430,13 @@ func _reset_net() -> void:
 func _move_towards_direction(dir3: Vector3, sprint: bool) -> void:
 	if dir3 == Vector3.ZERO:
 		return
-
 	var yaw := rotation.y
 
-	var fwd := Vector3.FORWARD.rotated(Vector3.UP, yaw)
+	var fwd := Vector3.BACK.rotated(Vector3.UP, yaw)
 	fwd.y = 0.0
 	fwd = fwd.normalized()
 
-	var right := Vector3.RIGHT.rotated(Vector3.UP, yaw)
+	var right := Vector3.LEFT.rotated(Vector3.UP, yaw)
 	right.y = 0.0
 	right = right.normalized()
 
@@ -443,6 +445,7 @@ func _move_towards_direction(dir3: Vector3, sprint: bool) -> void:
 
 	_net["mvx"] = clampf(mvx, -1.0, 1.0)
 	_net["mvz"] = clampf(mvz, -1.0, 1.0)
+	_net["cam_yaw"] = yaw
 	_net["sprint"] = sprint
 
 
@@ -999,7 +1002,7 @@ func _try_pass_to_forward_only(ball: RigidBody3D, ignore_cooldown: bool = false,
 	ball.set_meta(LAST_PASS_FROM_META, get_path())
 	ball.set_meta(LAST_PASS_TIME_META, now_sec)
 
-	ball.apply_impulse(impulse, Vector3.ZERO)
+	ball.apply_hit(impulse, Vector3.ZERO, owner_peer_id)
 	_next_pass_time_sec = now_sec + PASS_COOLDOWN_SEC
 
 	# mark trap for receiver
@@ -1054,7 +1057,7 @@ func _try_pass_to_forward(ball: RigidBody3D) -> void:
 	ball.set_meta(LAST_PASS_FROM_META, get_path())
 	ball.set_meta(LAST_PASS_TIME_META, now_sec)
 
-	ball.apply_impulse(impulse, Vector3.ZERO)
+	ball.apply_hit(impulse, Vector3.ZERO, owner_peer_id)
 	_next_pass_time_sec = now_sec + PASS_COOLDOWN_SEC
 
 	# 👇 NEW: mark that this was a MID → FORWARD pass,
@@ -1149,7 +1152,7 @@ func _forward_try_safety_pass(ball: RigidBody3D) -> bool:
 	ball.set_meta(LAST_PASS_FROM_META, get_path())
 	ball.set_meta(LAST_PASS_TIME_META, now_sec)
 
-	ball.apply_impulse(impulse, Vector3.ZERO)
+	ball.apply_hit(impulse, Vector3.ZERO,owner_peer_id )
 	_next_pass_time_sec = now_sec + PASS_COOLDOWN_SEC
 
 	# 👇 NEW: if this was FORWARD → FORWARD (or to a human forward),
@@ -1865,7 +1868,7 @@ func _forward_handle_kick(ball: RigidBody3D, ball_pos: Vector3) -> void:
 	if dist_goal <= FWD_FINAL_SHOT_DIST and ball_speed < 6.0 and now_sec >= _next_forward_kick_time_sec:
 		ball.linear_velocity = Vector3.ZERO
 		var dir_final := to_goal.normalized()
-		ball.apply_impulse(dir_final * FWD_FINAL_SHOT_FORCE, Vector3.ZERO)
+		ball.apply_hit(dir_final * FWD_FINAL_SHOT_FORCE, Vector3.ZERO,owner_peer_id)
 		_next_forward_kick_time_sec = now_sec + FWD_KICK_COOLDOWN_SEC
 		_forward_dribble_phase = 0
 		print("FORWARD", owner_peer_id, " FINAL SHOT dist_goal=", dist_goal)
@@ -1882,7 +1885,7 @@ func _forward_handle_kick(ball: RigidBody3D, ball_pos: Vector3) -> void:
 		# Phase 0: small push towards goal
 		var dir_dribble := to_goal.normalized()
 		ball.linear_velocity = ball_vel      # keep current ground speed
-		ball.apply_impulse(dir_dribble * FWD_DRIBBLE_FORCE, Vector3.ZERO)
+		ball.apply_hit(dir_dribble * FWD_DRIBBLE_FORCE, Vector3.ZERO, owner_peer_id)
 		_forward_dribble_phase = 1
 		_next_forward_kick_time_sec = now_sec + FWD_KICK_COOLDOWN_SEC
 		print("FORWARD", owner_peer_id, " DRIBBLE KICK dist_goal=", dist_goal)
@@ -1919,3 +1922,6 @@ func _flat_angle_to_point(target: Vector3) -> float:
 	dir = dir.normalized()
 	var fwd := _flat_forward_dir()
 	return acos(clampf(fwd.dot(dir), -1.0, 1.0))
+
+func get_bot_input() -> Dictionary:
+	return _net

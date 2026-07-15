@@ -1,6 +1,6 @@
 [gd_scene load_steps=8 format=3 uid="uid://c7c8psuolfrbi"]
 
-[ext_resource type="Script" uid="uid://d27tl46wdl1bi" path="res://scripts/bot.gd" id="1_0djdi"]
+[ext_resource type="Script" uid="uid://cem28o3katqj3" path="res://scripts/bot.gd" id="1_0djdi"]
 [ext_resource type="ArrayMesh" uid="uid://dfkb3j37cjp2g" path="res://3DModels/android_phone.obj" id="2_temvm"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_ld6s0"]

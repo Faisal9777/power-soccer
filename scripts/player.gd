@@ -385,7 +385,8 @@ func get_input_data() -> Dictionary:
 func update_player_states(input: Dictionary, delta) -> void:
 	if _is_frozen:
 		return
-	
+	if owner_peer_id != 1:
+		print(input)
 	_update_player_facing(input)
 	_handle_movement(input, delta)
 	#_yaw_delta_accum = 0.0
@@ -1461,6 +1462,7 @@ func _face_camera_yaw(delta: float) -> void:
 	cur.y = lerp_angle(cur.y, target_yaw, clamp(turn_speed * delta, 0.0, 1.0))
 	rotation = cur
 # Helper: face ball (body yaw + pivot pitch)
+
 func _face_ball_server() -> void:
 	_resolve_ball()
 	if current_ball == null or !is_instance_valid(current_ball):

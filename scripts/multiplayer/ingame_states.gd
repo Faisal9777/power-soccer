@@ -56,6 +56,7 @@ func add_goal(player_id : int) -> void:
 	game_data[player_id]["goals"] += 1
 
 func sub_goal(player_id : int) -> void:
+	
 	game_data[player_id]["goals"] -= 1
 
 func add_assist(player_id : int) -> void:
