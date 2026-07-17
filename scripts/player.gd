@@ -1129,7 +1129,10 @@ func _kick_at_contact_server() -> bool:
 	if move_dir.length_squared() > 0.001:
 		dir = move_dir.normalized()
 	else:
-		dir = (C - hit_point).normalized()
+		#make the ball not go upward when shooting
+			dir = C - hit_point
+			dir.y = 0.0
+			dir = dir.normalized()
 	# Strength from charge (tweak exponent as you like)
 	var q: float = clampf(_charge, 0.0, 1.0)
 	var exponent: float = 2.0

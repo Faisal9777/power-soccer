@@ -1,6 +1,6 @@
-[gd_scene load_steps=83 format=4 uid="uid://ex55agd4o2wj"]
+[gd_scene load_steps=105 format=4 uid="uid://ex55agd4o2wj"]
 
-[ext_resource type="Script" uid="uid://c2xb0vlsk7lgf" path="res://scripts/world.gd" id="1_rup4s"]
+[ext_resource type="Script" uid="uid://ye8uys4eyoip" path="res://scripts/world.gd" id="1_rup4s"]
 [ext_resource type="PackedScene" uid="uid://dv5l1qjf5gwfn" path="res://scenes/Player.tscn" id="2_4kbfs"]
 [ext_resource type="PackedScene" uid="uid://c7c8psuolfrbi" path="res://scenes/BotPlayer.tscn" id="3_f17e3"]
 [ext_resource type="PackedScene" uid="uid://ds26o286r5vvn" path="res://scenes/ball.tscn" id="4_x2olw"]
@@ -81,9 +81,23 @@ bounce = 0.8
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_gbfbk"]
 
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_rga7q"]
+albedo_color = Color(0, 0, 1, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_6oujy"]
+material = SubResource("StandardMaterial3D_rga7q")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_eo1xk"]
+albedo_color = Color(0, 0, 1, 1)
+
 [sub_resource type="BoxMesh" id="BoxMesh_036b0"]
+material = SubResource("StandardMaterial3D_eo1xk")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_6oujy"]
+albedo_color = Color(0, 0, 1, 1)
 
 [sub_resource type="BoxMesh" id="BoxMesh_pkg7o"]
+material = SubResource("StandardMaterial3D_6oujy")
 
 [sub_resource type="BoxMesh" id="BoxMesh_ioo17"]
 
@@ -92,6 +106,7 @@ transparency = 2
 alpha_scissor_threshold = 0.5
 alpha_antialiasing_mode = 0
 cull_mode = 2
+albedo_color = Color(0, 0, 1, 1)
 albedo_texture = ExtResource("9_8u370")
 uv1_scale = Vector3(8, 8, 8)
 
@@ -102,10 +117,85 @@ transparency = 2
 alpha_scissor_threshold = 0.5
 alpha_antialiasing_mode = 0
 cull_mode = 2
+albedo_color = Color(0, 0, 1, 1)
 albedo_texture = ExtResource("9_8u370")
 uv1_scale = Vector3(8, 8, 8)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_hiqwa"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_4wdv8"]
+albedo_color = Color(1, 0, 0, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_d46x8"]
+material = SubResource("StandardMaterial3D_4wdv8")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_3l05q"]
+albedo_color = Color(1, 0, 0, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_x28ej"]
+material = SubResource("StandardMaterial3D_3l05q")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_1jxku"]
+albedo_color = Color(1, 0, 0, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_1dgkn"]
+material = SubResource("StandardMaterial3D_1jxku")
+
+[sub_resource type="BoxMesh" id="BoxMesh_e68xj"]
+
+[sub_resource type="CompressedTexture2D" id="CompressedTexture2D_5hglh"]
+load_path = "res://.godot/imported/fence.png-ab7b26019d43b2b37d63185a4df30c39.s3tc.ctex"
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_qg546"]
+transparency = 2
+alpha_scissor_threshold = 0.5
+alpha_antialiasing_mode = 0
+cull_mode = 2
+albedo_color = Color(1, 0, 0, 1)
+albedo_texture = SubResource("CompressedTexture2D_5hglh")
+uv1_scale = Vector3(8, 8, 8)
+
+[sub_resource type="BoxMesh" id="BoxMesh_pf35h"]
+
+[sub_resource type="CompressedTexture2D" id="CompressedTexture2D_iexy4"]
+load_path = "res://.godot/imported/fence.png-ab7b26019d43b2b37d63185a4df30c39.s3tc.ctex"
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_npbic"]
+transparency = 2
+alpha_scissor_threshold = 0.5
+alpha_antialiasing_mode = 0
+cull_mode = 2
+albedo_color = Color(1, 0, 0, 1)
+albedo_texture = SubResource("CompressedTexture2D_iexy4")
+uv1_scale = Vector3(8, 8, 8)
+
+[sub_resource type="BoxMesh" id="BoxMesh_e6ckp"]
+
+[sub_resource type="CompressedTexture2D" id="CompressedTexture2D_mvg0v"]
+load_path = "res://.godot/imported/fence.png-ab7b26019d43b2b37d63185a4df30c39.s3tc.ctex"
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_h3odw"]
+transparency = 2
+alpha_scissor_threshold = 0.5
+alpha_antialiasing_mode = 0
+cull_mode = 2
+albedo_color = Color(1, 0, 0, 1)
+albedo_texture = SubResource("CompressedTexture2D_mvg0v")
+uv1_scale = Vector3(8, 8, 8)
+
+[sub_resource type="BoxMesh" id="BoxMesh_5hl1e"]
+
+[sub_resource type="CompressedTexture2D" id="CompressedTexture2D_66tox"]
+load_path = "res://.godot/imported/fence.png-ab7b26019d43b2b37d63185a4df30c39.s3tc.ctex"
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_pq8jk"]
+transparency = 2
+alpha_scissor_threshold = 0.5
+alpha_antialiasing_mode = 0
+cull_mode = 2
+albedo_color = Color(1, 0, 0, 1)
+albedo_texture = SubResource("CompressedTexture2D_66tox")
+uv1_scale = Vector3(8, 8, 8)
 
 [sub_resource type="PhysicsMaterial" id="PhysicsMaterial_6oujy"]
 friction = 0.0
@@ -576,7 +666,7 @@ shape = SubResource("BoxShape3D_gbfbk")
 
 [node name="Post_L" type="MeshInstance3D" parent="Teams/TeamBlue/Goal_A"]
 transform = Transform3D(0.3, 0, 0, 0, 4, 0, 0, 0, 0.3, -4, 1.5, 0)
-mesh = SubResource("BoxMesh_036b0")
+mesh = SubResource("BoxMesh_6oujy")
 
 [node name="Post_R" type="MeshInstance3D" parent="Teams/TeamBlue/Goal_A"]
 transform = Transform3D(0.3, 0, 0, 0, 4, 0, 0, 0, 0.3, 4, 1.5, 0)
@@ -631,6 +721,12 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 35, 1.583, -76.588)
 [node name="Spawn5" type="Marker3D" parent="Teams/TeamBlue/Spawns"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, -109)
 
+[node name="Spawn6" type="Marker3D" parent="Teams/TeamBlue/Spawns"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 40, 1.5, -109)
+
+[node name="Spawn7" type="Marker3D" parent="Teams/TeamBlue/Spawns"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -40, 1.5, -109)
+
 [node name="TeamRed" type="Node3D" parent="Teams"]
 
 [node name="Goal_B" type="Node3D" parent="Teams/TeamRed"]
@@ -673,35 +769,35 @@ shape = SubResource("BoxShape3D_gbfbk")
 
 [node name="Post_L" type="MeshInstance3D" parent="Teams/TeamRed/Goal_B"]
 transform = Transform3D(0.3, 0, 0, 0, 4, 0, 0, 0, 0.3, -4, 1.5, 0)
-mesh = SubResource("BoxMesh_036b0")
+mesh = SubResource("BoxMesh_d46x8")
 
 [node name="Post_R" type="MeshInstance3D" parent="Teams/TeamRed/Goal_B"]
 transform = Transform3D(0.3, 0, 0, 0, 4, 0, 0, 0, 0.3, 4, 1.5, 0)
-mesh = SubResource("BoxMesh_036b0")
+mesh = SubResource("BoxMesh_x28ej")
 
 [node name="CrossBar" type="MeshInstance3D" parent="Teams/TeamRed/Goal_B"]
 transform = Transform3D(8, 0, 0, 0, 0.3, 0, 0, 0, 0.3, 0, 3.5, 0)
-mesh = SubResource("BoxMesh_pkg7o")
+mesh = SubResource("BoxMesh_1dgkn")
 
 [node name="NetPanel_Back" type="MeshInstance3D" parent="Teams/TeamRed/Goal_B"]
 transform = Transform3D(8, 0, 0, 0, 4, 0, 0, 0, 0.05, 0, 1.5, -3.25)
-mesh = SubResource("BoxMesh_ioo17")
-surface_material_override/0 = SubResource("StandardMaterial3D_wse8f")
+mesh = SubResource("BoxMesh_e68xj")
+surface_material_override/0 = SubResource("StandardMaterial3D_qg546")
 
 [node name="NetPanel_L" type="MeshInstance3D" parent="Teams/TeamRed/Goal_B"]
 transform = Transform3D(0.05, 0, 0, 0, 4, 0, 0, 0, 3.15, 4, 1.5, -1.7)
-mesh = SubResource("BoxMesh_ioo17")
-surface_material_override/0 = SubResource("StandardMaterial3D_wse8f")
+mesh = SubResource("BoxMesh_pf35h")
+surface_material_override/0 = SubResource("StandardMaterial3D_npbic")
 
 [node name="NetPanel_R" type="MeshInstance3D" parent="Teams/TeamRed/Goal_B"]
 transform = Transform3D(0.05, 0, 0, 0, 4, 0, 0, 0, 3.15, -4, 1.5, -1.7)
-mesh = SubResource("BoxMesh_ioo17")
-surface_material_override/0 = SubResource("StandardMaterial3D_wse8f")
+mesh = SubResource("BoxMesh_e6ckp")
+surface_material_override/0 = SubResource("StandardMaterial3D_h3odw")
 
 [node name="NetPanel_Top" type="MeshInstance3D" parent="Teams/TeamRed/Goal_B"]
 transform = Transform3D(8, 0, 0, 0, 0.05, 0, 1.13687e-13, 0, 3.15, 4.54747e-13, 3.5, -1.7)
-mesh = SubResource("BoxMesh_ic0uy")
-surface_material_override/0 = SubResource("StandardMaterial3D_k3n1d")
+mesh = SubResource("BoxMesh_5hl1e")
+surface_material_override/0 = SubResource("StandardMaterial3D_pq8jk")
 
 [node name="ScoreZone" type="Area3D" parent="Teams/TeamRed/Goal_B"]
 collision_layer = 4
@@ -727,6 +823,12 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 35, 1.583, -76.588)
 
 [node name="Spawn5" type="Marker3D" parent="Teams/TeamRed/Spawns"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, -109)
+
+[node name="Spawn6" type="Marker3D" parent="Teams/TeamRed/Spawns"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -40, 1.5, -109)
+
+[node name="Spawn7" type="Marker3D" parent="Teams/TeamRed/Spawns"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 40, 1.5, -109)
 
 [node name="Walls" type="Node3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.860714, -0.665835, -2.33582)
@@ -784,7 +886,7 @@ collision_layer = 255
 collision_mask = 255
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="BallOutOfBounds"]
-transform = Transform3D(10000, 0, 0, 0, 10, 0, 0, 0, 10000, 0, 0, 0)
+transform = Transform3D(10000000000, 0, 0, 0, 10, 0, 0, 0, 10000000000, 0, 0, 0)
 shape = SubResource("BoxShape3D_bo7i5")
 
 [node name="Platforms" type="Node3D" parent="."]

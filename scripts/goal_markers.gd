@@ -5,7 +5,7 @@ extends Control
 @export var camera_path: NodePath      = NodePath("../../Camera3D")
 @export var blue_goal_path: NodePath   = NodePath("../../Goal_A")
 @export var green_goal_path: NodePath  = NodePath("../../Goal_B")
-@export var ball_path: NodePath        = NodePath("../../Ball")            # NEW
+@export var ball_path: NodePath        = NodePath("/root/World/BallHolder/Ball")            # NEW
 
 # --- Per-target vertical offsets (in meters) ---
 @export var blue_offset_below_m:  float = 1.0   # meters below blue goal center
