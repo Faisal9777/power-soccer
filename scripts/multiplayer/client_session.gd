@@ -81,14 +81,12 @@ func join(server_info):
 func handle_data(msg, data):
 	var state = data.get("state")
 	if state == NetCodes.States.SESSION:
-		if msg == NetCodes.Msg.ROSTER_DATA:
-			_cl_sync_roster(data)
 		if msg == NetCodes.Msg.STATE_DATA:
 			GameState.roster = data["roster"]
-	elif not state == current_scene:
-		return
-	elif current_state:
-		current_state.handle_data(msg, data)
+	if msg == NetCodes.Msg.REGISTRATION_COMPLETE:
+			_cl_sync_roster(data)
+	else:
+		StateHandler.handle_data(msg, data, state)
 
 func disconnect_connection() -> void:
 	_disconnect()
@@ -131,6 +129,7 @@ func _on_joined_server(s):
 	"state" : NetCodes.States.SESSION, "user_id" : GameState.user_id}
 	sync = s
 	sync.send_data_id(1, NetCodes.Msg.REGISTER_PEER, payload)
+	
 
 func _on_server_disconnected() -> void:
 	_disconnect()
@@ -143,13 +142,12 @@ func _disconnect() -> void:
 	_disconnect_from_events()
 	GameState.clear()
 	Network.close_connection()
-	SessionManager.change_state(NetCodes.States.TITLE)
+	StateHandler.change_state(NetCodes.States.TITLE)
 
 func _cl_sync_roster(server_info):
 	BlockingOverlay.hide()
-	GameState.roster = server_info["roster"]
+	StateHandler.on_connected_to_server(server_info)
 	stop_discovery()
-	get_tree().change_scene_to_file(server_info["scene"])
 
 func _disconnect_from_events():
 	if Network.joined_server.is_connected(_on_joined_server):

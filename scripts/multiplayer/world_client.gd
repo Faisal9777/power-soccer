@@ -119,7 +119,7 @@ func init(p : Node3D,
 
 
 func _ready() -> void:
-	SessionManager.register_state(self)
+	StateHandler.register_state(self)
 	_my_id = multiplayer.get_unique_id()
 	var hz := float(ProjectSettings.get_setting("physics/common/physics_ticks_per_second"))
 	_fixed_dt = 1.0 / max(1.0, hz)

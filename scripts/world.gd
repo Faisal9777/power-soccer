@@ -998,6 +998,7 @@ func _send_local_input() -> void:
 		return
 
 	var d := _gather_input()
+	d["id"] = multiplayer.get_unique_id()
 
 	# ✅ IMPORTANT: also feed local player immediately on this machine
 	# so client-side code (_ability.client_tick, UI, etc.) can react instantly.
@@ -1013,7 +1014,7 @@ func _send_local_input() -> void:
 					print("PLAYER: got ability_action1 (server=", multiplayer.is_server(), ")")
 
 	else:
-		rpc_id(1, "_rpc_client_input", multiplayer.get_unique_id(), d)
+		SessionManager.send_data_id(1, NetCodes.Msg.DISCRETE_INPUTS, d)
 
 @rpc("any_peer")
 func _rpc_client_input(from_id: int, d: Dictionary) -> void:

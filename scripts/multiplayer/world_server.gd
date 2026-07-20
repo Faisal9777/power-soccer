@@ -59,6 +59,8 @@ func start_init(players: Dictionary,
 func handle_data(msg, value):
 	if msg == NetCodes.Msg.INPUTS:
 		process_input_by_id(value["id"], msg, value)
+	elif msg == NetCodes.Msg.DISCRETE_INPUTS:
+		_client_discrete_input(value["id"], value)
 
 func process_input_by_id(peer_id: int, msg, cmd : Dictionary) -> void:
 	var idx = controllers.find_custom(
@@ -126,6 +128,15 @@ func _broadcast_snapshots() -> void:
 	snapshots["game_state"] = _game.current_state
 	SessionManager.send_data(NetCodes.Msg.SNAPSHOTS,snapshots)
 
+func _client_discrete_input(from_id: int, d: Dictionary) -> void:
+	if d.get("grapple_toggle", false):
+		print("World got grapple toggle from ", from_id)
+	if _players.has(from_id):
+		#print("_rpc_client_input2")
+		var p: CharacterBody3D = _players[from_id]
+		if p and p.has_method("apply_net_input"):
+			#print("_rpc_client_input3")
+			p.apply_net_input(d)
 
 func _build_player_paths() -> Dictionary:
 	var paths := {}
@@ -196,7 +207,8 @@ func _on_game_end(game_end_data) -> void:
 	_network_endpoint.rpc(NetCodes.Rpc.INPUT_STREAM, NetCodes.Msg.GAME_END, game_end_data)
 	if _is_also_player:
 		_client_game.end_game(game_end_data)
-	SessionManager.change_state(NetCodes.States.LOBBY)
+	else:
+		SessionManager.change_state(NetCodes.States.LOBBY)
 
 func _on_game_reset(game_data) -> void:
 	_network_endpoint.rpc(NetCodes.Rpc.INPUT_STREAM, NetCodes.Msg.GAME_BEGIN, game_data)

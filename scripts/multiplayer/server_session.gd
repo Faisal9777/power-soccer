@@ -6,11 +6,12 @@ signal joined_server
 signal server_found(info)
 
 var _transport_method : IAnnounceTransport
-var current_scene = ""
+var current_scene := 1 
 var current_state : Node
 var scene_data = {}
 var scene_after_server = ""
 var server_info = {}
+var is_cloud_session := true
 var can_broadcast := false
 var can_world_state_broadcast := true
 var can_track_player := false
@@ -27,7 +28,8 @@ const server_phase = {
 }
 
 func set_current_scene(scene : String):
-	current_scene = scene
+	print("set current scene is called")
+	#current_scene = scene
 
 func change_state(state_info: int):
 	current_state = null
@@ -40,9 +42,10 @@ func change_state(state_info: int):
 		scene_data["next_scene"] = "Lobby"
 	current_scene = state_info
 
-func setup(transport_method, id, port):
+func setup(transport_method, id, port, is_remote_session):
 	_transport_method = transport_method
 	server_info = {"id" : id, "port" : port}
+	is_cloud_session = is_remote_session
 
 func host(server_name, scene):
 	scene_after_server = scene
@@ -85,17 +88,20 @@ func toggle_world_state_broadcast(trigger):
 	can_world_state_broadcast = trigger
 
 func start_game() -> void:
-	current_scene = C.WORLD
+	print("start game is called")
+	#current_scene = C.WORLD
 
 func manage_event(msg) -> void:
-	if current_scene == "World":
-		if msg == NetCodes.MatchAction.END:
-			SessionManager.change_state(NetCodes.States.LOBBY)
+	print("manage event is called")
+	#if current_scene == "World":
+		#if msg == NetCodes.MatchAction.END:
+			#SessionManager.change_state(NetCodes.States.LOBBY)
 
 func _process(delta):
 	if can_track_player:
 		_check_all_players()
-	_check_server_status()
+	if is_cloud_session:
+		_check_server_status()
 
 func _broadcast():
 	if can_broadcast:
@@ -110,7 +116,9 @@ func _broadcast():
 		server_info["lobby_size"] = GameState.get_lobby_size()
 		server_info["players_connected"] = GameState.get_players_connected()
 		server_info["can_other_join"] = can_other_join
-		server_info["players"] = _get_all_user_ids()
+		server_info["current_state"] = current_scene
+		if is_cloud_session:
+			server_info["players"] = _get_all_user_ids()
 
 		_transport_method.send(server_info)
 
@@ -172,9 +180,8 @@ func _on_peer_left(id):
 func _srv_register_player(payload : Dictionary):
 	var id = payload.get("id", 0)
 	var user_id = payload.get("user_id", 0)
-	var is_validated : bool = await _transport_method.validate(user_id)
-	
-	if not can_other_join or not is_validated or not await _notify_player_joined(user_id): 
+
+	if not can_other_join or is_cloud_session and not await _can_join(user_id): 
 		Network.disconnect_peer(id)
 		sync.send_data_id(id, NetCodes.Msg.REJECT, {"message" : "Cannot join"})
 		return
@@ -183,8 +190,8 @@ func _srv_register_player(payload : Dictionary):
 	GameState.roster[id] = {"name": "", "ready": false, "is_active" : true,
 	"user_id" : user_id}
 	GameState.roster[id]["name"] = payload.get('name', "Unknown")
-	var server_info := {"roster":GameState.roster, "scene": C.LOBBY, "state" : NetCodes.States.SESSION}
-	sync.send_data_id(id, NetCodes.Msg.ROSTER_DATA, server_info)
+	#var server_info := {"roster":GameState.roster, "scene": C.LOBBY, "state" : NetCodes.States.SESSION}
+	sync.send_data_id(id, NetCodes.Msg.REGISTRATION_COMPLETE, server_info)
 	TaskScheduler.schedule(60, _broadcast_states)
 
 
@@ -196,4 +203,10 @@ func _notify_player_joined(user_id: int) -> bool:
 	return await _transport_method.post(NetCodes.backend.PLAYER_JOINED, body) == HTTPClient.RESPONSE_OK
 
 func _get_all_user_ids() -> Array:
-	return GameState.roster.values().map(func(player): return player["user_id"])
+		return GameState.roster.values().map(func(player): return player["user_id"])
+
+func _can_join(user_id):
+	var is_validated : bool = await _transport_method.validate(user_id)
+	if not is_validated or not await _notify_player_joined(user_id):
+		return false
+	return true

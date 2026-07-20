@@ -11,7 +11,7 @@ const LAN_PORT := 24565
 
 func create_lan_server_session(session_path: String, id) -> Node:
 	var transport_method = LanBroadcastTransport.new()
-	return await _create_server_session(session_path, transport_method, id, LAN_PORT)
+	return await _create_server_session(session_path, transport_method, id, LAN_PORT, false)
 
 func create_cloud_server_session(session_path: String, id, port) -> Node:
 	var endpoint = _get_endpoint("heartbeat_endpoint")
@@ -43,19 +43,7 @@ func close_session() -> void:
 	get_tree().change_scene_to_file(C.TITLE)
 
 func change_state(state_info: int):
-	session_node.change_state(state_info)
-	var scene_to_load = ""
-	if state_info == NetCodes.States.LOBBY:
-		scene_to_load = C.LOBBY
-	if state_info == NetCodes.States.WORLD:
-		scene_to_load = C.WORLD
-	elif state_info == NetCodes.States.SCOREBOARD:
-		scene_to_load = C.SCORE
-	elif state_info == NetCodes.States.TITLE:
-		scene_to_load = C.TITLE
-		session_node.queue_free()
-		Network.close_connection()
-	get_tree().change_scene_to_file(scene_to_load)
+	StateHandler.change_state(state_info)
 
 func send_data_id(target_id, msg, value):
 	session_node.send_data_id(target_id, msg, value)
@@ -91,7 +79,7 @@ func _get_endpoint(endpoint) -> String:
 	return Config.get_value(endpoint)
 	
 
-func _create_server_session(session_path: String, transport_method, id, port) -> Node:
+func _create_server_session(session_path: String, transport_method, id, port, is_cloud_session=true) -> Node:
 	session_node = await _create_node(session_path, SESSION_NAME)
-	session_node.setup(transport_method, id, port)
+	session_node.setup(transport_method, id, port, is_cloud_session)
 	return session_node
