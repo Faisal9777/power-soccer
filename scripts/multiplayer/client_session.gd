@@ -11,6 +11,7 @@ var http_service : HttpService
 var scene_data := {}
 var current_scene := -1
 var current_state : Node
+var server_id := 1
 var sync : Node
 var ENDPOINTS = preload("res://scripts/shared/endpoints.gd")
 const C = preload("res://scripts/shared/scene.gd")
@@ -21,6 +22,9 @@ var _timeout_timer: SceneTreeTimer = null
 func setup(discovery):
 	cloud_discovery = discovery
 	add_child(discovery)
+
+func get_session_id() -> int:
+	return multiplayer.get_unique_id()
 
 func stop_discovery():
 	Network.stop_discovery()
@@ -51,9 +55,8 @@ func change_state(state_info: int):
 	if state_info == NetCodes.States.SCOREBOARD:
 		scene_data["next_scene"] = NetCodes.States.LOBBY
 
-func send_data_id(target_id, msg, value):
-	value["state"] = current_scene
-	sync.send_data_id(target_id, msg, value)
+func send_data_id(msg, value):
+	sync.send_data_id(server_id, msg, value)
 
 func send_data(msg, value):
 	value["state"] = current_scene
@@ -83,8 +86,8 @@ func handle_data(msg, data):
 	if state == NetCodes.States.SESSION:
 		if msg == NetCodes.Msg.STATE_DATA:
 			GameState.roster = data["roster"]
-	if msg == NetCodes.Msg.REGISTRATION_COMPLETE:
-			_cl_sync_roster(data)
+		elif msg == NetCodes.Msg.REGISTRATION_COMPLETE:
+				_cl_sync_roster(data)
 	else:
 		StateHandler.handle_data(msg, data, state)
 
@@ -101,6 +104,8 @@ func _on_request_completed(result, response_code, headers, body):
 		return
 
 	var json = JSON.parse_string(body.get_string_from_utf8())
+	if json.get("response") == NetCodes.ResponseType.REJOIN:
+		BlockingOverlay.show_overlay("Rejoining previous game")
 
 	join(json)
 
@@ -138,14 +143,16 @@ func _on_connection_failed() -> void:
 	_disconnect()
 
 func _disconnect() -> void:
-	is_connected = false
-	_disconnect_from_events()
-	GameState.clear()
-	Network.close_connection()
-	StateHandler.change_state(NetCodes.States.TITLE)
+	if is_connected:
+		_disconnect_from_events()
+		GameState.clear()
+		Network.close_connection()
+		is_connected = false
+		StateHandler.change_state(NetCodes.States.TITLE)
 
 func _cl_sync_roster(server_info):
 	BlockingOverlay.hide()
+	server_id = server_info.get("server_id", 1)
 	StateHandler.on_connected_to_server(server_info)
 	stop_discovery()
 

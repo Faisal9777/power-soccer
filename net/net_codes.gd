@@ -43,6 +43,11 @@ enum States {
 	SCOREBOARD = 3
 }
 
+enum ResponseType{
+	NEW_SERVER = 0,
+	REJOIN = 1,
+	REJECTED = 2
+}
 
 class Rpc:
 	const INPUT_STREAM := "receive_network_input_dictionary"

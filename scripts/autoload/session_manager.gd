@@ -45,15 +45,14 @@ func close_session() -> void:
 func change_state(state_info: int):
 	StateHandler.change_state(state_info)
 
-func send_data_id(target_id, msg, value):
-	session_node.send_data_id(target_id, msg, value)
+func send_data_id(msg, value):
+	session_node.send_data_id(msg, value)
 
 func send_data(msg, value):
 	session_node.send_data(msg, value)
 
 func register_state(state : Node):
-	if session_node:
-		session_node.current_state = state
+	StateHandler.register_state(state)
 
 func _create_node(node_path: String, node_name : String) -> Node:
 	var root = get_tree().root

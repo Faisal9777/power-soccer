@@ -1014,7 +1014,7 @@ func _send_local_input() -> void:
 					print("PLAYER: got ability_action1 (server=", multiplayer.is_server(), ")")
 
 	else:
-		SessionManager.send_data_id(1, NetCodes.Msg.DISCRETE_INPUTS, d)
+		StateHandler.send_data_id(NetCodes.Msg.DISCRETE_INPUTS, d)
 
 @rpc("any_peer")
 func _rpc_client_input(from_id: int, d: Dictionary) -> void:

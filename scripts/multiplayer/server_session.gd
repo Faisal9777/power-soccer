@@ -27,6 +27,9 @@ const server_phase = {
 	ERROR = "error"
 }
 
+func get_session_id() -> int:
+	return multiplayer.get_unique_id()
+
 func set_current_scene(scene : String):
 	print("set current scene is called")
 	#current_scene = scene
@@ -63,18 +66,13 @@ func handle_data(msg, data):
 	if state == NetCodes.States.SESSION:
 		if msg == NetCodes.Msg.REGISTER_PEER:
 			_srv_register_player(data)
-	elif not state == current_scene:
-		return
 	else:
-		if current_state:
-			current_state.handle_data(msg, data)
+		StateHandler.handle_data(msg, data, state)
 
 func send_data_id(target_id, msg, value):
-	value["state"] = current_scene
 	sync.send_data_id(target_id, msg, value)
 
 func send_data(msg, value):
-	value["state"] = current_scene
 	sync.send_data_all(msg, value)
 
 func disable_broadcast():
@@ -190,8 +188,11 @@ func _srv_register_player(payload : Dictionary):
 	GameState.roster[id] = {"name": "", "ready": false, "is_active" : true,
 	"user_id" : user_id}
 	GameState.roster[id]["name"] = payload.get('name', "Unknown")
+	var temp_server_info = server_info
+	temp_server_info["server_id"] = multiplayer.get_unique_id()
+	temp_server_info["state"] = NetCodes.States.SESSION
 	#var server_info := {"roster":GameState.roster, "scene": C.LOBBY, "state" : NetCodes.States.SESSION}
-	sync.send_data_id(id, NetCodes.Msg.REGISTRATION_COMPLETE, server_info)
+	sync.send_data_id(id, NetCodes.Msg.REGISTRATION_COMPLETE, temp_server_info)
 	TaskScheduler.schedule(60, _broadcast_states)
 
 

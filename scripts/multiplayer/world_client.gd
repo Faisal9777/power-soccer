@@ -86,7 +86,7 @@ func register_player(peer_id: int, player: Node) -> void:
 	_players[peer_id] = player
 
 func submit_input(input):
-	_send_network_id(server_peer_id, _my_id, NetCodes.Msg.INPUTS, input)
+	_send_network_id(_my_id, NetCodes.Msg.INPUTS, input)
 
 # ---------- Snapshot receive entry points ----------
 # Your network endpoint can forward server snapshots into either of these.
@@ -197,8 +197,8 @@ func _send_network(msg, value) -> void:
 	if _can_network:
 		_network_endpoint.rpc(NetCodes.Rpc.INPUT_STREAM, msg, {})
 
-func _send_network_id(target_id, sender_id, msg, value) -> void:
+func _send_network_id(sender_id, msg, value) -> void:
 	value["id"] = sender_id
 	if _can_network:
-		SessionManager.send_data_id(target_id, msg, value)
+		StateHandler.send_data_id(msg, value)
 	

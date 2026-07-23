@@ -28,5 +28,13 @@ func handle_data(msg, data, state):
 	elif current_state:
 		current_state.handle_data(msg, data)
 
+func send_data_id(msg, value):
+	value["state"] = current_scene
+	SessionManager.send_data_id(msg, value)
+
+func send_data(msg, value):
+	value["state"] = current_scene
+	SessionManager.send_data(msg, value)
+
 func on_connected_to_server(server_info):
 	change_state(server_info.get("current_state"))

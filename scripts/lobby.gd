@@ -40,8 +40,7 @@ var ABILITY_NAME := {
 
 func handle_data(msg, data):
 	if multiplayer.is_server():
-		if msg == NetCodes.Lobby_action.READY:
-			GameState.roster[data.get("id")]["ready"] = data.get("value")
+		_handle_lobby_action(msg, data)
 
 func _get_ability_id(e: Dictionary) -> String:
 	return String(e.get("ability", "grapple"))
@@ -53,7 +52,7 @@ func _cycle_ability(cur: String) -> String:
 
 
 func _ready() -> void:
-	SessionManager.register_state(self)
+	StateHandler.register_state(self)
 	GameState.lobby_size = _team_size*2
 	# --- Build the Tree columns + per-row buttons ---
 	print("YOU ARE SEEING THE NEW UPDATEE")
@@ -366,6 +365,11 @@ func _update_start_enabled() -> void:
 
 # -------------------- Lobby flow --------------------
 
+func _handle_lobby_action(msg, data):
+	if msg == NetCodes.Lobby_action.READY:
+		GameState.roster[data.get("id")]["ready"] = data.get("value")
+
+
 func _submit_name_to_host() -> void:
 	if multiplayer.multiplayer_peer == null: return
 	print("[client] sending name to host…")
@@ -375,8 +379,11 @@ func _on_ready_toggle() -> void:
 	
 	var new_ready = !bool(GameState.roster[multiplayer.get_unique_id()].get("ready"))
 	ready_btn.text = "Unready" if new_ready else "Ready"
-	SessionManager.session_node.toggle_scene_action(NetCodes.States.LOBBY, NetCodes.Lobby_action.READY, 
-	new_ready)
+	var action_val = {"id":SessionManager.session_node.get_session_id(), "value" : new_ready}
+	if multiplayer.is_server():
+		_handle_lobby_action(NetCodes.Lobby_action.READY, action_val)
+	else:
+		StateHandler.send_data_id(NetCodes.Lobby_action.READY, action_val)
 	_refresh_ui()
 	_update_start_enabled()
 

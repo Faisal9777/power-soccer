@@ -126,7 +126,7 @@ func _broadcast_snapshots() -> void:
 		snapshots[controller.id] = snapshot
 	
 	snapshots["game_state"] = _game.current_state
-	SessionManager.send_data(NetCodes.Msg.SNAPSHOTS,snapshots)
+	StateHandler.send_data(NetCodes.Msg.SNAPSHOTS,snapshots)
 
 func _client_discrete_input(from_id: int, d: Dictionary) -> void:
 	if d.get("grapple_toggle", false):
