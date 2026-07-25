@@ -175,25 +175,35 @@ func _on_peer_left(id):
 	if GameState.roster.has(id):
 		GameState.roster[id]["is_active"] = false
 
-func _srv_register_player(payload : Dictionary):
+func _srv_register_player(payload: Dictionary):
 	var id = payload.get("id", 0)
 	var user_id = payload.get("user_id", 0)
+	print("[register] incoming id=%s user_id=%s can_other_join=%s is_cloud_session=%s" % [id, user_id, can_other_join, is_cloud_session])
 
-	if not can_other_join or is_cloud_session and not await _can_join(user_id): 
+	var should_reject = not can_other_join or (is_cloud_session and not await _can_join(user_id))
+	print("[register] should_reject=%s" % should_reject)
+	if should_reject:
+		print("[register] REJECTING id=%s" % id)
 		Network.disconnect_peer(id)
-		sync.send_data_id(id, NetCodes.Msg.REJECT, {"message" : "Cannot join"})
+		sync.send_data_id(id, NetCodes.Msg.REJECT, {"message": "Cannot join"})
 		return
+
 	if not multiplayer.is_server():
+		print("[register] aborting, not server, id=%s" % id)
 		return
-	GameState.roster[id] = {"name": "", "ready": false, "is_active" : true,
-	"user_id" : user_id}
+
+	GameState.roster[id] = {"name": "", "ready": false, "is_active": true, "user_id": user_id}
 	GameState.roster[id]["name"] = payload.get('name', "Unknown")
-	var temp_server_info = server_info
+	print("[register] roster set id=%s entry=%s" % [id, GameState.roster[id]])
+
+	var temp_server_info = server_info.duplicate()
 	temp_server_info["server_id"] = multiplayer.get_unique_id()
 	temp_server_info["state"] = NetCodes.States.SESSION
-	#var server_info := {"roster":GameState.roster, "scene": C.LOBBY, "state" : NetCodes.States.SESSION}
+	print("[register] sending REGISTRATION_COMPLETE to id=%s payload=%s" % [id, temp_server_info])
+
 	sync.send_data_id(id, NetCodes.Msg.REGISTRATION_COMPLETE, temp_server_info)
 	TaskScheduler.schedule(60, _broadcast_states)
+	print("[register] broadcast scheduled, roster size=%s" % GameState.roster.size())
 
 
 func _notify_player_joined(user_id: int) -> bool:
