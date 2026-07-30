@@ -14,6 +14,20 @@ var session_token: String = ""
 var player_tag: String = ""
 var player_name: String = ""
 
+enum AuthMode {
+	NONE,
+	GOOGLE,
+	GUEST
+}
+
+var auth_mode := AuthMode.NONE
+
+func is_guest() -> bool:
+	return auth_mode == AuthMode.GUEST
+
+func is_google() -> bool:
+	return auth_mode == AuthMode.GOOGLE
+
 var tcp_server: TCPServer = null
 var is_listening := false
 
@@ -23,11 +37,32 @@ func _ready() -> void:
 	# Add a helper HTTPRequest node
 	http_client_node = HTTPRequest.new()
 	add_child(http_client_node)
-	load_session_token()
-
+	if load_session_token():
+		auth_status_changed.emit("Checking saved session...")
+		verify_session_token(session_token)
 # ==========================================
 # PUBLIC API
 # ==========================================
+
+func login_as_guest() -> void:
+	auth_mode = AuthMode.GUEST
+	
+	var rand_num = randi() % 100000
+	player_name = "Guest" + str(rand_num)
+	player_id = 0
+	session_token = ""
+	player_tag = ""
+	
+	GameState.player_name = player_name
+	Settings.set_player_name_and_save(player_name)
+	
+	auth_status_changed.emit("Playing as Guest")
+	auth_completed.emit(true, {
+		"session_token": session_token,
+		"player_id": player_id,
+		"player_tag": player_tag,
+		"player_name": player_name
+	})
 
 # Starts the sign-in flow (or validates saved session)
 func login() -> void:
@@ -97,6 +132,7 @@ func logout() -> void:
 	player_id = 0
 	player_tag = ""
 	player_name = ""
+	auth_mode = AuthMode.NONE
 
 	auth_completed.emit(false, {})
 # ==========================================
@@ -249,6 +285,7 @@ func _on_exchange_response(result: int, response_code: int, headers: PackedStrin
 			player_id = data["player_id"]
 			player_tag = data["player_tag"]
 			player_name = data.get("player_name", "Player")
+			auth_mode = AuthMode.GOOGLE
 			
 			save_session_token()
 			
@@ -292,6 +329,7 @@ func _on_verify_response(result: int, response_code: int, headers: PackedStringA
 			player_id = data["player_id"]
 			player_tag = data["player_tag"]
 			player_name = data.get("player_name", "Player")
+			auth_mode = AuthMode.GOOGLE
 			auth_status_changed.emit("Session active: %s" % player_name)
 			auth_completed.emit(true, {
 				"session_token": session_token,
@@ -304,6 +342,8 @@ func _on_verify_response(result: int, response_code: int, headers: PackedStringA
 	# Clear session if invalid/expired
 	logout()
 func save_session_token() -> void:
+	if auth_mode != AuthMode.GOOGLE:
+		return
 	if session_token.is_empty():
 		return
 

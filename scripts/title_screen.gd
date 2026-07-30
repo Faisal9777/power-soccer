@@ -153,6 +153,42 @@ func _start_game() -> void:
 		get_tree().change_scene_to_file(game_scene_path)
 
 func _open_multiplayer_screen() -> void:
+	if AuthManager.is_guest():
+		btn_find.disabled = false
+		btn_find.text = "Find Server"
+		btn_create.disabled = true
+		btn_create.text = "Create Cloud Server 🔒"
+		
+		var vbox = btn_find.get_parent()
+		var warning_label = vbox.get_node_or_null("GuestWarningLabel")
+		if warning_label == null:
+			warning_label = Label.new()
+			warning_label.name = "GuestWarningLabel"
+			warning_label.text = "Cloud multiplayer requires Google Sign-In."
+			warning_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			warning_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			warning_label.add_theme_color_override("font_color", Color(0.8, 0.4, 0.4))
+			vbox.add_child(warning_label)
+			
+			var upgrade_btn = Button.new()
+			upgrade_btn.name = "GuestUpgradeBtn"
+			upgrade_btn.text = "Sign in with Google"
+			upgrade_btn.pressed.connect(func():
+				popup.hide()
+				_setup_login_flow()
+			)
+			vbox.add_child(upgrade_btn)
+	else:
+		btn_find.disabled = false
+		btn_find.text = "Find Server"
+		btn_create.disabled = false
+		btn_create.text = "Create Server"
+		var vbox = btn_find.get_parent()
+		var warning_label = vbox.get_node_or_null("GuestWarningLabel")
+		if warning_label: warning_label.queue_free()
+		var upgrade_btn = vbox.get_node_or_null("GuestUpgradeBtn")
+		if upgrade_btn: upgrade_btn.queue_free()
+
 	#popup.popup_centered(Vector2i(460, 300))
 	popup.show()
 	await get_tree().process_frame
@@ -571,6 +607,10 @@ var _login_status_label: Label = null
 var _login_btn: Button = null
 
 func _setup_login_flow() -> void:
+	if _login_ui != null and is_instance_valid(_login_ui):
+		_login_ui.queue_free()
+		_login_ui = null
+		
 	# Hide main UI
 	$CenterContainer.visible = false
 	
@@ -622,11 +662,34 @@ func _setup_login_flow() -> void:
 	_login_btn = Button.new()
 	_login_btn.text = "Sign in with Google"
 	_login_btn.custom_minimum_size = Vector2(250, 50)
+	vbox.add_child(_login_btn)
+	
+	var separator = HSeparator.new()
+	separator.custom_minimum_size = Vector2(0, 20)
+	vbox.add_child(separator)
+	
+	var guest_btn = Button.new()
+	guest_btn.text = "Play as Guest"
+	guest_btn.custom_minimum_size = Vector2(250, 50)
+	vbox.add_child(guest_btn)
+	
+	var guest_desc = Label.new()
+	guest_desc.text = "Guests can only join or host LAN matches. Cloud multiplayer requires a Google account."
+	guest_desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	guest_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	guest_desc.add_theme_font_size_override("font_size", 14)
+	vbox.add_child(guest_desc)
+	
 	_login_btn.pressed.connect(func():
 		_login_btn.disabled = true
+		guest_btn.disabled = true
 		AuthManager.login()
 	)
-	vbox.add_child(_login_btn)
+	guest_btn.pressed.connect(func():
+		_login_btn.disabled = true
+		guest_btn.disabled = true
+		AuthManager.login_as_guest()
+	)
 	
 	_login_status_label = Label.new()
 	_login_status_label.text = ""
