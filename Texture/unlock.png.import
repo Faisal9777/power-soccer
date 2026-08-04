@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://b1dt83psdep5v"
-path="res://.godot/imported/Jump_90x90_big.png-e9ebc1007a8d950e303498ccea3ffd88.ctex"
+uid="uid://dbfyi6bryu6f3"
+path="res://.godot/imported/unlock.png-58c5fd18e295da040c0b922d078ee517.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://Texture/Jump_90x90_big.png"
-dest_files=["res://.godot/imported/Jump_90x90_big.png-e9ebc1007a8d950e303498ccea3ffd88.ctex"]
+source_file="res://Texture/unlock.png"
+dest_files=["res://.godot/imported/unlock.png-58c5fd18e295da040c0b922d078ee517.ctex"]
 
 [params]
 

@@ -5,7 +5,8 @@ var _mouse_delta := Vector2.ZERO
 
 func _input(event):
 	if event is InputEventMouseMotion:
-		_mouse_delta += event.relative
+		if not GameState.is_paused:
+			_mouse_delta += event.relative
 
 func get_mouse_delta() -> Vector2:
 	var m_delta = _mouse_delta

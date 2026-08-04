@@ -10,6 +10,8 @@ extends Node
 @export var player_scene: PackedScene
 @export var bot_player_scene: PackedScene
 
+var _local_controller: LocalController
+
 var _def_tex_ability: Texture2D
 var _def_tex_a1: Texture2D
 var _def_tex_a2: Texture2D
@@ -176,7 +178,8 @@ func _ready() -> void:
 		_initialize_multiplayer("NetServer", net)
 		net.start_init(_players, _scoreboard_instance, ingame, replication_manager, blue_spawns, red_spawns, ball_spawn,
 		ball_scene, GameState.match_len_sec, GameState.goal_limit, GameState.roster, get_node(joystick_path))
-		
+		_local_controller = net.get_local_controller()
+
 
 
 	# 1) Connect to the Network autoload signals (do it here so it works even if not wired in editor)
@@ -329,13 +332,17 @@ func _close_scoreboard() -> void:
 
 func _setup_pause_dialog() -> void:
 	# Root overlay that still works while paused
+	var cl = CanvasLayer.new()
+	cl.layer = 120
+	add_child(cl)
+	
 	_pause_ui = Control.new()
 	_pause_ui.name = "PauseOverlay"
 	_pause_ui.mouse_filter = Control.MOUSE_FILTER_STOP
-	_pause_ui.process_mode = Node.PROCESS_MODE_WHEN_PAUSED
+	_pause_ui.process_mode = Node.PROCESS_MODE_ALWAYS
 	_pause_ui.visible = false
 	_pause_ui.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(_pause_ui)  # or add to your CanvasLayer
+	cl.add_child(_pause_ui)  # Add to the new CanvasLayer
 
 	# Dim background
 	var dim := ColorRect.new()
@@ -408,22 +415,26 @@ func _toggle_pause_menu() -> void:
 	if _pause_ui and _pause_ui.visible:
 		_on_pause_resume()
 		return
-	get_tree().paused = true
+	_pause_ui.visible = true
 	if !OS.has_feature("mobile"):
 		Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
-	_pause_ui.visible = true
+	GameState.is_paused = true
+	if _local_controller:
+		_local_controller.set_paused(true)
 	if _btn_resume:
 		_btn_resume.grab_focus()  # keyboard/controller friendly
 
 func _on_pause_resume() -> void:
 	if _pause_ui:
 		_pause_ui.visible = false
-	get_tree().paused = false
+	GameState.is_paused = false
+	if _local_controller:
+		_local_controller.set_paused(false)
 	if !OS.has_feature("mobile"):  # don’t hide mouse on touch devices
 		Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+
 func _on_pause_exit() -> void:
-	if get_tree().paused:
-		get_tree().paused = false
+
 	if !OS.has_feature("mobile"):
 		Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 	# Quit or go to title:
@@ -437,7 +448,10 @@ func _open_graphics_settings() -> void:
 
 	if _gfx_ui == null:
 		_gfx_ui = _create_graphics_settings_ui()
-		add_child(_gfx_ui)
+		var cl = CanvasLayer.new()
+		cl.layer = 121
+		add_child(cl)
+		cl.add_child(_gfx_ui)
 
 	_gfx_ui.visible = true
 
@@ -447,7 +461,7 @@ func _create_graphics_settings_ui() -> Control:
 	root.name = "GraphicsSettings"
 	root.visible = false
 	root.mouse_filter = Control.MOUSE_FILTER_STOP
-	root.process_mode = Node.PROCESS_MODE_WHEN_PAUSED
+	root.process_mode = Node.PROCESS_MODE_ALWAYS
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
 
 	# background dim
@@ -695,6 +709,9 @@ func _physics_process(delta: float) -> void:
 func _shoot_action() -> String:
 	return "shoot_touch" if is_mobile else "shoot"
 func _update_inputs() -> void:
+	if GameState.is_paused:
+		_reset_inputs()
+		return
 	var gm := false
 	if Input.is_action_just_pressed("jump") and not jump_edge_latched:
 		jump_edge_latched = true
@@ -933,6 +950,17 @@ func _spawn_players() -> void:
 # -------------------------
 
 func _gather_input() -> Dictionary:
+	if GameState.is_paused:
+		return {
+			"mvx": 0.0, "mvz": 0.0, "sprint": false, "jump_pressed": false,
+			"tackle_pressed": false, "dribble": false, "stop_ball": false,
+			"shoot_down": false, "shoot_up": false, "rmb": false,
+			"facing": Dictionary(), "aim_position": null, "cam_yaw": 0.0,
+			"assist_pass_pressed": false, "latch_toggle": false,
+			"ability_toggle": false, "ability_action1": false,
+			"ability_action2": false, "ability_action3": false
+		}
+	
 	var mvx : float = 0.0
 	var mvz : float = 0.0
 	if is_mobile and is_instance_valid(joystick):

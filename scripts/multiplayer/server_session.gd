@@ -7,6 +7,10 @@ signal server_found(info)
 
 var _transport_method : IAnnounceTransport
 var current_scene := 1 
+var server_password: int  = 0
+
+var peer_identities := {}
+
 var current_state : Node
 var scene_data = {}
 var scene_after_server = ""
@@ -50,9 +54,14 @@ func setup(transport_method, id, port, is_remote_session):
 	server_info = {"id" : id, "port" : port}
 	is_cloud_session = is_remote_session
 
-func host(server_name, scene):
+func host(server_name, is_public, scene):
 	scene_after_server = scene
 	server_info["name"] = server_name
+	server_info["is_lan"] = true
+
+	server_info["is_public"] = is_public
+	server_password = randi_range(100000, 999999)
+
 	Network.peer_left.connect(_on_peer_left)
 	Network.server_started.connect(_on_hosting_started)
 	Network.host(server_info)
@@ -66,6 +75,10 @@ func handle_data(msg, data):
 	if state == NetCodes.States.SESSION:
 		if msg == NetCodes.Msg.REGISTER_PEER:
 			_srv_register_player(data)
+			
+		if msg == NetCodes.Msg.AUTH_REQUEST:
+			_authenticate_password(data)
+			
 	else:
 		StateHandler.handle_data(msg, data, state)
 
@@ -177,6 +190,11 @@ func _on_peer_left(id):
 
 func _srv_register_player(payload: Dictionary):
 	var id = payload.get("id", 0)
+	var player_info = peer_identities.get(id, {})
+	var actual_name = player_info.get("player_name", payload.get('name', "Unknown"))
+	var tag = player_info.get("player_tag", "")
+
+	
 	var user_id = payload.get("user_id", 0)
 	print("[register] incoming id=%s user_id=%s can_other_join=%s is_cloud_session=%s" % [id, user_id, can_other_join, is_cloud_session])
 
@@ -204,6 +222,74 @@ func _srv_register_player(payload: Dictionary):
 	sync.send_data_id(id, NetCodes.Msg.REGISTRATION_COMPLETE, temp_server_info)
 	TaskScheduler.schedule(60, _broadcast_states)
 	print("[register] broadcast scheduled, roster size=%s" % GameState.roster.size())
+
+func _authenticate_password(payload):
+	var id = payload.get("id", 0)
+	var password = payload.get("password", "")
+	var session_token = payload.get("session_token", "")
+	
+	# 1. Password check if lobby is private (server_password != 0)
+	if server_password != 0:
+		var pass_int = 0
+		if password is String:
+			pass_int = password.to_int()
+		else:
+			pass_int = int(password)
+		if pass_int != server_password:
+			
+			sync.send_data_id(id, NetCodes.Msg.AUTH_FAILED, {})
+			return
+		elif server_info["is_lan"] == true:
+			sync.send_data_id(id, NetCodes.Msg.AUTH_OK, {})
+
+			
+	if server_info["is_lan"] != true :
+		# 2. Session validation via Node.js
+		var player_info = await _verify_token_with_backend(session_token)
+		if player_info.is_empty():
+			sync.send_data_id(id, NetCodes.Msg.AUTH_FAILED, {})
+			return
+			
+		peer_identities[id] = player_info
+		sync.send_data_id(id, NetCodes.Msg.AUTH_OK, {})
+
+func _verify_token_with_backend(token: String) -> Dictionary:
+	if token == "":
+		return {}
+		
+	Config.load_config()
+	var backend_url = Config.get_value("cloud_server_endpoint", "http://127.0.0.1:3000")
+	var verify_url = backend_url + "/api/auth/verify"
+	
+	var http_client = HTTPRequest.new()
+	add_child(http_client)
+	
+	var headers = [
+		"Content-Type: application/json",
+		"Authorization: Bearer " + token
+	]
+	
+	var err = http_client.request(verify_url, headers, HTTPClient.METHOD_GET)
+	if err != OK:
+		http_client.queue_free()
+		return {}
+		
+	var response = await http_client.request_completed
+	http_client.queue_free()
+	
+	var response_code = response[1]
+	var body = response[3]
+	
+	if response_code == 200:
+		var json = JSON.new()
+		if json.parse(body.get_string_from_utf8()) == OK:
+			var data = json.data
+			if data.has("player_tag"):
+				return {
+					"player_tag": data["player_tag"],
+					"player_name": data.get("player_name", "Player")
+				}
+	return {}
 
 
 func _notify_player_joined(user_id: int) -> bool:

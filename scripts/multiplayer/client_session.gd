@@ -1,6 +1,7 @@
 extends Node
 class_name ClientSession
 
+signal auth_failed
 signal joined_server
 signal server_found(info)
 
@@ -16,6 +17,7 @@ var sync : Node
 var ENDPOINTS = preload("res://scripts/shared/endpoints.gd")
 const C = preload("res://scripts/shared/scene.gd")
 const REQUEST_TIMEOUT_MS = 10.0  # seconds
+var client_password
 
 var _timeout_timer: SceneTreeTimer = null
 
@@ -39,9 +41,11 @@ func stop_discovery():
 func start_discovery():
 	if is_connected:
 		return
-	cloud_discovery.lobbies_received.connect(_on_lobbies_found)
-	cloud_discovery.discovery_failed.connect(_on_discovery_failed)
-	cloud_discovery.start_search(2.0)
+
+	if not AuthManager.is_guest():
+		cloud_discovery.lobbies_received.connect(_on_lobbies_found)
+		cloud_discovery.discovery_failed.connect(_on_discovery_failed)
+		cloud_discovery.start_search(2.0)
 	Network.server_found.connect(_on_server_found)
 	Network.start_discovery()
 
@@ -74,14 +78,24 @@ func host_cloud_server():
 	_timeout_timer = get_tree().create_timer(REQUEST_TIMEOUT_MS)
 	_timeout_timer.timeout.connect(_on_request_timeout)
 
-func join(server_info):
+func join(server_info, password):
 	var ip = server_info["ip"]
 	var port = server_info["port"]
-	
-	Network.joined_server.connect(_on_joined_server)
+	client_password = password
+	if server_info.get("is_public", true):
+		Network.joined_server.connect(_on_joined_server)
+	else:
+		Network.joined_server.connect(_on_joined_private_server)
+
 	Network.join(ip, port)
 
 func handle_data(msg, data):
+	if msg == NetCodes.Msg.AUTH_OK:
+		var payload := {"name" : Settings.player_name, "id" : multiplayer.get_unique_id(),"state" : NetCodes.States.SESSION, "user_id" : GameState.user_id}
+		sync.send_data_id(1, NetCodes.Msg.REGISTER_PEER, payload)
+	if msg == NetCodes.Msg.AUTH_FAILED:
+		auth_failed.emit()
+	
 	var state = data.get("state")
 	if state == NetCodes.States.SESSION:
 		if msg == NetCodes.Msg.STATE_DATA:
@@ -107,7 +121,8 @@ func _on_request_completed(result, response_code, headers, body):
 	if json.get("response") == NetCodes.ResponseType.REJOIN:
 		BlockingOverlay.show_overlay("Rejoining previous game")
 
-	join(json)
+	join(json,"")
+
 
 func _on_request_timeout() -> void:
 	BlockingOverlay.hide_overlay()
@@ -135,6 +150,21 @@ func _on_joined_server(s):
 	sync = s
 	sync.send_data_id(1, NetCodes.Msg.REGISTER_PEER, payload)
 	
+func _on_joined_private_server(s):
+	Network.connection_failed.connect(_on_connection_failed)
+	Network.server_disconnected.connect(_on_server_disconnected)
+	is_connected = true
+	sync = s
+	
+	var payload := {
+		"id" : multiplayer.get_unique_id(),
+		"password": client_password,
+		"session_token": AuthManager.session_token,
+		"state" : NetCodes.States.SESSION, 
+		"user_id" : GameState.user_id
+	}
+
+	sync.send_data_id(1, NetCodes.Msg.AUTH_REQUEST, payload)
 
 func _on_server_disconnected() -> void:
 	_disconnect()
@@ -167,3 +197,7 @@ func _disconnect_from_events():
 		Network.server_disconnected.disconnect(_on_server_disconnected)
 func _exit_tree():
 	_disconnect_from_events()
+func close_connection():
+	is_connected = false
+
+	Network.close_connection()

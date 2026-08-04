@@ -1,0 +1,416 @@
+extends Node
+
+signal auth_started
+signal auth_completed(success: bool, player_info: Dictionary)
+signal auth_status_changed(message: String)
+
+var authenticated := false
+const LOCAL_PORT := 8080
+const SECURE_KEY := "SuperSecretEncryptionKey123!" # Ideally derived or user-unique, used for FileAccess encryption
+const SESSION_FILE := "user://session.enc"
+const GUEST_ID_FILE := "user://guest_id.dat"
+var google_plugin = null
+
+var player_id: int = 0
+var session_token: String = ""
+var player_tag: String = ""
+var player_name: String = ""
+var guest_id: String = ""
+
+enum AuthMode {
+	NONE,
+	GOOGLE,
+	GUEST
+}
+
+var auth_mode := AuthMode.NONE
+
+func is_guest() -> bool:
+	return auth_mode == AuthMode.GUEST
+
+func is_google() -> bool:
+	return auth_mode == AuthMode.GOOGLE
+
+var tcp_server: TCPServer = null
+var is_listening := false
+
+var http_client_node: HTTPRequest = null
+
+func _ready() -> void:
+	# Add a helper HTTPRequest node
+	http_client_node = HTTPRequest.new()
+	add_child(http_client_node)
+	if load_session_token():
+		auth_status_changed.emit("Checking saved session...")
+		verify_session_token(session_token)
+# ==========================================
+# PUBLIC API
+# ==========================================
+
+func login_as_guest() -> void:
+	auth_mode = AuthMode.GUEST
+	
+	var rand_num = randi() % 100000
+	player_name = "Guest" + str(rand_num)
+	player_id = 0
+	session_token = ""
+	player_tag = ""
+	guest_id = _get_or_create_guest_id()
+	
+	GameState.player_name = player_name
+	Settings.set_player_name_and_save(player_name)
+	
+	auth_status_changed.emit("Playing as Guest")
+	auth_completed.emit(true, {
+		"session_token": session_token,
+		"player_id": player_id,
+		"player_tag": player_tag,
+		"player_name": player_name,
+		"guest_id": guest_id
+	})
+
+# Starts the sign-in flow (or validates saved session)
+func login() -> void:
+
+	if OS.has_feature("android") or OS.has_feature("ios"):
+		mobile_login()
+	else:
+		start_oauth_flow()
+
+func mobile_login() -> void:
+	auth_status_changed.emit("Starting Google Sign-In...")
+	auth_started.emit()
+
+	if not Engine.has_singleton("GoogleSignInPlugin"):
+		auth_status_changed.emit("Google Sign-In plugin not found.")
+		auth_completed.emit(false, {})
+		return
+
+	google_plugin = Engine.get_singleton("GoogleSignInPlugin")
+
+	# Connect only once
+	if not google_plugin.sign_in_completed.is_connected(_on_google_sign_in_completed):
+		google_plugin.sign_in_completed.connect(_on_google_sign_in_completed)
+
+	if not google_plugin.sign_in_failed.is_connected(_on_google_sign_in_failed):
+		google_plugin.sign_in_failed.connect(_on_google_sign_in_failed)
+
+	google_plugin.sign_in()
+
+func _on_google_sign_in_completed(id_token: String) -> void:
+	auth_status_changed.emit("Google Sign-In successful.")
+
+	exchange_mobile_token(id_token)
+
+
+func _on_google_sign_in_failed(error: String) -> void:
+	auth_status_changed.emit(error)
+	auth_completed.emit(false, {})
+
+
+func exchange_mobile_token(id_token: String) -> void:
+	auth_status_changed.emit("Verifying account...")
+
+	Config.load_config()
+	var backend_url = Config.get_value("cloud_server_endpoint", "http://127.0.0.1:3000")
+	var url = backend_url + "/api/auth/login-mobile"
+
+	var headers = ["Content-Type: application/json"]
+
+	var body = JSON.stringify({
+		"id_token": id_token
+	})
+
+	var err = http_client_node.request(url, headers, HTTPClient.METHOD_POST, body)
+
+	if err != OK:
+		auth_status_changed.emit("Network error")
+		auth_completed.emit(false, {})
+		return
+
+	var response = await http_client_node.request_completed
+	_on_exchange_response(response[0], response[1], response[2], response[3])
+
+# Logs out and clears session
+func logout() -> void:
+	clear_session_token()
+	player_id = 0
+	player_tag = ""
+	player_name = ""
+	guest_id = ""
+	auth_mode = AuthMode.NONE
+
+	auth_completed.emit(false, {})
+# ==========================================
+# OAUTH2 LOOPBACK (PC FLOW)
+# ==========================================
+
+func start_oauth_flow() -> void:
+	auth_status_changed.emit("Starting Google Sign-In...")
+	auth_started.emit()
+	
+	if OS.has_feature("mobile"):
+		# Mobile native/fallback placeholder logic:
+		# On mobile, we will later hook into native plugins or custom intent/URI schemes.
+		# For now, we will fallback to standard loopback or notify player.
+		auth_status_changed.emit("Mobile login requires platform plugin integration.")
+		return
+		
+	# Start TCP server to listen for redirect
+	tcp_server = TCPServer.new()
+	var err = tcp_server.listen(LOCAL_PORT, "127.0.0.1")
+	if err != OK:
+		push_error("Failed to start local TCP server on port %d: %d" % [LOCAL_PORT, err])
+		auth_status_changed.emit("Auth failed: Local port %d in use." % LOCAL_PORT)
+		auth_completed.emit(false, {})
+		return
+		
+	is_listening = true
+	set_process(true)
+	
+	# Get Client ID and Endpoints from Config
+	Config.load_config()
+	var client_id = Config.get_value("google_client_id", "")
+	if client_id == "":
+		push_error("google_client_id not set in config!")
+		auth_status_changed.emit("Configuration error.")
+		auth_completed.emit(false, {})
+		return
+		
+	# Build Google Auth URI
+	# For installed desktop apps, standard Google flow with loopback redirect
+	var redirect_uri = "http://127.0.0.1:%d" % LOCAL_PORT
+	var scope = "openid profile email"
+	var auth_url = "https://accounts.google.com/o/oauth2/v2/auth" + \
+		"?client_id=" + client_id.uri_encode() + \
+		"&redirect_uri=" + redirect_uri.uri_encode() + \
+		"&response_type=code" + \
+		"&scope=" + scope.uri_encode()
+		
+	auth_status_changed.emit("Opening web browser...")
+	OS.shell_open(auth_url)
+
+func _process(delta: float) -> void:
+	if not is_listening or tcp_server == null:
+		set_process(false)
+		return
+		
+	if tcp_server.is_connection_available():
+		var peer: StreamPeerTCP = tcp_server.take_connection()
+		_handle_redirect_connection(peer)
+
+func _handle_redirect_connection(peer: StreamPeerTCP) -> void:
+	# Give it a brief moment to receive data
+	await get_tree().create_timer(0.2).timeout
+	
+	var bytes = peer.get_available_bytes()
+	if bytes <= 0:
+		peer.disconnect_from_host()
+		return
+		
+	var request_str = peer.get_string(bytes)
+	var code = _extract_code_from_http_request(request_str)
+	
+	# Send a simple response to the browser
+	var response = "HTTP/1.1 200 OK\r\n" + \
+		"Content-Type: text/html\r\n" + \
+		"Connection: close\r\n\r\n" + \
+		"<html><body><h3>Authentication successful! You can close this window and return to the game.</h3></body></html>"
+	peer.put_data(response.to_utf8_buffer())
+	peer.disconnect_from_host()
+	
+	# Stop listening
+	is_listening = false
+	tcp_server.stop()
+	tcp_server = null
+	set_process(false)
+	
+	if code != "":
+		auth_status_changed.emit("Exchanging auth code with backend...")
+		exchange_code_for_session(code)
+	else:
+		auth_status_changed.emit("Auth failed: Code not received.")
+		auth_completed.emit(false, {})
+
+func _extract_code_from_http_request(request: String) -> String:
+	# Simple HTTP parser
+	# Example GET line: GET /?code=4/0AfgeXv... HTTP/1.1
+	var lines = request.split("\n")
+	if lines.size() > 0:
+		var get_line = lines[0]
+		if "GET " in get_line:
+			var parts = get_line.split(" ")
+			if parts.size() > 1:
+				var path = parts[1]
+				if "?" in path:
+					var query_params = path.split("?")[1].split("&")
+					for param in query_params:
+						var pair = param.split("=")
+						if pair.size() == 2 and pair[0] == "code":
+							return pair[1].uri_decode()
+	return ""
+
+# ==========================================
+# BACKEND COMMUNICATION
+# ==========================================
+
+func exchange_code_for_session(code: String) -> void:
+	Config.load_config()
+	var backend_url = Config.get_value("cloud_server_endpoint", "http://127.0.0.1:3000")
+	var login_endpoint = backend_url + "/api/auth/login"
+	
+	var headers = ["Content-Type: application/json"]
+	var body = JSON.stringify({
+		"code": code,
+		"platform": "pc",
+		"redirect_uri": "http://127.0.0.1:%d" % LOCAL_PORT
+	})
+	print("Backend URL = ", backend_url)
+	print("Login endpoint = ", login_endpoint)
+	var err = http_client_node.request(login_endpoint, headers, HTTPClient.METHOD_POST, body)
+	if err != OK:
+		auth_status_changed.emit("Connection to server failed.")
+		auth_completed.emit(false, {})
+		return
+		
+	var response = await http_client_node.request_completed
+	_on_exchange_response(response[0], response[1], response[2], response[3])
+
+func _on_exchange_response(result: int, response_code: int, headers: PackedStringArray, body: PackedByteArray) -> void:
+	if response_code != 200:
+		auth_status_changed.emit("Server login failed (Code %d)." % response_code)
+		auth_completed.emit(false, {})
+		return
+		
+	var response_text = body.get_string_from_utf8()
+	var json = JSON.new()
+	if json.parse(response_text) == OK:
+		var data = json.data
+		if data.has("session_token") and data.has("player_id"):
+			session_token = data["session_token"]
+			player_id = data["player_id"]
+			player_tag = data["player_tag"]
+			player_name = data.get("player_name", "Player")
+			auth_mode = AuthMode.GOOGLE
+			
+			save_session_token()
+			
+			auth_status_changed.emit("Welcome, %s!" % player_name)
+			auth_completed.emit(true, {
+				"session_token": session_token,
+				"player_id": player_id,
+				"player_tag": player_tag,
+				"player_name": player_name
+			})
+			return
+			
+	auth_status_changed.emit("Failed to parse server response.")
+	auth_completed.emit(false, {})
+
+func verify_session_token(token: String) -> void:
+	Config.load_config()
+	var backend_url = Config.get_value("cloud_server_endpoint", "http://127.0.0.1:3000")
+	var verify_endpoint = backend_url + "/api/auth/verify"
+	
+	var headers = [
+		"Content-Type: application/json",
+		"Authorization: Bearer " + token
+	]
+	
+	var err = http_client_node.request(verify_endpoint, headers, HTTPClient.METHOD_GET)
+	if err != OK:
+		auth_status_changed.emit("Backend verification failed.")
+		auth_completed.emit(false, {})
+		return
+		
+	var response = await http_client_node.request_completed
+	_on_verify_response(response[0], response[1], response[2], response[3])
+
+func _on_verify_response(result: int, response_code: int, headers: PackedStringArray, body: PackedByteArray) -> void:
+	if response_code == 200:
+		var response_text = body.get_string_from_utf8()
+		var json = JSON.new()
+		if json.parse(response_text) == OK:
+			var data = json.data
+			player_id = data["player_id"]
+			player_tag = data["player_tag"]
+			player_name = data.get("player_name", "Player")
+			auth_mode = AuthMode.GOOGLE
+			auth_status_changed.emit("Session active: %s" % player_name)
+			auth_completed.emit(true, {
+				"session_token": session_token,
+				"player_id": player_id,
+				"player_tag": player_tag,
+				"player_name": player_name
+			})
+			return
+			
+	# Clear session if invalid/expired
+	logout()
+func save_session_token() -> void:
+	if auth_mode != AuthMode.GOOGLE:
+		return
+	if session_token.is_empty():
+		return
+
+	var file := FileAccess.open_encrypted_with_pass(
+		SESSION_FILE,
+		FileAccess.WRITE,
+		SECURE_KEY
+	)
+
+	if file:
+		file.store_string(session_token)
+		file.close()
+
+
+func load_session_token() -> bool:
+	if not FileAccess.file_exists(SESSION_FILE):
+		return false
+
+	var file := FileAccess.open_encrypted_with_pass(
+		SESSION_FILE,
+		FileAccess.READ,
+		SECURE_KEY
+	)
+
+	if file == null:
+		return false
+
+	session_token = file.get_as_text().strip_edges()
+	file.close()
+
+	return not session_token.is_empty()
+
+
+func clear_session_token() -> void:
+	session_token = ""
+
+	if FileAccess.file_exists(SESSION_FILE):
+		DirAccess.remove_absolute(SESSION_FILE)
+
+func _get_or_create_guest_id() -> String:
+	if guest_id != "":
+		return guest_id
+	
+	if FileAccess.file_exists(GUEST_ID_FILE):
+		var file := FileAccess.open(GUEST_ID_FILE, FileAccess.READ)
+		if file:
+			var saved_id = file.get_as_text().strip_edges()
+			file.close()
+			if saved_id.begins_with("guest_"):
+				guest_id = saved_id
+				return guest_id
+				
+	var rand_hex = Crypto.new().generate_random_bytes(8).hex_encode()
+	guest_id = "guest_" + rand_hex
+	
+	var file := FileAccess.open(GUEST_ID_FILE, FileAccess.WRITE)
+	if file:
+		file.store_string(guest_id)
+		file.close()
+		
+	return guest_id
+	
+func is_authenticated() -> bool:
+	return authenticated

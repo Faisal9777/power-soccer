@@ -22,6 +22,10 @@ extends Control
 const C = preload("res://scripts/shared/scene.gd")
 const SCRIPT_PATHS = preload("res://scripts/shared/script_path.gd")
 var _gfx_ui: Control = null
+var _login_ui: Control = null
+var _login_status_label: Label = null
+var _login_btn: Button = null
+var _is_public : bool 
 
 const LOBBY_SCENE := "res://scenes/Lobby.tscn"
 
@@ -43,10 +47,9 @@ func _ready() -> void:
 	# -------- normal client flow below --------
 	# (show title screen buttons, etc.)
 	
+	if !AuthManager.is_authenticated():
+		_setup_login_flow()
 	
-	Settings.ensure_player_name()
-	if Settings.player_name == "" or Settings.player_name.begins_with("Player_"):
-		await _prompt_for_player_name()
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 	if OS.has_feature("mobile") and quit_btn:
 		quit_btn.visible = false
@@ -167,6 +170,42 @@ func _start_game() -> void:
 		get_tree().change_scene_to_file(game_scene_path)
 
 func _open_multiplayer_screen() -> void:
+	if AuthManager.is_guest():
+		btn_find.disabled = false
+		btn_find.text = "Find Server"
+		btn_create.disabled = true
+		btn_create.text = "Create Cloud Server 🔒"
+		
+		var vbox = btn_find.get_parent()
+		var warning_label = vbox.get_node_or_null("GuestWarningLabel")
+		if warning_label == null:
+			warning_label = Label.new()
+			warning_label.name = "GuestWarningLabel"
+			warning_label.text = "Cloud multiplayer requires Google Sign-In."
+			warning_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			warning_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			warning_label.add_theme_color_override("font_color", Color(0.8, 0.4, 0.4))
+			vbox.add_child(warning_label)
+			
+			var upgrade_btn = Button.new()
+			upgrade_btn.name = "GuestUpgradeBtn"
+			upgrade_btn.text = "Sign in with Google"
+			upgrade_btn.pressed.connect(func():
+				popup.hide()
+				_setup_login_flow()
+			)
+			vbox.add_child(upgrade_btn)
+	else:
+		btn_find.disabled = false
+		btn_find.text = "Find Server"
+		btn_create.disabled = false
+		btn_create.text = "Create Server"
+		var vbox = btn_find.get_parent()
+		var warning_label = vbox.get_node_or_null("GuestWarningLabel")
+		if warning_label: warning_label.queue_free()
+		var upgrade_btn = vbox.get_node_or_null("GuestUpgradeBtn")
+		if upgrade_btn: upgrade_btn.queue_free()
+
 	#popup.popup_centered(Vector2i(460, 300))
 	popup.show()
 	await get_tree().process_frame
@@ -177,7 +216,113 @@ func _on_find_server() -> void:
 	_set_connect_ui_enabled(true)
 	get_tree().change_scene_to_file(C.SERVER_LIST)
 
-func _on_create_server() -> void:
+func _open_create_server_popup(is_lan: bool) -> void:
+	popup.hide()
+	var root := Control.new()
+	root.name = "CreateServerPopup"
+	root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(root)
+
+	# dark background
+	var dim := ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.6)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	root.add_child(dim)
+
+	# center panel
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	root.add_child(center)
+
+	var panel := Panel.new()
+	panel.custom_minimum_size = Vector2i(420, 320)
+	center.add_child(panel)
+
+	var margin := MarginContainer.new()
+	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	panel.add_child(margin)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 10)
+	margin.add_child(vbox)
+
+	# ---------------- Server Name ----------------
+	var name_label := Label.new()
+	name_label.text = "Server Name"
+	vbox.add_child(name_label)
+
+	var name_input := LineEdit.new()
+	name_input.placeholder_text = "My Server"
+	vbox.add_child(name_input)
+
+	# ---------------- Public / Private ----------------
+	var public_check := CheckBox.new()
+	public_check.text = "Public Server"
+	public_check.button_pressed = true
+	vbox.add_child(public_check)
+
+	var private_check := CheckBox.new()
+	private_check.text = "Private Server"
+	vbox.add_child(private_check)
+
+
+	# mutual exclusivity
+	public_check.toggled.connect(func(v):
+		if v:
+			private_check.button_pressed = false
+
+		else:
+			if not private_check.button_pressed:
+				public_check.button_pressed = true
+	)
+
+	private_check.toggled.connect(func(v):
+		if v:
+			public_check.button_pressed = false
+
+		else:
+
+			if not public_check.button_pressed:
+				public_check.button_pressed = true
+	)
+
+	# ---------------- Buttons ----------------
+	var btn_row := HBoxContainer.new()
+	btn_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	btn_row.add_theme_constant_override("separation", 20)
+	vbox.add_child(btn_row)
+
+	var create_btn := Button.new()
+	create_btn.text = "Create"
+	btn_row.add_child(create_btn)
+
+	var cancel_btn := Button.new()
+	cancel_btn.text = "Cancel"
+	btn_row.add_child(cancel_btn)
+
+	# ---------------- Actions ----------------
+	cancel_btn.pressed.connect(func():
+		root.queue_free()
+	)
+
+	create_btn.pressed.connect(func():
+		var server_name = name_input.text.strip_edges()
+		var is_public = public_check.button_pressed
+
+
+		if server_name == "":
+			server_name = "Server"
+
+		if is_lan:
+			_on_create_server_with_data(server_name, is_public)
+		else:
+			_on_create_cloud_server_with_data(server_name, is_public)
+
+		root.queue_free()
+	)
+
+func _on_create_server_with_data(name: String, is_public: bool) -> void:
+	print("LAN SERVER:", name, is_public)
 	print('_on_create_server')
 	# Identity
 	GameState.reset_lobby()
@@ -188,21 +333,28 @@ func _on_create_server() -> void:
 	# Start ENet server and go to lobby
 	GameState.player_name = Settings.player_name
 	GameState.id = 1
-	GameState.roster[1] = {"name": GameState.player_name, "ready": false,
-	"is_active" : true} # team optional
+	GameState.roster[1] = {"name": GameState.player_name, "ready": false, "team": GameState.Team.BLUE} # team optional
 	
 	var lan := get_lan_ip()
 	print("Hosting on UDP 24565, LAN IP =", lan)
 	# Register host in roster (peer 1) with ready=false
+	GameState.roster[1] = {"name": GameState.player_name, "ready": false}
 	var id := Crypto.new().generate_random_bytes(16).hex_encode()
 	var session_node = await SessionManager.create_lan_server_session(SCRIPT_PATHS.SERVER_SESSION, id)
-	session_node.host(GameState.player_name, "Lobby")
+	session_node.host(name, is_public, "Lobby")
 
-func _on_create_cloud_server() -> void:
+func _on_create_cloud_server_with_data(name: String, is_public: bool) -> void:
+	print("CLOUD SERVER:", name, is_public)
+	_is_public = is_public
 	var session_node = await SessionManager.create_client_session(SCRIPT_PATHS.CLIENT_SESSION)
 	session_node.host_cloud_server()
 
 
+
+func _on_create_server() -> void:
+	_open_create_server_popup(true)
+func _on_create_cloud_server() -> void:
+	_open_create_server_popup(false)
 #func _on_connect_to_ip() -> void:
 #
 	#GameState.is_host = false
@@ -468,3 +620,131 @@ func _apply_graphics_settings(fullscreen: bool, vsync: bool, quality: int, tex_q
 func _on_center_container_gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed:
 		popup.hide()
+
+func _setup_login_flow() -> void:
+	if _login_ui != null and is_instance_valid(_login_ui):
+		_login_ui.queue_free()
+		_login_ui = null
+		
+	# Hide main UI
+	$CenterContainer.visible = false
+	
+	# Create login overlay
+	_login_ui = Control.new()
+	_login_ui.name = "LoginOverlay"
+	_login_ui.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(_login_ui)
+	
+	# Dark background
+	var bg := ColorRect.new()
+	bg.color = Color(0.1, 0.1, 0.1, 0.95)
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_login_ui.add_child(bg)
+	
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_login_ui.add_child(center)
+	
+	var card := PanelContainer.new()
+	card.custom_minimum_size = Vector2(400, 250)
+	center.add_child(card)
+	
+	var margin := MarginContainer.new()
+	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	margin.add_theme_constant_override("margin_left", 20)
+	margin.add_theme_constant_override("margin_right", 20)
+	margin.add_theme_constant_override("margin_top", 20)
+	margin.add_theme_constant_override("margin_bottom", 20)
+	card.add_child(margin)
+	
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 15)
+	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	margin.add_child(vbox)
+	
+	var title := Label.new()
+	title.text = "Soccer Game"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 32)
+	vbox.add_child(title)
+	
+	var desc := Label.new()
+	desc.text = "Please sign in with Google to continue."
+	desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	vbox.add_child(desc)
+	
+	_login_btn = Button.new()
+	_login_btn.text = "Sign in with Google"
+	_login_btn.custom_minimum_size = Vector2(250, 50)
+	vbox.add_child(_login_btn)
+	
+	var separator = HSeparator.new()
+	separator.custom_minimum_size = Vector2(0, 20)
+	vbox.add_child(separator)
+	
+	var guest_btn = Button.new()
+	guest_btn.text = "Play as Guest"
+	guest_btn.custom_minimum_size = Vector2(250, 50)
+	vbox.add_child(guest_btn)
+	
+	var guest_desc = Label.new()
+	guest_desc.text = "Guests can only join or host LAN matches. Cloud multiplayer requires a Google account."
+	guest_desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	guest_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	guest_desc.add_theme_font_size_override("font_size", 14)
+	vbox.add_child(guest_desc)
+	
+	_login_btn.pressed.connect(func():
+		_login_btn.disabled = true
+		guest_btn.disabled = true
+		AuthManager.login()
+	)
+	guest_btn.pressed.connect(func():
+		_login_btn.disabled = true
+		guest_btn.disabled = true
+		AuthManager.login_as_guest()
+	)
+	
+	_login_status_label = Label.new()
+	_login_status_label.text = ""
+	_login_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_login_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_login_status_label.add_theme_font_size_override("font_size", 20)
+	vbox.add_child(_login_status_label)
+	
+	# Connect to AuthManager signals
+	AuthManager.auth_status_changed.connect(_on_auth_status_changed)
+	AuthManager.auth_completed.connect(_on_auth_completed)
+	
+	# Auto-login check
+	if AuthManager.load_session_token():
+		_login_btn.disabled = true
+		AuthManager.verify_session_token(AuthManager.session_token)
+
+func _on_auth_status_changed(msg: String) -> void:
+	if _login_status_label:
+		_login_status_label.text = msg
+
+func _on_auth_completed(success: bool, player_info: Dictionary) -> void:
+	if success:
+		AuthManager.authenticated = true
+		# Update Settings & GameState player name
+		Settings.set_player_name_and_save(player_info["player_name"])
+		GameState.player_name = player_info["player_name"]
+		
+		# Disconnect signals to prevent double-connects on scene reload
+		if AuthManager.auth_status_changed.is_connected(_on_auth_status_changed):
+			AuthManager.auth_status_changed.disconnect(_on_auth_status_changed)
+		if AuthManager.auth_completed.is_connected(_on_auth_completed):
+			AuthManager.auth_completed.disconnect(_on_auth_completed)
+			
+		# Clean up login UI and show main menu
+		if _login_ui:
+			_login_ui.queue_free()
+		$CenterContainer.visible = true
+	else:
+		if _login_btn:
+			_login_btn.disabled = false
+		# The specific error was already printed to the label via auth_status_changed
+		# just leave it there so the player knows what actually went wrong!

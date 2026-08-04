@@ -1,6 +1,7 @@
-[gd_scene load_steps=2 format=3 uid="uid://dcy4agh5qcqs7"]
+[gd_scene load_steps=3 format=3 uid="uid://dcy4agh5qcqs7"]
 
-[ext_resource type="Script" uid="uid://bshgmakepp78j" path="res://scenes/server_list.gd" id="1_4xksb"]
+[ext_resource type="Script" uid="uid://1t3rtoslcsgk" path="res://scenes/server_list.gd" id="1_4xksb"]
+[ext_resource type="Script" uid="uid://7diq48uxaes" path="res://scripts/back_button.gd" id="2_jl44o"]
 
 [node name="ServerList" type="Control"]
 layout_mode = 3
@@ -45,3 +46,61 @@ offset_bottom = -100.0
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/separation = 10
+
+[node name="FilterBox" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -36.0
+grow_horizontal = 2
+grow_vertical = 0
+
+[node name="FilterBar" type="HBoxContainer" parent="FilterBox"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="FilterServers" type="Button" parent="FilterBox/FilterBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Filter"
+
+[node name="FilterOptions" type="HBoxContainer" parent="FilterBox"]
+layout_mode = 2
+theme_override_constants/separation = 20
+alignment = 1
+
+[node name="LAN" type="CheckBox" parent="FilterBox/FilterOptions"]
+layout_mode = 2
+text = "LAN"
+
+[node name="Cloud" type="CheckBox" parent="FilterBox/FilterOptions"]
+layout_mode = 2
+text = "Cloud"
+
+[node name="HasPlayers" type="CheckBox" parent="FilterBox/FilterOptions"]
+layout_mode = 2
+text = "Has Players"
+
+[node name="Private" type="CheckBox" parent="FilterBox/FilterOptions"]
+layout_mode = 2
+text = "Private"
+
+[node name="Public" type="CheckBox" parent="FilterBox/FilterOptions"]
+layout_mode = 2
+text = "Public"
+
+[node name="ServerSearch" type="LineEdit" parent="FilterBox/FilterOptions"]
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "Server Name"
+
+[node name="BackButton" type="Button" parent="."]
+layout_mode = 1
+anchors_preset = -1
+anchor_right = 0.05
+anchor_bottom = 0.05
+offset_right = 8.0
+offset_bottom = 8.0
+script = ExtResource("2_jl44o")

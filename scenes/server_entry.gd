@@ -1,19 +1,37 @@
 extends PanelContainer
-@onready var name_label = $MarginContainer/HBoxContainer/NameLabel
-@onready var players_label = $MarginContainer/HBoxContainer/PlayersLabel
-@onready var ping_label = $MarginContainer/HBoxContainer/PingLabel
-@onready var join_button = $MarginContainer/HBoxContainer/JoinButton
+
+@onready var lock_icon = $MarginContainer/HBoxContainer/LeftGroup/LockIcon
+@onready var name_label = $MarginContainer/HBoxContainer/LeftGroup/NameLabel
+@onready var network_label = $MarginContainer/HBoxContainer/RightGroup/NetworkLabel
+@onready var players_label = $MarginContainer/HBoxContainer/RightGroup/PlayersLabel
+@onready var ping_label = $MarginContainer/HBoxContainer/RightGroup/PingLabel
+@onready var join_button = $MarginContainer/HBoxContainer/RightGroup/JoinButton
+
+const LOCKED_ICON = preload("res://Texture/lock.png")
+const UNLOCKED_ICON = preload("res://Texture/unlock.png")
 
 var server_data
 
 func setup(data):
-	print("data in tthe entry; ", data)
+	print("data in the entry: ", data)
+
+
 	server_data = data
-	if not name_label:
-		print("name label is null")
+
 	name_label.text = data.get("name", "Unknown Server")
-	players_label.text = data.get("status", "0/0")
+	players_label.text = "%d/%d" % [
+		data.get("players_connected", 0),
+		data.get("lobby_size", 0)
+	]
 	ping_label.text = "%d ms" % data.get("ping", 0)
+
+	# Public / Private
+	var is_public = data.get("is_public", true)
+	lock_icon.texture = UNLOCKED_ICON if is_public else LOCKED_ICON
+
+	# LAN / Cloud
+	var is_lan = data.get("is_lan", true)
+	network_label.text = "LAN" if is_lan else "Cloud"
 
 func update_status(data):
 	setup(data)
