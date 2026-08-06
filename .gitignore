@@ -27,3 +27,8 @@ mono_crash.*.json
 *_LOCAL_*
 *_REMOTE_*
 *.gd.uid
+
+# Local development files
+/android/
+project_code.txt
+combine_code.py

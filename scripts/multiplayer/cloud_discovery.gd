@@ -25,8 +25,13 @@ func stop_search():
 	can_search = false
 
 func _find_data():
-	if can_search:
-		http_service.http_get(endpoint + "?user_id=" + str(GameState.user_id), [])
+	if !can_search:
+		return
+
+	var headers = [
+		"Authorization: Bearer " + AuthManager.session_token
+	]
+	http_service.http_get(endpoint, headers)
 
 func _on_request_completed(result, response_code, headers, body):
 	if response_code != 200:

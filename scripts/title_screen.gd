@@ -38,10 +38,19 @@ func _ready() -> void:
 		GameState.is_dedicated = true
 		Config.load_config()
 		
-		var id = _get_arg_value("--id", args)
-		var port = _get_arg_value("--port", args)
+		var id = _get_arg_value2("--id", args)
+		var port = _get_arg_value2("--port", args)
+		var is_public = _get_arg_value2("--public", args)
+		var player_name = _get_arg_value2("--player_name", args)
+
+		print("Dedicated server args:", args)
+		print("Dedicated server lobby ID:", id)
+		print("Dedicated server port:", port)
+		if id == "" or port == "":
+			push_error("Dedicated server missing required --id or --port arguments")
+			return
 		var session = await SessionManager.create_cloud_server_session(SCRIPT_PATHS.SERVER_SESSION, id, port)
-		session.host(Settings.player_name, "Lobby")
+		session.host(player_name, is_public, "Lobby")
 		return
 
 	# -------- normal client flow below --------
@@ -347,7 +356,7 @@ func _on_create_cloud_server_with_data(name: String, is_public: bool) -> void:
 	print("CLOUD SERVER:", name, is_public)
 	_is_public = is_public
 	var session_node = await SessionManager.create_client_session(SCRIPT_PATHS.CLIENT_SESSION)
-	session_node.host_cloud_server()
+	session_node.host_cloud_server(is_public)
 
 
 

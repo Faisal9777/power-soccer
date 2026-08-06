@@ -15,6 +15,7 @@ var current_state : Node
 var scene_data = {}
 var scene_after_server = ""
 var server_info = {}
+var lobby_id : String = ""
 var is_cloud_session := true
 var can_broadcast := false
 var can_world_state_broadcast := true
@@ -51,13 +52,17 @@ func change_state(state_info: int):
 
 func setup(transport_method, id, port, is_remote_session):
 	_transport_method = transport_method
+	lobby_id = id
+	if lobby_id == "":
+		push_error("Dedicated server setup missing lobby_id")
 	server_info = {"id" : id, "port" : port}
+	print("Dedicated server setup: lobby_id=", lobby_id, "port=", port)
 	is_cloud_session = is_remote_session
 
 func host(server_name, is_public, scene):
 	scene_after_server = scene
 	server_info["name"] = server_name
-	server_info["is_lan"] = true
+	server_info["is_lan"] = not is_cloud_session
 
 	server_info["is_public"] = is_public
 	server_password = randi_range(100000, 999999)
@@ -131,6 +136,8 @@ func _broadcast():
 		if is_cloud_session:
 			server_info["players"] = _get_all_user_ids()
 
+		server_info["id"] = lobby_id
+		print("Sending heartbeat with lobby_id=", lobby_id, "server_info=", server_info)
 		_transport_method.send(server_info)
 
 func _broadcast_states():
@@ -154,10 +161,11 @@ func _check_all_players():
 		var is_active = GameState.roster[key].get("is_active", false)
 		if not is_active:
 			var body = JSON.stringify({
-			"user_id": GameState.roster[key].get("user_id"),
-			"server_id": server_info.get("id")
+				"user_id": GameState.roster[key].get("user_id"),
+				"server_id": server_info.get("id")
 			})
-			await _transport_method.post(NetCodes.backend.PLAYER_DISCONNECTED, body) == HTTPClient.RESPONSE_OK
+			var token = GameState.roster[key].get("session_token", "")
+			await _transport_method.post(NetCodes.backend.PLAYER_DISCONNECTED, body, token) == HTTPClient.RESPONSE_OK
 			GameState.roster.erase(key)
 
 func _check_server_status():
@@ -174,6 +182,7 @@ func _on_hosting_started():
 	timer.autostart = true
 	timer.timeout.connect(_broadcast)
 	add_child(timer)
+	print("Dedicated server started; lobby_id=", lobby_id, " server_info=", server_info)
 	SessionManager.change_state(NetCodes.States.LOBBY)
 
 
@@ -194,23 +203,29 @@ func _srv_register_player(payload: Dictionary):
 	var actual_name = player_info.get("player_name", payload.get('name', "Unknown"))
 	var tag = player_info.get("player_tag", "")
 
-	
 	var user_id = payload.get("user_id", 0)
+	var session_token = payload.get("session_token", "")
 	print("[register] incoming id=%s user_id=%s can_other_join=%s is_cloud_session=%s" % [id, user_id, can_other_join, is_cloud_session])
 
-	var should_reject = not can_other_join or (is_cloud_session and not await _can_join(user_id))
+	var should_reject = not can_other_join or (is_cloud_session and not await _can_join(user_id, session_token))
 	print("[register] should_reject=%s" % should_reject)
 	if should_reject:
 		print("[register] REJECTING id=%s" % id)
-		Network.disconnect_peer(id)
 		sync.send_data_id(id, NetCodes.Msg.REJECT, {"message": "Cannot join"})
+		Network.disconnect_peer(id)
 		return
 
 	if not multiplayer.is_server():
 		print("[register] aborting, not server, id=%s" % id)
 		return
 
-	GameState.roster[id] = {"name": "", "ready": false, "is_active": true, "user_id": user_id}
+	GameState.roster[id] = {
+		"name": "",
+		"ready": false,
+		"is_active": true,
+		"user_id": user_id,
+		"session_token": session_token
+	}
 	GameState.roster[id]["name"] = payload.get('name', "Unknown")
 	print("[register] roster set id=%s entry=%s" % [id, GameState.roster[id]])
 
@@ -292,18 +307,27 @@ func _verify_token_with_backend(token: String) -> Dictionary:
 	return {}
 
 
-func _notify_player_joined(user_id: int) -> bool:
+func _notify_player_joined(user_id: int, session_token: String) -> bool:
 	var body = JSON.stringify({
 		"user_id": user_id,
 		"server_id": server_info.get("id")
 	})
-	return await _transport_method.post(NetCodes.backend.PLAYER_JOINED, body) == HTTPClient.RESPONSE_OK
+	return await _transport_method.post(NetCodes.backend.PLAYER_JOINED, body, session_token) == HTTPClient.RESPONSE_OK
 
 func _get_all_user_ids() -> Array:
 		return GameState.roster.values().map(func(player): return player["user_id"])
 
-func _can_join(user_id):
-	var is_validated : bool = await _transport_method.validate(user_id)
-	if not is_validated or not await _notify_player_joined(user_id):
+func _can_join(user_id, session_token: String):
+	var validated = await _transport_method.validate(user_id, session_token)
+	print("validate =", validated)
+
+	var joined = await _notify_player_joined(user_id, session_token)
+	print("notify_player_joined =", joined)
+
+	if !validated:
 		return false
+
+	if !joined:
+		return false
+
 	return true
