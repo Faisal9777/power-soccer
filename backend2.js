@@ -335,7 +335,7 @@ async function createServer(isPublic = false, playerName = "Player") {
         lastSeen: Date.now(),
         players: 0,
         maxPlayers: DEFAULT_MAX_PLAYERS,
-        serverInfo: {}
+        serverInfo: { }
     };
 
     servers.set(server.id, server);
@@ -678,6 +678,12 @@ app.post("/heartbeat", (req, res) => {
         const server = servers.get(id);
         if (server) {
             server.status = ServerPhase.RUNNING;
+            server.lastSeen = Date.now();
+            server.serverInfo = req.body;
+            server.players = Number(req.body.players_connected ?? req.body.players?.length ?? 0);
+            if (req.body.max_players) {
+                server.maxPlayers = Number(req.body.max_players);
+            }
         }
         entry.resolve(entry.proc);
         return res.send("OK (registered)");

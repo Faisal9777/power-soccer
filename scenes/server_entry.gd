@@ -17,7 +17,7 @@ func setup(data):
 
 
 	server_data = data
-
+	
 	name_label.text = data.get("name", "Unknown Server")
 	players_label.text = "%d/%d" % [
 		data.get("players_connected", 0),

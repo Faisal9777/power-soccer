@@ -54,9 +54,9 @@ func _cycle_ability(cur: String) -> String:
 
 
 func _ready() -> void:
-	if GameState.is_host:
+	if multiplayer.is_server():
 		_password = SessionManager.session_node.server_password
-		password_label.text = "Password: %d" % _password
+		rpc("_rpc_set_server_password", _password)
 	StateHandler.register_state(self)
 	GameState.lobby_size = _team_size*2
 	# --- Build the Tree columns + per-row buttons ---
@@ -481,6 +481,9 @@ func _rpc_submit_name(name: String) -> void:
 	GameState.roster[from]["team"] = team
 	#GameState.roster[from] = {"name": name, "ready": false, "team": team, "ability": "grapple"}
 
+	# Send password only to the newly joined client
+	rpc_id(from, "_rpc_set_server_password", _password)
+
 	_ensure_leader_exists()   # ✅ IMPORTANT
 
 @rpc("any_peer", "call_local")
@@ -490,6 +493,12 @@ func _rpc_set_ready(peer_id: int, ready: bool) -> void:
 	if from != peer_id: return
 	if GameState.roster.has(peer_id):
 		GameState.roster[peer_id]["ready"] = ready
+
+@rpc("any_peer", "call_local", "reliable")
+func _rpc_set_server_password(password: int) -> void:
+	_password = password
+	password_label.text = "Password: %d" % password
+
 
 @rpc("any_peer", "call_local")
 func _rpc_host_is_leaving() -> void:

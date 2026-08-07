@@ -40,7 +40,7 @@ func _ready() -> void:
 		
 		var id = _get_arg_value2("--id", args)
 		var port = _get_arg_value2("--port", args)
-		var is_public = _get_arg_value2("--public", args)
+		var is_public: bool = _get_arg_value2("--public", args) == "true"
 		var player_name = _get_arg_value2("--player_name", args)
 
 		print("Dedicated server args:", args)
@@ -356,7 +356,7 @@ func _on_create_cloud_server_with_data(name: String, is_public: bool) -> void:
 	print("CLOUD SERVER:", name, is_public)
 	_is_public = is_public
 	var session_node = await SessionManager.create_client_session(SCRIPT_PATHS.CLIENT_SESSION)
-	session_node.host_cloud_server(is_public)
+	session_node.host_cloud_server(name, is_public)
 
 
 

@@ -66,7 +66,7 @@ func send_data(msg, value):
 	value["state"] = current_scene
 	sync.send_data_all(msg, value)
 
-func host_cloud_server(is_public):
+func host_cloud_server(name, is_public):
 	BlockingOverlay.show_overlay("Creating Server...") 
 	http_service = HttpService.new(self) 
 	Config.load_config() 
@@ -77,7 +77,7 @@ func host_cloud_server(is_public):
 		"Authorization: Bearer " + AuthManager.session_token
 	]
 	http_service.request_completed.connect(_on_request_completed) 
-	http_service.post(url, headers, JSON.stringify({ "user_id": GameState.user_id , "is_public" : is_public, "player_name" : GameState.player_name }))
+	http_service.post(url, headers, JSON.stringify({ "user_id": GameState.user_id , "is_public" : is_public, "player_name" : name }))
 
 	_timeout_timer = get_tree().create_timer(REQUEST_TIMEOUT_MS)
 	_timeout_timer.timeout.connect(_on_request_timeout)
@@ -95,7 +95,13 @@ func join(server_info, password):
 
 func handle_data(msg, data):
 	if msg == NetCodes.Msg.AUTH_OK:
-		var payload := {"name" : Settings.player_name, "id" : multiplayer.get_unique_id(),"state" : NetCodes.States.SESSION, "user_id" : GameState.user_id}
+		var payload := {
+			"name" : Settings.player_name,
+			"id" : multiplayer.get_unique_id(),
+			"state" : NetCodes.States.SESSION,
+			"user_id" : GameState.user_id,
+			"session_token": AuthManager.session_token
+		}
 		sync.send_data_id(1, NetCodes.Msg.REGISTER_PEER, payload)
 	if msg == NetCodes.Msg.AUTH_FAILED:
 		auth_failed.emit()

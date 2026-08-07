@@ -141,6 +141,9 @@ func _remove_server(key):
 
 func _on_connect_button_pressed(data) -> void:
 	GameState.reset_lobby()
+	print(data.get("is_public"))
+	var value = data.get("is_public")
+
 	# If server is private → ask password first
 	if not data.get("is_public", true):
 		pending_join_data = data
