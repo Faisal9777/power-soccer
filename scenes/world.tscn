@@ -1,21 +1,21 @@
 [gd_scene load_steps=82 format=4 uid="uid://ex55agd4o2wj"]
 
-[ext_resource type="Script" uid="uid://df8g7as2j4x03" path="res://scripts/world.gd" id="1_rup4s"]
+[ext_resource type="Script" uid="uid://b5mahdjst0xhy" path="res://scripts/world.gd" id="1_rup4s"]
 [ext_resource type="PackedScene" uid="uid://dv5l1qjf5gwfn" path="res://scenes/Player.tscn" id="2_4kbfs"]
 [ext_resource type="PackedScene" uid="uid://c7c8psuolfrbi" path="res://scenes/BotPlayer.tscn" id="3_f17e3"]
 [ext_resource type="PackedScene" uid="uid://ds26o286r5vvn" path="res://scenes/ball.tscn" id="4_x2olw"]
 [ext_resource type="Texture2D" uid="uid://bx00aw6dsln1n" path="res://Texture/bg_cliffs (2).png" id="5_817gm"]
 [ext_resource type="Texture2D" uid="uid://wwhv8iq8ltk4" path="res://Texture/grass.png" id="6_ggc52"]
 [ext_resource type="PackedScene" uid="uid://dpicujbq5yvvi" path="res://scenes/PlayerCamera.tscn" id="7_l8ah6"]
-[ext_resource type="Script" uid="uid://bu66qw2j47120" path="res://scripts/GoalTrigger.gd" id="8_e75v4"]
+[ext_resource type="Script" uid="uid://brt15pv4qar8e" path="res://scripts/GoalTrigger.gd" id="8_e75v4"]
 [ext_resource type="Texture2D" uid="uid://b3r4sx5dkov6i" path="res://Texture/fence.png" id="9_8u370"]
-[ext_resource type="Script" uid="uid://bufq4j47x5qgd" path="res://scripts/teleporter_pad.gd" id="10_rga7q"]
+[ext_resource type="Script" uid="uid://dc6b1ohgpx1ni" path="res://scripts/teleporter_pad.gd" id="10_rga7q"]
 [ext_resource type="Texture2D" uid="uid://dq37xpv80pfh8" path="res://Texture/teleporter.png" id="11_6oujy"]
 [ext_resource type="Texture2D" uid="uid://cicfh8nywp38p" path="res://Texture/TeleporterRed.png" id="12_hi6a0"]
-[ext_resource type="Script" uid="uid://bt67ehls0nnft" path="res://scripts/spring_pad.gd" id="13_eo1xk"]
-[ext_resource type="Script" uid="uid://5ww5v7r64to" path="res://scripts/spring_mesh.gd" id="14_18clu"]
-[ext_resource type="Script" uid="uid://dasht4kmkuhjk" path="res://scripts/ui.gd" id="15_4wdv8"]
-[ext_resource type="Script" uid="uid://noc67t8sii2r" path="res://scripts/joy_stick.gd" id="16_d46x8"]
+[ext_resource type="Script" uid="uid://cl3x21a71h8bc" path="res://scripts/spring_pad.gd" id="13_eo1xk"]
+[ext_resource type="Script" uid="uid://cw1hucpin5hpc" path="res://scripts/spring_mesh.gd" id="14_18clu"]
+[ext_resource type="Script" uid="uid://qy2wikuman02" path="res://scripts/ui.gd" id="15_4wdv8"]
+[ext_resource type="Script" uid="uid://pfcvhibsl1rj" path="res://scripts/joy_stick.gd" id="16_d46x8"]
 [ext_resource type="Texture2D" uid="uid://dxdbb2yilfbxy" path="res://Texture/KnobTexture.png" id="17_3l05q"]
 [ext_resource type="Texture2D" uid="uid://cg2brpywalpp3" path="res://Texture/Pull_90x90_big.png" id="17_ggc52"]
 [ext_resource type="Texture2D" uid="uid://cjxo436p0pfyk" path="res://Texture/Release_90x90_big.png" id="18_l8ah6"]
@@ -28,21 +28,21 @@
 [ext_resource type="Texture2D" uid="uid://x24vgxf76at0" path="res://Texture/Latch_90x90_big.png" id="23_qg546"]
 [ext_resource type="Texture2D" uid="uid://dxkaf2u8do7px" path="res://Texture/Sprint_90x90_big.png" id="24_pf35h"]
 [ext_resource type="Texture2D" uid="uid://ien31p1gfj72" path="res://Texture/CAP_90x90_big.png" id="25_iexy4"]
-[ext_resource type="Script" uid="uid://dw055l6qafcw" path="res://scripts/goal_markers.gd" id="26_npbic"]
+[ext_resource type="Script" uid="uid://biii28s4muarm" path="res://scripts/goal_markers.gd" id="26_npbic"]
 [ext_resource type="Texture2D" uid="uid://drjevrun5go0s" path="res://Texture/PurpleMarker.png" id="27_e6ckp"]
 [ext_resource type="Texture2D" uid="uid://cjktvh0wm3j61" path="res://Texture/BlueMarker.png" id="28_mvg0v"]
 [ext_resource type="Texture2D" uid="uid://cnv6w7h0jv5xa" path="res://Texture/BallMarker.png" id="29_h3odw"]
 [ext_resource type="Texture2D" uid="uid://0emwaniqm11o" path="res://Texture/Focus_90x90_big.png" id="30_5hl1e"]
-[ext_resource type="Script" uid="uid://dcf54b1pdaose" path="res://scripts/focus.gd" id="31_66tox"]
+[ext_resource type="Script" uid="uid://bp6dvtew8jxpw" path="res://scripts/focus.gd" id="31_66tox"]
 [ext_resource type="Texture2D" uid="uid://pvoi51a3i4j1" path="res://Texture/TP_90x90_big.png" id="32_pq8jk"]
 [ext_resource type="Texture2D" uid="uid://3wairufbjtf4" path="res://Texture/PlatformAlbedo.PNG" id="32_rga7q"]
 [ext_resource type="Texture2D" uid="uid://tvg2d0a1xxo3" path="res://Texture/PlatformAo.PNG" id="33_6oujy"]
-[ext_resource type="Script" uid="uid://vfob1wq6nbw7" path="res://scripts/tp.gd" id="33_q57r8"]
+[ext_resource type="Script" uid="uid://c8kdtck17x3mx" path="res://scripts/tp.gd" id="33_q57r8"]
 [ext_resource type="Texture2D" uid="uid://dr3f3rck5j8wj" path="res://Texture/PlatformNormal.png" id="34_hi6a0"]
 [ext_resource type="Texture2D" uid="uid://cwtp6b7qg6wy3" path="res://Texture/PlatformRoughness.PNG" id="35_eo1xk"]
 [ext_resource type="Texture2D" uid="uid://b1umkmyts2eap" path="res://Texture/ChatGPT Image Nov 23, 2025, 09_56_57 PM.png" id="39_e75v4"]
 [ext_resource type="Texture2D" uid="uid://c4tkxpnkywy3x" path="res://Texture/ChatGPT Image Nov 23, 2025, 09_58_58 PM.png" id="40_8u370"]
-[ext_resource type="Script" uid="uid://cackot6nqiqq2" path="res://scripts/proxy_follower.gd" id="43_6oujy"]
+[ext_resource type="Script" uid="uid://byme3443p81rx" path="res://scripts/proxy_follower.gd" id="43_6oujy"]
 
 [sub_resource type="PanoramaSkyMaterial" id="PanoramaSkyMaterial_qktwf"]
 panorama = ExtResource("5_817gm")
@@ -127,7 +127,7 @@ roughness = 0.2
 
 [sub_resource type="ArrayMesh" id="ArrayMesh_hi6a0"]
 _surfaces = [{
-"aabb": AABB(-0.559671, -0.0598102, -0.557261, 1.11934, 1.61962, 1.11452),
+"aabb": AABB(-0.5596713, -0.059810232, -0.55726093, 1.1193426, 1.6196206, 1.1145219),
 "format": 34359738375,
 "material": SubResource("StandardMaterial3D_6oujy"),
 "primitive": 3,
@@ -151,7 +151,7 @@ roughness = 0.2
 
 [sub_resource type="ArrayMesh" id="ArrayMesh_18clu"]
 _surfaces = [{
-"aabb": AABB(-0.559671, -0.0598102, -0.557261, 1.11934, 1.61962, 1.11452),
+"aabb": AABB(-0.5596713, -0.059810232, -0.55726093, 1.1193426, 1.6196206, 1.1145219),
 "format": 34359738375,
 "material": SubResource("StandardMaterial3D_eo1xk"),
 "primitive": 3,
@@ -167,7 +167,7 @@ roughness = 0.2
 
 [sub_resource type="ArrayMesh" id="ArrayMesh_d46x8"]
 _surfaces = [{
-"aabb": AABB(-0.559671, -0.0598102, -0.557261, 1.11934, 1.61962, 1.11452),
+"aabb": AABB(-0.5596713, -0.059810232, -0.55726093, 1.1193426, 1.6196206, 1.1145219),
 "format": 34359738375,
 "material": SubResource("StandardMaterial3D_4wdv8"),
 "primitive": 3,
@@ -183,7 +183,7 @@ roughness = 0.2
 
 [sub_resource type="ArrayMesh" id="ArrayMesh_x28ej"]
 _surfaces = [{
-"aabb": AABB(-0.559671, -0.0598102, -0.557261, 1.11934, 1.61962, 1.11452),
+"aabb": AABB(-0.5596713, -0.059810232, -0.55726093, 1.1193426, 1.6196206, 1.1145219),
 "format": 34359738375,
 "material": SubResource("StandardMaterial3D_3l05q"),
 "primitive": 3,
@@ -199,7 +199,7 @@ roughness = 0.2
 
 [sub_resource type="ArrayMesh" id="ArrayMesh_1dgkn"]
 _surfaces = [{
-"aabb": AABB(-0.559671, -0.0598102, -0.557261, 1.11934, 1.61962, 1.11452),
+"aabb": AABB(-0.5596713, -0.059810232, -0.55726093, 1.1193426, 1.6196206, 1.1145219),
 "format": 34359738375,
 "material": SubResource("StandardMaterial3D_1jxku"),
 "primitive": 3,
@@ -215,7 +215,7 @@ roughness = 0.2
 
 [sub_resource type="ArrayMesh" id="ArrayMesh_5hglh"]
 _surfaces = [{
-"aabb": AABB(-0.559671, -0.0598102, -0.557261, 1.11934, 1.61962, 1.11452),
+"aabb": AABB(-0.5596713, -0.059810232, -0.55726093, 1.1193426, 1.6196206, 1.1145219),
 "format": 34359738375,
 "material": SubResource("StandardMaterial3D_e68xj"),
 "primitive": 3,

@@ -114,6 +114,8 @@ func _ready() -> void:
 	replication_manager.name = "ReplicationManager"
 	add_child(replication_manager)
 	LoadingUI.show_loading()
+	_setup_desktop_canvas_ui()
+
 	if multiplayer.is_server():
 		out_bounds.body_entered.connect(_on_ball_out_of_bounds)
 	if OS.has_feature("mobile"):
@@ -426,7 +428,6 @@ func _toggle_pause_menu() -> void:
 	if _local_controller:
 		_local_controller.set_paused(true)
 	if _player_controller:
-		print("lets pause")
 		_player_controller.set_paused(true)
 	if _btn_resume:
 		_btn_resume.grab_focus()  # keyboard/controller friendly
@@ -438,7 +439,6 @@ func _on_pause_resume() -> void:
 	if _local_controller:
 		_local_controller.set_paused(false)
 	if _player_controller:
-		print("lets pause")
 		_player_controller.set_paused(false)
 	if !OS.has_feature("mobile"):  # don’t hide mouse on touch devices
 		Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
@@ -1432,3 +1432,17 @@ func _perf_tick(delta: float) -> void:
 
 func _on_player_controller_created() -> void:
 	_player_controller = net._get_player_controller()
+
+func _setup_desktop_canvas_ui() -> void:
+	if OS.has_feature("mobile"):
+		return
+
+	var ui := get_node_or_null("CanvasLayer/UI")
+	if ui == null:
+		return
+
+	for child in ui.get_children():
+		if child.name == "GoalMarkers" or child.name == "BallMarker":
+			child.show()
+		else:
+			child.hide()
