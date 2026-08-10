@@ -114,7 +114,7 @@ func _broadcast():
 		server_info["lobby_size"] = GameState.get_lobby_size()
 		server_info["players_connected"] = GameState.get_players_connected()
 		server_info["can_other_join"] = can_other_join
-		server_info["current_state"] = current_scene
+		server_info["current_state"] = StateHandler.current_scene
 		if is_cloud_session:
 			server_info["players"] = _get_all_user_ids()
 
@@ -180,7 +180,16 @@ func _srv_register_player(payload: Dictionary):
 	var user_id = payload.get("user_id", 0)
 	print("[register] incoming id=%s user_id=%s can_other_join=%s is_cloud_session=%s" % [id, user_id, can_other_join, is_cloud_session])
 
-	var should_reject = not can_other_join or (is_cloud_session and not await _can_join(user_id))
+	var existing_peer_id = _find_roster_entry_by_user(user_id)
+	var _existing_player = existing_peer_id != -1
+	var can_join = _existing_player or can_other_join
+	print("[register] existing_peer_id=%s _existing_player=%s can_join=%s" % [existing_peer_id, _existing_player, can_join])
+
+	var should_reject = (
+		not can_join
+		or (is_cloud_session and not await _verify_auth(user_id))
+		or (is_cloud_session and not _existing_player and not await _notify_player_joined(user_id))
+	)
 	print("[register] should_reject=%s" % should_reject)
 	if should_reject:
 		print("[register] REJECTING id=%s" % id)
@@ -192,19 +201,30 @@ func _srv_register_player(payload: Dictionary):
 		print("[register] aborting, not server, id=%s" % id)
 		return
 
-	GameState.roster[id] = {"name": "", "ready": false, "is_active": true, "user_id": user_id}
-	GameState.roster[id]["name"] = payload.get('name', "Unknown")
-	print("[register] roster set id=%s entry=%s" % [id, GameState.roster[id]])
+	if _existing_player:
+		var entry = GameState.roster[existing_peer_id]
+		GameState.roster.erase(existing_peer_id)
+		entry["is_active"] = true
+		GameState.roster[id] = entry
+		print("[register] reactivated user_id=%s old_peer=%s new_peer=%s entry=%s" % [user_id, existing_peer_id, id, entry])
+	else:
+		GameState.roster[id] = {"name": payload.get('name', "Unknown"), "ready": false, "is_active": true, "user_id": user_id}
+		print("[register] roster set id=%s entry=%s" % [id, GameState.roster[id]])
 
 	var temp_server_info = server_info.duplicate()
 	temp_server_info["server_id"] = multiplayer.get_unique_id()
 	temp_server_info["state"] = NetCodes.States.SESSION
+	temp_server_info["was_reactivated"] = _existing_player
 	print("[register] sending REGISTRATION_COMPLETE to id=%s payload=%s" % [id, temp_server_info])
 
 	sync.send_data_id(id, NetCodes.Msg.REGISTRATION_COMPLETE, temp_server_info)
 	TaskScheduler.schedule(60, _broadcast_states)
+	StateHandler.handle_data(NetCodes.Msg.PLAYER_RECONNECT, {"value" : id, "old_id" : existing_peer_id}, null)
 	print("[register] broadcast scheduled, roster size=%s" % GameState.roster.size())
 
+
+func _verify_auth(user_id) -> bool:
+	return await _transport_method.validate(user_id)
 
 func _notify_player_joined(user_id: int) -> bool:
 	var body = JSON.stringify({
@@ -213,11 +233,10 @@ func _notify_player_joined(user_id: int) -> bool:
 	})
 	return await _transport_method.post(NetCodes.backend.PLAYER_JOINED, body) == HTTPClient.RESPONSE_OK
 
+func _find_roster_entry_by_user(user_id) -> int:
+	for peer_id in GameState.roster:
+		if GameState.roster[peer_id]["user_id"] == user_id:
+			return peer_id
+	return -1
 func _get_all_user_ids() -> Array:
 		return GameState.roster.values().map(func(player): return player["user_id"])
-
-func _can_join(user_id):
-	var is_validated : bool = await _transport_method.validate(user_id)
-	if not is_validated or not await _notify_player_joined(user_id):
-		return false
-	return true

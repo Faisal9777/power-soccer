@@ -11,6 +11,9 @@ var GameClient := load("res://scripts/multiplayer/game_client.gd")
 # How far "behind" we render remote players for smooth interpolation (ms)
 @export var deadzone := 0.02
 @export var snap_dist := 2.5
+const C = preload("res://scripts/shared/scene.gd")
+var player_scene:= C.PLAYER
+var bot_player_scene:= C.BOT
 
 var init_phase_completed := false
 var server_data_completed := false
@@ -23,7 +26,6 @@ var controllers : Array = []
 var blue_sp : Node
 var red_sp : Node
 var ball : Node
-var ball_sp : Node
 var state : Node
 var scoreboard : Control
 
@@ -54,19 +56,16 @@ func process_input(cmd: Dictionary, peer_id : int) -> void:
 	_store_snapshots(cmd)
 
 func process_input_dictionary(msg : int, value : Dictionary) -> void:
-	if msg == NetCodes.Msg.INIT_BEGIN:
-		var roster := value.get("roster") as Dictionary
-		GameState.roster = roster
-		server_data_completed = true
-		var ball_path = value.get("ball_path")
-		ball = get_node_or_null(ball_path)
-		_evaluate_all_phases()
-
 	if msg == NetCodes.Msg.GAME_BEGIN:
+		print("the vallue sent from the server during the game beggin is: ", value)
 		#_game.start_game(value)
 		LoadingUI.hide_loading()
 		p_controller.start_process()
 		_game.start_game(value)
+	
+	elif msg == NetCodes.Msg.INIT_BEGIN:
+		sync_init(value)
+	
 	elif msg == NetCodes.Msg.GAME_END:
 		_game.end_game(value)
 	
@@ -104,17 +103,24 @@ func init(p : Node3D,
 	ingame: Node,
 	blue_spawns: Node3D,
 	red_spawns: Node3D,
-	ball_spawn: Node3D,
+	ball_scene: Node3D,
 	j_stick) -> void:
 	proxy = p
 	joystick = j_stick
 	blue_sp = blue_spawns
 	red_sp = red_spawns
-	ball_sp = ball_spawn
+	ball = ball_scene
 	state = ingame
 	scoreboard = score_board 
 	
 	init_phase_completed = true
+	_evaluate_all_phases()
+
+func sync_init(value):
+	GameState.roster = value
+	server_data_completed = true
+	#var ball_path = value.get("ball_path")
+	#ball = get_node_or_null(ball_path)
 	_evaluate_all_phases()
 
 
@@ -127,6 +133,8 @@ func _ready() -> void:
 
 # ---------- Main loop ----------
 func _physics_process(delta: float) -> void:
+	if Input.is_action_pressed("debug"):
+		_evaluate_all_phases()
 	if p_controller:
 		p_controller.physics_tick(delta)
 
@@ -141,7 +149,7 @@ func _process(_delta: float) -> void:
 func _evaluate_all_phases() -> void:
 	if init_phase_completed and server_data_completed:
 		_resolve_players_from_roster(GameState.roster)
-		_send_network(NetCodes.Msg.INIT_DONE, {})
+		_send_network(NetCodes.Msg.INIT_DONE, {"id" : multiplayer.get_unique_id()})
 
 # ---------- Snapshot storage ----------
 func _store_snapshots(snapshots: Dictionary) -> void:
@@ -160,32 +168,58 @@ func _store_snapshots(snapshots: Dictionary) -> void:
 		controller.store_snapshot(snap)
 	#_game.current_state = snapshots.game_state
 
+func _resolve_player(id, rec, scene_to_use) -> Node:
+	var world := get_parent()
+	if bool(rec.get("is_bot", false)) and bot_player_scene:
+		scene_to_use = bot_player_scene
+
+	if scene_to_use == null:
+		push_error("No player scene assigned (player_scene / bot_player_scene)")
+		return
+
+	var p: Node = load(scene_to_use).instantiate()
+
+	var display_name := String(rec.get("name", GameState.player_name))
+	p.name = display_name
+
+	p.set_multiplayer_authority(1)
+	p.owner_peer_id = id
+
+	world.players_root.add_child(p, true)
+
+	var ability_id := String(rec.get("ability", "grapple"))  # default
+	if p is Player:
+		(p as Player).ability_id = StringName(ability_id) 
+	return p 
+
 func _resolve_players_from_roster(rosters) -> void:
 	# Build unresolved list first
+	var scene_to_use := player_scene
 	for k in rosters.keys():
-		var peer_id := int(k)
 		var entry := rosters[k] as Dictionary
+		var peer_id = int(k)
+		var node_id := int(entry.get("node_id"))
 		var ppath: NodePath = entry.get("player_path", NodePath(""))
 		var team = entry.get("team")
 		var name = entry.get("name")
 		if ppath.is_empty():
-			print("Roster peer ", peer_id, " has EMPTY player_path")
+			print("Roster peer ", node_id, " has EMPTY player_path")
 			continue
 
-		var node := get_node_or_null(ppath)
+		var node := _resolve_player(node_id, entry, scene_to_use)
 		if peer_id == multiplayer.get_unique_id():
 			var scheduler = JobScheduler.new()
 			scheduler.name = "JobScheduler"
 			add_child(scheduler)
-			var cam = get_node_or_null("/root/World/Scene/Camera3D") as Camera3D
+			var cam = get_node_or_null(ObjectPath.CAMERA) as Camera3D
 			cam.init(proxy, joystick)
 			var input_buffer = LocalInputBuffer.new(NodeUtils.init_input_source(self))
-			p_controller = PlayerController.new(node, peer_id, name, team, cam, ball, joystick, self, input_buffer, scheduler)
+			p_controller = PlayerController.new(node, node_id, name, team, cam, ball, joystick, self, input_buffer, scheduler)
 			p_controller.get_body_mesh().visible = false
 			proxy.init(node, p_controller)
 			controllers.append(p_controller)
 		else:
-			controllers.append(RemotePlayerReplicator.new(node, name, peer_id, team))
+			controllers.append(RemotePlayerReplicator.new(node, name, node_id, team))
 
 		if node != null:
 			_players[k] = node
@@ -193,12 +227,13 @@ func _resolve_players_from_roster(rosters) -> void:
 	add_child(_game)
 	_game.setup(state, scoreboard, controllers)
 
+
 func _send_network(msg, value) -> void:
 	if _can_network:
-		_network_endpoint.rpc(NetCodes.Rpc.INPUT_STREAM, msg, {})
+		_network_endpoint.rpc(NetCodes.Rpc.INPUT_STREAM, msg, value)
 
 func _send_network_id(sender_id, msg, value) -> void:
 	value["id"] = sender_id
 	if _can_network:
-		StateHandler.send_data_id(msg, value)
+		StateHandler.send_data(msg, value)
 	

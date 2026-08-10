@@ -123,36 +123,27 @@ func start_game(world : Node) -> void:
 		_start_clock_server()
 		_start_match_authoritative(world)
 
-func _build_position_snapshots() -> Dictionary:
-	var snapshots: Dictionary = {}  # { pid:int : { "path": NodePath, "global_transform": Transform3D } }
+func get_game_snapshot() -> Dictionary:
+	var ball := ball_scene
 
-	for k in GameState.roster.keys():
-		var pid := int(k)
+	var game_data = {
+		"ball_position": ball.global_transform.origin
+	}
 
-		# Each roster entry is something like:
-		# { "name": ..., "team": ..., "player_path": NodePath or String }
-		var entry := GameState.roster[pid] as Dictionary
-		if !entry.has("player_path"):
-			continue
+	for controller in p_controllers:
+		game_data[controller.id] = {}
 
-		var raw_path = entry["player_path"]
-		var path: NodePath = raw_path if raw_path is NodePath else NodePath(raw_path)
+		game_data[controller.id]["position"] = controller.player.global_transform
 
-		var player := get_node_or_null(path) as Node3D
-		if player == null:
-			# Player not spawned / already freed
-			continue
+		game_data[controller.id]["face_at"] = ball.global_transform.origin
+		game_data[controller.id]["freeze"] = not is_in_game()
+	
+	return game_data
 
-		# Build one snapshot for this player:
-		# - store the path so clients can resolve the node
-		# - store the full global_transform (position + rotation + scale)
-		var snap: Dictionary = {
-			"path": path,
-			"global_transform": player.global_transform,
-		}
-
-		snapshots[pid] = snap
-	return snapshots
+func is_in_game() -> bool:
+	if state.can_process:
+		return true
+	return false
 
 func _start_clock_server() -> void:
 	var now := Time.get_ticks_msec()
@@ -172,23 +163,10 @@ func _start_game() -> void:
 	state.is_paused = false
 	for controller in p_controllers:
 		controller.freeze(false)
-	#_toggle_player_process(false)
 
-func _toggle_player_process(toggle : bool) -> void:
-	var switch := false
-	if toggle != true:
-		switch = true
-		
-	for k in GameState.roster.keys():
-		var p := get_node(GameState.roster[k]["player_path"]) as Node3D
-		#print("the player's id is: ", pid)
-		if p == null:
-			continue
-		p.freeze(switch)
 
 func _set_game() -> void:
 	_spawn_ball_at(ball_spawn.global_transform.origin)
-	#_spawn_players_from_roster()
 	
 	#var snapshots = _build_position_snapshots()
 	#var snapshots = {"ball_scene" : ball_scene.get_path(),
@@ -301,28 +279,6 @@ func _position_players2() -> void:
 	
 	game_reset.emit(game_data)
 
-func _spawn_players_from_roster() -> void:
-	# player_scene should be known (from GameState or exported on World)
-	var scene: PackedScene = GameState.player_scene
-	var blue_i := 0
-	var red_i  := 0
-	for pid in match_config.roster.keys():
-		var info : Dictionary = match_config.roster[pid]
-		var team := int(info.team) if info.has("team") else GameState.Team.BLUE
-		var p := scene.instantiate()
-		p.name = "P_%s" % str(pid)
-		players_root.add_child(p, true)
-		# set networking authority if you use per-player authority
-		if IS_HOST: p.set_multiplayer_authority(pid)
-
-		var spawn := _pick_spawn(team, blue_i, red_i)
-		p.global_transform.origin = spawn.global_transform.origin
-		p.call_deferred("reset_state") # clear velocity, stamina, etc.
-
-		if team == GameState.Team.BLUE: blue_i += 1
-		else:                           red_i  += 1
-
-
 
 @rpc("any_peer", "reliable", "call_local")
 func _rpc_aim_camera(target_pos: Vector3, path: NodePath) -> void:
@@ -333,54 +289,6 @@ func _rpc_aim_camera(target_pos: Vector3, path: NodePath) -> void:
 	else:
 		print("tha players path was not found")
 
-#func _position_players2() -> void:
-	#var blue_placed := 1
-	#var red_placed  := 1
-#
-	## Find a target to face: live Ball if it exists, else the BallSpawn
-	#var ball := ball_scene
-	##var target_pos := ball.global_transform.origin if ball != null else ball_spawn.global_transform.origin
-	#var target_pos := ball_spawn.global_position
-	#for k in GameState.roster.keys():
-		#var pid := int(k)
-		#var name := String(GameState.roster.get(pid, {}).get("name", ""))
-		#var team := int(GameState.roster.get(pid, {}).get("team", 0))
-		##print("about to calll _cl_init_entry: ", multiplayer.get_unique_id())
-		## initialize only if missing
-		#var p := get_node(GameState.roster[k]["player_path"]) as Node3D
-		##print("the player's id is: ", pid)
-		#if p == null:
-			#continue
-#
-		#if GameState.is_blue(pid):
-			#var sp := spawns_blue.get_node_or_null("Spawn%d" % blue_placed) as Node3D
-			#if sp:
-				#p.global_transform = sp.global_transform
-				#blue_placed += 1
-		#else:
-			#var sp := spawns_red.get_node_or_null("Spawn%d" % red_placed) as Node3D
-			#if sp:
-				#p.global_transform = sp.global_transform
-				#red_placed += 1
-		## tell that specific client to aim their camera
-#
-		#_init_entry(pid, name, team)
-		#p.focus_at(ball)
-		#p.freeze(true)
-
-
-#func _init_entry(pid: int, name: String, team: int) -> void:
-	## Each peer (and the caller) runs this locally
-	#game.get_or_add(pid, {
-		#"name": name,
-		#"goals": 0,
-		#"team": team,
-		#"assists": 0,
-		#"saves": 0,
-	#}) as Dictionary
-	#if _scoreboard_instance:
-		#var stats_array = get_stats_in_array()
-		#_scoreboard_instance.set_stats(stats_array)
 
 func _process_game_end() -> void:
 	_stop_all_process()

@@ -15,6 +15,7 @@ var _def_tex_a1: Texture2D
 var _def_tex_a2: Texture2D
 var _def_tex_a3: Texture2D
 
+
 func _set_btn_tex(btn: Node, tex: Texture2D, fallback: Texture2D) -> void:
 	var use_tex := tex if tex != null else fallback
 	if use_tex == null or btn == null:
@@ -127,25 +128,25 @@ func _ready() -> void:
 		score_btn.button_up.connect(_on_mobile_score_up)
 	
 	_setup_team_position()
-	# If you didn't set the spawner in the editor, do it here:
-	var spawner : Node
-	if players_root:
-		spawner = players_root.get_node_or_null("MultiplayerSpawner")
-	if spawner == null:
-		spawner = MultiplayerSpawner.new()
-		spawner.name = "MultiplayerSpawner"
-		players_root.add_child(spawner)
-		spawner.spawn_path = players_root.get_path()
-		
-
-	# Register ALL player-type scenes that might be spawned
-	if player_scene:
-		spawner.add_spawnable_scene(player_scene.resource_path)
-
-	if bot_player_scene:
-		spawner.add_spawnable_scene(bot_player_scene.resource_path)
-
-	_create_ball_spawner()
+	## If you didn't set the spawner in the editor, do it here:
+	#var spawner : Node
+	#if players_root:
+		#spawner = players_root.get_node_or_null("MultiplayerSpawner")
+	#if spawner == null:
+		#spawner = MultiplayerSpawner.new()
+		#spawner.name = "MultiplayerSpawner"
+		#players_root.add_child(spawner)
+		#spawner.spawn_path = players_root.get_path()
+		#
+#
+	## Register ALL player-type scenes that might be spawned
+	#if player_scene:
+		#spawner.add_spawnable_scene(player_scene.resource_path)
+#
+	#if bot_player_scene:
+		#spawner.add_spawnable_scene(bot_player_scene.resource_path)
+#
+	#_create_ball_spawner()
 	_setup_pause_dialog()
 	_tackle_cd_label = _ensure_cd_label(tackle_btn)
 	_pass_cd_label = _ensure_cd_label(pass_btn)
@@ -160,22 +161,22 @@ func _ready() -> void:
 	var ingame := get_node_or_null("ingame_state")
 	var blue_spawns := get_node(TEAM_BLUE_PATH)  as Node3D
 	var red_spawns  := get_node(TEAM_RED_PATH)   as Node3D
-	var ball_spawn  := get_node(BALL_SPAWN_PATH) as Node3D
-
+	var ball_spawn  = ball_root
+	_create_ball_server()
 	if not multiplayer.is_server():
 		net = WorldClientScript.new()
 		_initialize_multiplayer("NetClient", net)
-		net.init(local_view_proxy, _scoreboard_instance, ingame, blue_spawns, red_spawns, ball_spawn, get_node(joystick_path))
+		net.init(local_view_proxy, _scoreboard_instance, ingame, blue_spawns, red_spawns, ball_scene, get_node(joystick_path))
 	else:
-		_create_ball_server()
 		var ids: Array[int] = []
+		var rosters = GameState.roster.duplicate()
 		for k in GameState.roster.keys():
 			ids.append(int(k))   # ensure int
-			_server_begin_match(ids)
+			_on_peer_joined(int(k), rosters)
 		net = WorldServerScript.new()
 		_initialize_multiplayer("NetServer", net)
 		net.start_init(_players, _scoreboard_instance, ingame, replication_manager, blue_spawns, red_spawns, ball_spawn,
-		ball_scene, GameState.match_len_sec, GameState.goal_limit, GameState.roster, get_node(joystick_path))
+		ball_scene, GameState.match_len_sec, GameState.goal_limit, rosters, get_node(joystick_path))
 		
 
 
@@ -676,9 +677,9 @@ func _setup_team_position(plane_z: float = 0.0) -> void:
 	# Face opposite direction (yaw 180°)
 	team_red.rotation_degrees.y = fposmod(team_blue.rotation_degrees.y + 180.0, 360.0)
 
-func _server_begin_match(peer_ids: Array[int]) -> void:
+func _server_begin_match(peer_ids: Array[int], rosters) -> void:
 	for id in peer_ids:
-		_on_peer_joined(id)  # your existing spawn path
+		_on_peer_joined(id, rosters)  # your existing spawn path
 
 func _physics_process(delta: float) -> void:
 	#if  Input.is_action_just_pressed("tackle"): print("tackle input was detected in physics process")
@@ -793,12 +794,12 @@ func _on_server_started() -> void:
 func _on_joined_server() -> void:
 	print("Client joined server.")
 	
-func _on_peer_joined(id: int) -> void:
+func _on_peer_joined(id: int, rosters) -> void:
 	print("Peer joined: ", id)
 	if multiplayer.is_server():
 		if GameState.is_dedicated_server() and id == 1:
 			return  # never spawn the dedicated server as a player
-		_spawn_player_for2(id)
+		_spawn_player_for2(id, rosters)
 
 
 func on_peer_joined(id: int) -> void:
@@ -846,7 +847,7 @@ func _spawn_player_for(id: int) -> void:
 		# Focus camera if this is *our* player on this machine
 		#_focus_camera_on_player(p, id)
 
-func _spawn_player_for2(id: int) -> void:
+func _spawn_player_for2(id: int, rosters) -> void:
 	if !multiplayer.is_server():
 		return
 
@@ -881,6 +882,8 @@ func _spawn_player_for2(id: int) -> void:
 	# store player_path back into roster (server-side)
 	if GameState.roster.has(id):
 		GameState.roster[id]["player_path"] = p.get_path()
+	rosters[id]["player_path"] = p.get_path()
+	rosters[id]["node_id"] = p.owner_peer_id
 
 	print("Spawned/registered player for peer ", id,
 		" (bot=", rec.get("is_bot", false),
@@ -982,7 +985,7 @@ func _gather_input() -> Dictionary:
 	"shoot_up": shoot_up,
 	"rmb": Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT),
 	"facing": facing,
-	"aim_position": _my_player.get_aim_arrow_position() if _my_player and shoot_edge_latched else null,
+	"aim_position": net.p_controller.player.get_aim_arrow_position() if net.p_controller.player and shoot_edge_latched else null,
 	"cam_yaw": yaw,
 	"assist_pass_pressed": assist_pass_edge_latched,
 	"latch_toggle": latch_edge_latched,
@@ -994,6 +997,8 @@ func _gather_input() -> Dictionary:
 
 
 func _send_local_input() -> void:
+	if GameState.is_dedicated_server():
+		return
 	if multiplayer.multiplayer_peer == null:
 		return
 
@@ -1014,7 +1019,7 @@ func _send_local_input() -> void:
 					print("PLAYER: got ability_action1 (server=", multiplayer.is_server(), ")")
 
 	else:
-		StateHandler.send_data_id(NetCodes.Msg.DISCRETE_INPUTS, d)
+		StateHandler.send_data(NetCodes.Msg.DISCRETE_INPUTS, d)
 
 @rpc("any_peer")
 func _rpc_client_input(from_id: int, d: Dictionary) -> void:

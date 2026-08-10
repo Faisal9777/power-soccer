@@ -15,6 +15,7 @@ var p_controller : LocalController
 var controllers : Array = []
 var broadcast_id : int = -1
 var ball: Node
+var rosters : Dictionary
 # Input pump
 const NET_INPUT_HZ: float = 30.0
 var last_server_seq:= {}
@@ -38,6 +39,7 @@ func start_init(players: Dictionary,
 		_is_also_player = true
 	_players = players
 	ingame.set_roster(GameState.roster)
+	rosters = roster
 	_replication_manager = replication_manager
 	_player_controller_setup(players, ball_scene, joystick, controllers)
 	_game = GameServer.new()
@@ -54,13 +56,19 @@ func start_init(players: Dictionary,
 	if _is_also_player:
 		_peers_ready +=1
 		_client_game = NodeUtils.create_game_client(self, GameClient, "GameClient", ingame, score_board, controllers)
-	_network_endpoint.rpc(NetCodes.Rpc.INPUT_STREAM, NetCodes.Msg.INIT_BEGIN, data)
+	StateHandler.send_data(NetCodes.Msg.CHANGE_STATE, {"value" : NetCodes.States.WORLD,"state_data" : roster})
 
 func handle_data(msg, value):
 	if msg == NetCodes.Msg.INPUTS:
 		process_input_by_id(value["id"], msg, value)
 	elif msg == NetCodes.Msg.DISCRETE_INPUTS:
 		_client_discrete_input(value["id"], value)
+	elif msg == NetCodes.Msg.PLAYER_RECONNECT:
+		var id = value.get("value")
+		var old_id = value.get("old_id")
+		rosters[id] = rosters[old_id]
+		rosters.erase(old_id)
+		StateHandler.send_data_id(id, NetCodes.Msg.CHANGE_STATE, {"value" : NetCodes.States.WORLD, "state_data" : GameState.roster})
 
 func process_input_by_id(peer_id: int, msg, cmd : Dictionary) -> void:
 	var idx = controllers.find_custom(
@@ -71,7 +79,7 @@ func process_input_by_id(peer_id: int, msg, cmd : Dictionary) -> void:
 	if idx == -1:
 		print("the player does not exist with the id: ", idx)
 	var controller = controllers[idx]
-	var inputs = cmd.get("inputs", [])
+	var inputs = cmd.get("value", [])
 	if inputs and inputs.size() > 0:
 		var input = _get_latest_input(inputs)
 		controller.input_buffer.push_input(input)
@@ -80,14 +88,18 @@ func process_input_by_id(peer_id: int, msg, cmd : Dictionary) -> void:
 func process_input_dictionary(msg: int, value : Dictionary) -> void:
 	#print("the msg recieved in receive_network_input_dictionary is: ", msg)
 	if msg == NetCodes.Msg.INIT_DONE:
-		_peers_ready += 1
-		#print("_peers_ready: ", _peers_ready)
-		if _peers_ready == GameState.roster.size():
-			_game.game_reset.connect(_on_game_reset)
-			_game.start_game(get_parent())
-			LoadingUI.hide_loading()
-			broadcast_id = TaskScheduler.schedule(60, _broadcast_snapshots)
-			can_process = true
+		if _game and _game.is_in_game():
+			var snap = _game.get_game_snapshot()
+			StateHandler.send_data_id(value["id"], NetCodes.Msg.GAME_BEGIN, snap)
+		else:
+			_peers_ready += 1
+			#print("_peers_ready: ", _peers_ready)
+			if _peers_ready == GameState.roster.size():
+				_game.game_reset.connect(_on_game_reset)
+				_game.start_game(get_parent())
+				LoadingUI.hide_loading()
+				broadcast_id = TaskScheduler.schedule(60, _broadcast_snapshots)
+				can_process = true
 
 func get_node_track() -> Node3D:
 	return
@@ -118,6 +130,10 @@ func _simulate_remote_players(delta) -> void:
 func _broadcast_snapshots() -> void:
 	if not can_process:
 		return
+	var snapshots := _get_snapshot()
+	StateHandler.send_data(NetCodes.Msg.SNAPSHOTS,snapshots)
+
+func _get_snapshot() -> Dictionary:
 	var snapshots := {}
 
 	for controller in controllers:  # your list of Player nodes on server
@@ -126,7 +142,7 @@ func _broadcast_snapshots() -> void:
 		snapshots[controller.id] = snapshot
 	
 	snapshots["game_state"] = _game.current_state
-	StateHandler.send_data(NetCodes.Msg.SNAPSHOTS,snapshots)
+	return snapshots
 
 func _client_discrete_input(from_id: int, d: Dictionary) -> void:
 	if d.get("grapple_toggle", false):
@@ -159,7 +175,7 @@ func _player_controller_setup(rosters : Dictionary, ball : Node, joystick: Node,
 		var node := get_node_or_null(ppath)
 		if peer_id == multiplayer.get_unique_id():
 			var player = get_node(ppath)
-			var cam = get_node_or_null("/root/World/Scene/Camera3D") as Camera3D
+			var cam = get_node_or_null(ObjectPath.CAMERA) as Camera3D
 			cam.init(node, joystick)
 			var input_source = NodeUtils.init_input_source(self)
 			var input_buffer = LocalInputBuffer.new(input_source)

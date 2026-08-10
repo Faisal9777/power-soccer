@@ -27,7 +27,9 @@ SessionManager="*res://scripts/autoload/session_manager.gd"
 Config="*res://scripts/autoload/config.gd"
 BlockingOverlay="*res://scenes/BlockingOverlay.tscn"
 TaskScheduler="*res://scripts/utility/task_scheduler.gd"
+LevelContainer="*res://scripts/autoload/level_container.gd"
 StateHandler="*res://scripts/state_handler.gd"
+ObjectPath="*res://scripts/node_path.gd"
 
 [display]
 

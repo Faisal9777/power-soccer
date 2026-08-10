@@ -383,7 +383,7 @@ func _on_ready_toggle() -> void:
 	if multiplayer.is_server():
 		_handle_lobby_action(NetCodes.Lobby_action.READY, action_val)
 	else:
-		StateHandler.send_data_id(NetCodes.Lobby_action.READY, action_val)
+		StateHandler.send_data(NetCodes.Lobby_action.READY, action_val)
 	_refresh_ui()
 	_update_start_enabled()
 
@@ -584,7 +584,6 @@ func _try_start_match() -> void:
 		return
 	for pid in GameState.roster.keys():
 		GameState.roster[pid]["ready"] = false
-	rpc("_rpc_start_match", WORLD_SCENE)
 	SessionManager.change_state(NetCodes.States.WORLD)
 
 

@@ -55,12 +55,9 @@ func change_state(state_info: int):
 	if state_info == NetCodes.States.SCOREBOARD:
 		scene_data["next_scene"] = NetCodes.States.LOBBY
 
-func send_data_id(msg, value):
+func send_data(msg, value):
 	sync.send_data_id(server_id, msg, value)
 
-func send_data(msg, value):
-	value["state"] = current_scene
-	sync.send_data_all(msg, value)
 
 func host_cloud_server():
 	BlockingOverlay.show_overlay("Creating Server...") 

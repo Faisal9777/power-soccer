@@ -189,7 +189,7 @@ func _on_create_server() -> void:
 	GameState.player_name = Settings.player_name
 	GameState.id = 1
 	GameState.roster[1] = {"name": GameState.player_name, "ready": false,
-	"is_active" : true} # team optional
+	"is_active" : true, "user_id" : GameState.user_id} # team optional
 	
 	var lan := get_lan_ip()
 	print("Hosting on UDP 24565, LAN IP =", lan)
