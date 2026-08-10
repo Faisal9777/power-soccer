@@ -82,7 +82,8 @@ func snap_to(target_transform : Transform3D) -> void:
 	global_position = desired_pos
 
 func set_joystick(n: Control) -> void:
-	joystick = n
+	if OS.has_feature("mobile"):
+		joystick = n
 
 func set_rotation_source(r_manager : LocalController) -> void:
 	rotation_manager = r_manager
@@ -170,7 +171,9 @@ func _unhandled_input(event: InputEvent) -> void:
 func _input(event: InputEvent) -> void:
 	if not _is_mobile:
 		return
-
+	# Don't process camera touch input while paused/frozen.
+	if _is_frozen:
+		return
 	var vp_size := get_viewport().get_visible_rect().size
 
 	if event is InputEventScreenTouch:
@@ -190,13 +193,13 @@ func _input(event: InputEvent) -> void:
 			return
 		if sd.index == _look_touch_id:
 			var sy: float = (1.0 if invert_y else -1.0)
-			#_yaw   -= sd.relative.x * mouse_sens
-			#_pitch += sd.relative.y * mouse_sens * sy
-			#_pitch  = clamp(_pitch, _min_pitch, _max_pitch)
-#
-			#_dy_accum += -sd.relative.x * mouse_sens
-			#_dp_accum +=  sd.relative.y * mouse_sens * sy
-
+			rotation_manager.look_yaw -= sd.relative.x * rotation_manager.mouse_sens
+			rotation_manager.look_pitch += sd.relative.y * rotation_manager.mouse_sens * sy
+			rotation_manager.look_pitch = clamp(
+				rotation_manager.look_pitch,
+				rotation_manager.min_pitch,
+				rotation_manager.max_pitch
+			)
 func consume_facing_delta() -> Dictionary:
 	var dy := _dy_accum
 	var dp := _dp_accum
@@ -279,8 +282,7 @@ func _update_facing(delta) -> void:
 			rotation_manager.max_pitch
 		)
 
-	_apply_rotation(delta)
-
+		_apply_rotation(delta)
 
 func _apply_rotation(delta: float) -> void:
 

@@ -141,7 +141,6 @@ func _remove_server(key):
 
 func _on_connect_button_pressed(data) -> void:
 	GameState.reset_lobby()
-	print(data.get("is_public"))
 	var value = data.get("is_public")
 
 	# If server is private → ask password first
@@ -279,9 +278,9 @@ func _passes_filters(data) -> bool:
 		if !filter_private:
 			return false
 
-	# Has Players
-	if filter_has_players and data.get("players", 0) > 0:
-		return true
+	# Lobby Empty
+	if filter_has_players and not data.get("can_other_join", true):
+		return false
 	# Name filter
 	if filter_name != "":
 		var server_name := String(data.get("name", "")).to_lower()

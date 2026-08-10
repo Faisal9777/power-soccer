@@ -114,7 +114,7 @@ func init(p : Node3D,
 	ball_spawn: Node3D,
 	j_stick) -> void:
 	proxy = p
-	joystick = j_stick
+	joystick = get_node("/root/World/CanvasLayer/UI/JoyStick") 
 	blue_sp = blue_spawns
 	red_sp = red_spawns
 	ball_sp = ball_spawn
@@ -227,3 +227,5 @@ func _send_network_id(sender_id, msg, value) -> void:
 	if _can_network:
 		StateHandler.send_data_id(msg, value)
 	
+func _get_player_controller() -> PlayerController:
+	return p_controller

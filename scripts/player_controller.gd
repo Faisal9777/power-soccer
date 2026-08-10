@@ -65,6 +65,9 @@ func process_input(delta):
 	if GameState.is_paused:
 		return
 	var input = input_buffer.get_input()
+	if is_mobile and is_instance_valid(joystick):
+		input["mvx"] = joystick.vector.x
+		input["mvz"] = joystick.vector.y
 	_apply_inputs(input, delta)
 	input["yaw"] = look_yaw
 	input["pitch"] = look_pitch
@@ -104,8 +107,11 @@ func _reconcile_local_best_practice(p: Node3D, snap: Dictionary) -> void:
 			_pending_inputs.remove_at(i)
 		else:
 			i += 1
-
 	# --- D) replay remaining inputs using FIXED dt (determinism) ---
 	for cmd in _pending_inputs:
 		_apply_inputs(cmd, _fixed_dt)
 	on_reconciled.emit(player.global_transform)
+
+
+func set_paused(state: bool) -> void:
+	super.set_paused(state)

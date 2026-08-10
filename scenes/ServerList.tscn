@@ -1,7 +1,7 @@
 [gd_scene load_steps=3 format=3 uid="uid://dcy4agh5qcqs7"]
 
-[ext_resource type="Script" uid="uid://1t3rtoslcsgk" path="res://scenes/server_list.gd" id="1_4xksb"]
-[ext_resource type="Script" uid="uid://7diq48uxaes" path="res://scripts/back_button.gd" id="2_jl44o"]
+[ext_resource type="Script" uid="uid://de1wwmdpnlt28" path="res://scenes/server_list.gd" id="1_4xksb"]
+[ext_resource type="Script" uid="uid://ceee5sxahoj0d" path="res://scripts/back_button.gd" id="2_jl44o"]
 
 [node name="ServerList" type="Control"]
 layout_mode = 3
@@ -81,7 +81,7 @@ text = "Cloud"
 
 [node name="HasPlayers" type="CheckBox" parent="FilterBox/FilterOptions"]
 layout_mode = 2
-text = "Has Players"
+text = "Lobbies Not Full"
 
 [node name="Private" type="CheckBox" parent="FilterBox/FilterOptions"]
 layout_mode = 2

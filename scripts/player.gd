@@ -848,7 +848,7 @@ func _get_input_dir_server() -> Vector3:
 
 func _handle_action_server(input_dir: Vector3, delta: float) -> void:
 	#if _cooldowns["move"] == 0.0:
-		#_move_server(input_dir, delta)
+		#_move_server(input_dir, delta, _using_sprint)
 	if _cooldowns["jump"] == 0.0:
 		_handle_jump_server()
 	_handle_kick_action_server()

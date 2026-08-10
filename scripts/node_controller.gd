@@ -48,7 +48,13 @@ func _get_player_movement(input) -> Dictionary:
 			"mvz": 0.0,
 			"sprint": false
 		}
-
+	# Mobile / replayed joystick input
+	if input.has("mvx") and input.has("mvz"):
+		return {
+			"mvx": float(input["mvx"]),
+			"mvz": float(input["mvz"]),
+			"sprint": bool(input.get("sprint", false))
+		}
 	var mvx: float = (
 		float(input.get("move_right", 0.0)) -
 		float(input.get("move_left", 0.0))

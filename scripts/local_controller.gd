@@ -29,6 +29,8 @@ func freeze(toggle) -> void:
 func _init(p_player, pid, p_name, team, c_cam, ball, joystick, i_buffer : InputBuffer):
 	cam = c_cam
 	cam.set_rotation_source(self)
+	self.joystick = joystick
+
 	super._init(p_player, pid, p_name, team, ball, i_buffer)
 
 func _get_player_movement(input) -> Dictionary:
@@ -51,6 +53,8 @@ func _get_player_movement(input) -> Dictionary:
 
 func _generate_facing_direction_with_input(input) -> void:
 	if _paused:
+		return
+	if is_mobile:
 		return
 	if input.get('rmb'):
 	# Direction FROM camera TO target

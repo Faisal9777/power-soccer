@@ -11,6 +11,9 @@ extends Node
 @export var bot_player_scene: PackedScene
 
 var _local_controller: LocalController
+var _player_controller: PlayerController
+
+
 
 var _def_tex_ability: Texture2D
 var _def_tex_a1: Texture2D
@@ -168,6 +171,7 @@ func _ready() -> void:
 		net = WorldClientScript.new()
 		_initialize_multiplayer("NetClient", net)
 		net.init(local_view_proxy, _scoreboard_instance, ingame, blue_spawns, red_spawns, ball_spawn, get_node(joystick_path))
+		net.local_controller_created.connect(_on_player_controller_created)
 	else:
 		_create_ball_server()
 		var ids: Array[int] = []
@@ -421,6 +425,9 @@ func _toggle_pause_menu() -> void:
 	GameState.is_paused = true
 	if _local_controller:
 		_local_controller.set_paused(true)
+	if _player_controller:
+		print("lets pause")
+		_player_controller.set_paused(true)
 	if _btn_resume:
 		_btn_resume.grab_focus()  # keyboard/controller friendly
 
@@ -430,6 +437,9 @@ func _on_pause_resume() -> void:
 	GameState.is_paused = false
 	if _local_controller:
 		_local_controller.set_paused(false)
+	if _player_controller:
+		print("lets pause")
+		_player_controller.set_paused(false)
 	if !OS.has_feature("mobile"):  # don’t hide mouse on touch devices
 		Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 
@@ -1419,3 +1429,6 @@ func _perf_tick(delta: float) -> void:
 
 		_perf_acc = 0.0
 		_perf_frames = 0
+
+func _on_player_controller_created() -> void:
+	_player_controller = net._get_player_controller()

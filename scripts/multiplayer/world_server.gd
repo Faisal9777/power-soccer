@@ -33,13 +33,15 @@ func start_init(players: Dictionary,
 	goal_limit: int,
 	roster: Dictionary,
 	joystick : Node) -> void:
+	var Joystick : Node = get_node("/root/World/CanvasLayer/UI/JoyStick")
+
 	ball = ball_scene
 	if GameState.roster.has(1):
 		_is_also_player = true
 	_players = players
 	ingame.set_roster(GameState.roster)
 	_replication_manager = replication_manager
-	_player_controller_setup(players, ball_scene, joystick, controllers)
+	_player_controller_setup(players, ball_scene, Joystick, controllers)
 	_game = GameServer.new()
 	add_child(_game)
 	# Give Game everything it needs *before* it's added (so _ready can safely use them)
