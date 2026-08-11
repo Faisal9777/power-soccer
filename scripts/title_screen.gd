@@ -67,12 +67,12 @@ func _ready() -> void:
 	btn_play.pressed.connect(_start_game)
 	btn_multi.pressed.connect(_open_multiplayer_screen)
 
-	# NEW: Graphics Settings button (auto-create if not in scene)
+	# Settings button (auto-create if not in scene)
 	var btn_gfx := vb.get_node_or_null("GraphicsButton") as Button
 	if btn_gfx == null:
 		btn_gfx = Button.new()
 		btn_gfx.name = "GraphicsButton"
-		btn_gfx.text = "Graphics Settings"
+		btn_gfx.text = "Settings"
 		btn_gfx.custom_minimum_size = Vector2i(260, 56)
 
 		# Put it under MultiplayerButton, and above QuitButton if it exists
@@ -80,7 +80,7 @@ func _ready() -> void:
 		if quit_btn:
 			vb.move_child(btn_gfx, quit_btn.get_index())
 
-	btn_gfx.pressed.connect(_open_graphics_settings)
+	btn_gfx.pressed.connect(_open_settings)
 
 	# Popup buttons
 	btn_find.pressed.connect(_on_find_server)
@@ -422,46 +422,41 @@ func _fade_then_change() -> void:
 	t.tween_property(fade, "modulate:a", 1.0, 0.35)
 	await t.finished
 	get_tree().change_scene_to_file(game_scene_path)
-func _open_graphics_settings() -> void:
+func _open_settings() -> void:
 	if _gfx_ui and _gfx_ui.visible:
 		_gfx_ui.hide()
 		return
 
 	if _gfx_ui == null:
-		_gfx_ui = _create_graphics_settings_ui()
+		_gfx_ui = _create_settings_ui()
 		add_child(_gfx_ui)
 
 	_gfx_ui.visible = true
 
 
-func _create_graphics_settings_ui() -> Control:
+func _create_settings_ui() -> Control:
 	var root := Control.new()
-	root.name = "GraphicsSettings"
+	root.name = "SettingsWindow"
 	root.visible = false
 	root.mouse_filter = Control.MOUSE_FILTER_STOP
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
 
-	# background dim
 	var dim := ColorRect.new()
 	dim.color = Color(0, 0, 0, 0.5)
 	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
 	root.add_child(dim)
 
-	# centered panel
 	var center := CenterContainer.new()
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	root.add_child(center)
 
 	var panel := Panel.new()
-
-	# ✅ Make panel fit the screen (avoid going off-screen on small displays)
 	var vp := get_viewport_rect().size
-	var w := int(min(520.0, vp.x - 40.0))
-	var h := int(min(520.0, vp.y - 40.0))
-	panel.custom_minimum_size = Vector2i(max(360, w), max(300, h))
+	var w := int(min(640.0, vp.x - 40.0))
+	var h := int(min(620.0, vp.y - 40.0))
+	panel.custom_minimum_size = Vector2i(max(420, w), max(360, h))
 	center.add_child(panel)
 
-	# padding inside panel
 	var pad := MarginContainer.new()
 	pad.set_anchors_preset(Control.PRESET_FULL_RECT)
 	pad.add_theme_constant_override("margin_left", 16)
@@ -470,22 +465,18 @@ func _create_graphics_settings_ui() -> Control:
 	pad.add_theme_constant_override("margin_bottom", 16)
 	panel.add_child(pad)
 
-	# main layout: Header + Scroll + Buttons
 	var main_v := VBoxContainer.new()
 	main_v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	main_v.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	main_v.add_theme_constant_override("separation", 12)
 	pad.add_child(main_v)
 
-	# --------------------
-	# Header row (Title + X)
-	# --------------------
 	var header := HBoxContainer.new()
 	header.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	main_v.add_child(header)
 
 	var title := Label.new()
-	title.text = "Graphics Settings"
+	title.text = "Settings"
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	title.add_theme_font_size_override("font_size", 24)
@@ -497,119 +488,188 @@ func _create_graphics_settings_ui() -> Control:
 	close_btn.custom_minimum_size = Vector2i(44, 44)
 	header.add_child(close_btn)
 
-	# --------------------
-	# Scrollable content
-	# --------------------
-	var scroll := ScrollContainer.new()
-	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	main_v.add_child(scroll)
+	var tabs := TabContainer.new()
+	tabs.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	main_v.add_child(tabs)
 
-	var v := VBoxContainer.new()
-	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	v.add_theme_constant_override("separation", 14)
-	scroll.add_child(v)
+	var graphics_page := Control.new()
+	graphics_page.name = "Graphics"
+	graphics_page.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	graphics_page.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	tabs.add_child(graphics_page)
 
-	# --- Fullscreen toggle ---
+	var graphics_margin := MarginContainer.new()
+	graphics_margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	graphics_margin.add_theme_constant_override("margin_left", 8)
+	graphics_margin.add_theme_constant_override("margin_right", 8)
+	graphics_margin.add_theme_constant_override("margin_top", 8)
+	graphics_margin.add_theme_constant_override("margin_bottom", 8)
+	graphics_page.add_child(graphics_margin)
+
+	var graphics_v := VBoxContainer.new()
+	graphics_v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	graphics_v.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	graphics_v.add_theme_constant_override("separation", 10)
+	graphics_margin.add_child(graphics_v)
+
+	# ============================================================
+	# Scrollable graphics options
+	# ============================================================
+
+	var graphics_scroll := ScrollContainer.new()
+	graphics_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	graphics_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	graphics_scroll.size_flags_stretch_ratio = 1.0
+	graphics_v.add_child(graphics_scroll)
+
+	var graphics_content := VBoxContainer.new()
+	graphics_content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	graphics_content.add_theme_constant_override("separation", 14)
+	graphics_scroll.add_child(graphics_content)
+
+	# ---------------- Fullscreen ----------------
+
 	var fullscreen := CheckBox.new()
 	fullscreen.text = "Fullscreen"
-	fullscreen.button_pressed = DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN
-	v.add_child(fullscreen)
+	fullscreen.button_pressed = (
+		DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN
+	)
+	graphics_content.add_child(fullscreen)
 
-	# --- VSync toggle ---
+	# ---------------- VSync ----------------
+
 	var vsync := CheckBox.new()
 	vsync.text = "VSync"
-	vsync.button_pressed = ProjectSettings.get_setting("display/window/vsync/vsync_mode") != 0
-	v.add_child(vsync)
+	vsync.button_pressed = (
+		ProjectSettings.get_setting(
+			"display/window/vsync/vsync_mode"
+		) != 0
+	)
+	graphics_content.add_child(vsync)
 
-	# --- Quality dropdown ---
+	# ---------------- MSAA Quality ----------------
+
 	var quality_label := Label.new()
 	quality_label.text = "Quality (MSAA)"
-	v.add_child(quality_label)
+	graphics_content.add_child(quality_label)
 
 	var quality := OptionButton.new()
 	quality.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+
 	quality.add_item("Low (No AA)", 0)
 	quality.add_item("Medium (2x AA)", 1)
 	quality.add_item("High (4x AA)", 2)
 
 	match get_viewport().msaa_3d:
-		Viewport.MSAA_DISABLED: quality.select(0)
-		Viewport.MSAA_2X:       quality.select(1)
-		Viewport.MSAA_4X:       quality.select(2)
-		_:                      quality.select(clamp(Settings.quality, 0, 2))
-	v.add_child(quality)
+		Viewport.MSAA_DISABLED:
+			quality.select(0)
+		Viewport.MSAA_2X:
+			quality.select(1)
+		Viewport.MSAA_4X:
+			quality.select(2)
+		_:
+			quality.select(clamp(Settings.quality, 0, 2))
 
-	# --- Texture quality dropdown ---
+	graphics_content.add_child(quality)
+
+	# ---------------- Texture Quality ----------------
+
 	var tex_label := Label.new()
 	tex_label.text = "Texture Quality"
-	v.add_child(tex_label)
+	graphics_content.add_child(tex_label)
 
 	var tex_quality := OptionButton.new()
 	tex_quality.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+
 	tex_quality.add_item("Low", 0)
 	tex_quality.add_item("Medium", 1)
 	tex_quality.add_item("High", 2)
-	tex_quality.select(clamp(Settings.tex_quality, 0, 2))
-	v.add_child(tex_quality)
 
-	# --- 3D Render Scale (Scaling 3D -> Scale) ---
+	tex_quality.select(clamp(Settings.tex_quality, 0, 2))
+
+	graphics_content.add_child(tex_quality)
+
+	# ---------------- 3D Render Scale ----------------
+
 	var scale_label := Label.new()
 	scale_label.text = "3D Render Scale"
-	v.add_child(scale_label)
+	graphics_content.add_child(scale_label)
 
 	var scale_row := HBoxContainer.new()
 	scale_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scale_row.add_theme_constant_override("separation", 12)
-	v.add_child(scale_row)
+	graphics_content.add_child(scale_row)
 
 	var scale_slider := HSlider.new()
 	scale_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scale_slider.min_value = 0.25
 	scale_slider.max_value = 2.0
 	scale_slider.step = 0.05
-	scale_slider.value = clampf(Settings.scale_3d, float(scale_slider.min_value), float(scale_slider.max_value))
+	scale_slider.value = clampf(
+		Settings.scale_3d,
+		float(scale_slider.min_value),
+		float(scale_slider.max_value)
+	)
 	scale_row.add_child(scale_slider)
 
 	var scale_value := Label.new()
 	scale_value.custom_minimum_size = Vector2i(70, 0)
 	scale_row.add_child(scale_value)
 
-	var _update_scale_text := func():
+	var update_scale_text := func():
 		scale_value.text = "%d%%" % int(round(scale_slider.value * 100.0))
-	_update_scale_text.call()
+
+	update_scale_text.call()
 
 	scale_slider.value_changed.connect(func(_v):
-		_update_scale_text.call()
+		update_scale_text.call()
 	)
 
-	# --------------------
-	# Bottom buttons (always visible)
-	# --------------------
-	var hrow := HBoxContainer.new()
-	hrow.alignment = BoxContainer.ALIGNMENT_CENTER
-	hrow.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	hrow.add_theme_constant_override("separation", 16)
-	main_v.add_child(hrow)
+	# ============================================================
+	# Bottom buttons
+	# IMPORTANT: These are OUTSIDE the ScrollContainer
+	# ============================================================
+
+	var button_row := HBoxContainer.new()
+	button_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	button_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	button_row.size_flags_vertical = Control.SIZE_SHRINK_END
+	button_row.add_theme_constant_override("separation", 16)
+
+	graphics_v.add_child(button_row)
 
 	var apply := Button.new()
+	apply.name = "ApplyButton"
 	apply.text = "Apply"
 	apply.custom_minimum_size = Vector2i(160, 48)
-	hrow.add_child(apply)
+	apply.focus_mode = Control.FOCUS_ALL
+	button_row.add_child(apply)
 
 	var back := Button.new()
+	back.name = "BackButton"
 	back.text = "Back"
 	back.custom_minimum_size = Vector2i(160, 48)
-	hrow.add_child(back)
+	back.focus_mode = Control.FOCUS_ALL
+	button_row.add_child(back)
 
-	# --- handlers ---
+	# ============================================================
+	# Close
+	# ============================================================
+
 	var _close := func():
 		root.hide()
 
 	close_btn.pressed.connect(_close)
 	back.pressed.connect(_close)
 
+	# ============================================================
+	# APPLY GRAPHICS SETTINGS
+	# ============================================================
+
 	apply.pressed.connect(func():
+		print("SETTINGS: Apply pressed")
+
 		_apply_graphics_settings(
 			fullscreen.button_pressed,
 			vsync.button_pressed,
@@ -618,6 +678,31 @@ func _create_graphics_settings_ui() -> Control:
 			float(scale_slider.value)
 		)
 	)
+	if not OS.has_feature("mobile"):
+		var key_page := Control.new()
+		key_page.name = "Key Bindings"
+		key_page.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		key_page.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		tabs.add_child(key_page)
+
+		var key_margin := MarginContainer.new()
+		key_margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+		key_margin.add_theme_constant_override("margin_left", 8)
+		key_margin.add_theme_constant_override("margin_right", 8)
+		key_margin.add_theme_constant_override("margin_top", 8)
+		key_margin.add_theme_constant_override("margin_bottom", 8)
+		key_page.add_child(key_margin)
+
+		var key_bindings_ui := preload("res://scripts/KeyBindingsUI.gd").new()
+		key_bindings_ui.name = "KeyBindingsUI"
+		key_bindings_ui.set_anchors_preset(Control.PRESET_FULL_RECT)
+		key_margin.add_child(key_bindings_ui)
+
+	var tab_names := ["Graphics"]
+	if not OS.has_feature("mobile"):
+		tab_names.append("Key Bindings")
+	for index in range(tab_names.size()):
+		tabs.set_tab_title(index, tab_names[index])
 
 	return root
 
