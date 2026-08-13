@@ -698,9 +698,25 @@ func _create_settings_ui() -> Control:
 		key_bindings_ui.set_anchors_preset(Control.PRESET_FULL_RECT)
 		key_margin.add_child(key_bindings_ui)
 
+	if OS.has_feature("mobile"):
+		var layout_page := preload(
+			"res://scripts/LayoutEditor.gd"
+		).new()
+
+		layout_page.name = "Layout"
+
+		layout_page.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		layout_page.size_flags_vertical = Control.SIZE_EXPAND_FILL
+
+		tabs.add_child(layout_page)
+
 	var tab_names := ["Graphics"]
-	if not OS.has_feature("mobile"):
+
+	if OS.has_feature("mobile"):
+		tab_names.append("Layout")
+	else:
 		tab_names.append("Key Bindings")
+
 	for index in range(tab_names.size()):
 		tabs.set_tab_title(index, tab_names[index])
 

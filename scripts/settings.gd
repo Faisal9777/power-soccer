@@ -14,7 +14,8 @@ var tex_quality := 2      # 0=Low, 1=Med, 2=High (Textures)
 var scale_3d: float = 1.0
 var key_bindings: Dictionary = {}
 var _default_key_bindings: Dictionary = {}
-
+# Layout state for CanvasLayer UI
+var layout_state: Dictionary = {}
 func _enter_tree() -> void:
 	_capture_default_key_bindings()
 	_load()
@@ -85,12 +86,15 @@ func _load() -> void:
 		quality     = cfg.get_value("video", "quality", quality)
 		tex_quality = cfg.get_value("video", "texture_quality", tex_quality)
 
-		# NEW:
-		scale_3d    = float(cfg.get_value("video", "scale_3d", scale_3d))
+		scale_3d = float(cfg.get_value("video", "scale_3d", scale_3d))
 
-		# profile
 		player_name = cfg.get_value("profile", "name", player_name)
+
 		key_bindings = cfg.get_value("input", "bindings", {})
+
+		layout_state = cfg.get_value("layout", "state", {})
+		if typeof(layout_state) != TYPE_DICTIONARY:
+			layout_state = {}
 
 func _save() -> void:
 	var cfg := ConfigFile.new()
@@ -105,6 +109,8 @@ func _save() -> void:
 
 	cfg.set_value("profile", "name", player_name)
 	cfg.set_value("input", "bindings", key_bindings)
+	cfg.set_value("layout", "state", layout_state)
+
 
 	cfg.save(CFG_PATH)
 
@@ -418,3 +424,16 @@ func set_action_binding_force(
 	_apply_key_bindings()
 
 	return true
+
+func set_layout_state_and_save(state: Dictionary) -> void:
+	layout_state = state.duplicate(true)
+	_save()
+
+
+func clear_layout_state_and_save() -> void:
+	layout_state.clear()
+	_save()
+
+
+func has_layout_state() -> bool:
+	return not layout_state.is_empty()

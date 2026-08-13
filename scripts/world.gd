@@ -158,6 +158,8 @@ func _ready() -> void:
 	_pass_cd_label = _ensure_cd_label(pass_btn)
 	_ensure_grapple_crosshair()
 	_cache_default_ability_textures()
+	# Apply saved UI layout (after UI/joystick scripts finish their _ready)
+	call_deferred("_apply_saved_layout_to_world_ui")
 	#_initialize_game_setup()
 	var game : Node = Ingame.new()
 	game.name = "ingame_state"
@@ -460,8 +462,9 @@ func _open_settings() -> void:
 
 	if _gfx_ui == null:
 		_gfx_ui = _create_settings_ui()
-		add_child(_gfx_ui)
-
+		var canvas_layer := get_node("CanvasLayer") as CanvasLayer
+		canvas_layer.add_child(_gfx_ui)
+		
 	_gfx_ui.visible = true
 	_pause_ui.hide()
 
@@ -471,9 +474,11 @@ func _create_settings_ui() -> Control:
 	root.visible = false
 	root.mouse_filter = Control.MOUSE_FILTER_STOP
 	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	root.process_mode = Node.PROCESS_MODE_ALWAYS
 	
 	var dim := ColorRect.new()
 	dim.color = Color(0, 0, 0, 0.5)
+	dim.mouse_filter = Control.MOUSE_FILTER_STOP
 	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
 	root.add_child(dim)
 
@@ -729,7 +734,18 @@ func _create_settings_ui() -> Control:
 		key_bindings_ui.name = "KeyBindingsUI"
 		key_bindings_ui.set_anchors_preset(Control.PRESET_FULL_RECT)
 		key_margin.add_child(key_bindings_ui)
+	
+	if OS.has_feature("mobile"):
+		var layout_page := preload(
+			"res://scripts/LayoutEditor.gd"
+		).new()
+		layout_page.world_root = self
+		layout_page.name = "Layout"
 
+		layout_page.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		layout_page.size_flags_vertical = Control.SIZE_EXPAND_FILL
+
+		tabs.add_child(layout_page)
 	var tab_names := ["Graphics"]
 	if not OS.has_feature("mobile"):
 		tab_names.append("Key Bindings")
@@ -1531,3 +1547,79 @@ func _setup_desktop_canvas_ui() -> void:
 			child.show()
 		else:
 			child.hide()
+
+func _get_saved_layout_state() -> Dictionary:
+	# Supports either:
+	# - Settings.has_layout_state() + Settings.layout_state
+	# - or just Settings.layout_state
+	if Settings == null:
+		return {}
+
+	if Settings.has_method("has_layout_state") and Settings.call("has_layout_state"):
+		if Settings.has_method("get"):
+			var d = Settings.get("layout_state")
+			return d if d is Dictionary else {}
+		return Settings.layout_state if "layout_state" in Settings else {}
+
+	# fallback: if you don’t have has_layout_state(), still try layout_state
+	if Settings.has_method("get"):
+		var d2 = Settings.get("layout_state")
+		return d2 if d2 is Dictionary else {}
+
+	return {}
+
+
+func _apply_layout_state_to_item(item: CanvasItem, state: Dictionary) -> void:
+	if state.is_empty() or not state.has("t"):
+		return
+
+	if state["t"] == "c" and item is Control:
+		var c := item as Control
+		# anchors first
+		c.anchor_left = float(state.get("al", c.anchor_left))
+		c.anchor_top = float(state.get("at", c.anchor_top))
+		c.anchor_right = float(state.get("ar", c.anchor_right))
+		c.anchor_bottom = float(state.get("ab", c.anchor_bottom))
+		# then offsets
+		c.offset_left = float(state.get("ol", c.offset_left))
+		c.offset_top = float(state.get("ot", c.offset_top))
+		c.offset_right = float(state.get("or", c.offset_right))
+		c.offset_bottom = float(state.get("ob", c.offset_bottom))
+
+	else:
+		# Node2D / TouchScreenButton path
+		if state.has("p"):
+			item.position = state["p"]
+
+
+func _apply_saved_layout_to_world_ui() -> void:
+	# Wait so UI.gd (rescale) and joy_stick.gd (_ready centering) finishes first
+	await get_tree().process_frame
+	await get_tree().process_frame
+
+	var cl := get_node_or_null(^"CanvasLayer")
+	if cl == null:
+		return
+
+	var saved := _get_saved_layout_state()
+	if saved.is_empty():
+		return
+
+	# Keys were saved like "UI/JoyStick", "UI/ActionPad/Jump", ...
+	for k in saved.keys():
+		var key_str := String(k)
+		var n := cl.get_node_or_null(NodePath(key_str))
+		if n != null and n is CanvasItem:
+			_apply_layout_state_to_item(n as CanvasItem, saved[k])
+	_debug_print_world_ui_sizes("after apply_saved_layout")
+
+func _debug_print_world_ui_sizes(tag: String = "") -> void:
+	var vp := get_viewport().get_visible_rect().size
+	print("[WorldUI]", tag, " viewport_w=", vp.x, " viewport_h=", vp.y)
+
+	var ui := get_node_or_null(^"CanvasLayer/UI")
+	if ui is Control:
+		var c := ui as Control
+		print("[WorldUI]", tag,
+			" ui_w=", c.size.x, " ui_h=", c.size.y,
+			" ui_global_rect=", c.get_global_rect())
