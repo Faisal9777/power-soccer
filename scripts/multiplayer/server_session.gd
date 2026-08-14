@@ -8,7 +8,7 @@ signal server_found(info)
 var _transport_method : IAnnounceTransport
 var current_scene := 1 
 var server_password: int  = 0
-
+var _empty_shutdown_started = false
 var peer_identities := {}
 
 var current_state : Node
@@ -17,6 +17,8 @@ var scene_after_server = ""
 var server_info = {}
 var lobby_id : String = ""
 var is_cloud_session := true
+var is_connected = false
+
 var can_broadcast := false
 var can_world_state_broadcast := true
 var can_track_player := false
@@ -68,6 +70,7 @@ func host(server_name, is_public, scene):
 	server_password = randi_range(100000, 999999)
 
 	Network.peer_left.connect(_on_peer_left)
+	Network.all_peers_left.connect(_on_all_peers_left)
 	Network.server_started.connect(_on_hosting_started)
 	Network.host(server_info)
 
@@ -137,6 +140,12 @@ func _broadcast():
 			server_info["players"] = _get_all_user_ids()
 
 		server_info["id"] = lobby_id
+		print(
+			"HEARTBEAT STATE: current_scene=",
+			current_scene,
+			" current_state=",
+			server_info.get("current_state")
+		)
 		print("Sending heartbeat with lobby_id=", lobby_id, "server_info=", server_info)
 		_transport_method.send(server_info)
 
@@ -176,6 +185,8 @@ func _check_server_status():
 
 func _on_hosting_started():
 	can_broadcast = true
+	is_connected = true
+
 	sync = await SessionManager.create_network_sync()
 	var timer = Timer.new()
 	timer.wait_time = 2.0
@@ -206,7 +217,14 @@ func _srv_register_player(payload: Dictionary):
 	var user_id = payload.get("user_id", 0)
 	var session_token = payload.get("session_token", "")
 	print("[register] incoming id=%s user_id=%s can_other_join=%s is_cloud_session=%s" % [id, user_id, can_other_join, is_cloud_session])
+	var lobby_full := GameState.get_players_connected() >= GameState.get_lobby_size()
 
+	if lobby_full:
+		print("[register] REJECTING id=%s: lobby full" % id)
+		sync.send_data_id(id, NetCodes.Msg.REJECT, {"message": "Lobby is full"})
+		#Network.disconnect_peer(id)
+		return
+		
 	var should_reject = not can_other_join or (is_cloud_session and not await _can_join(user_id, session_token))
 	print("[register] should_reject=%s" % should_reject)
 	if should_reject:
@@ -315,8 +333,16 @@ func _notify_player_joined(user_id: int, session_token: String) -> bool:
 	return await _transport_method.post(NetCodes.backend.PLAYER_JOINED, body, session_token) == HTTPClient.RESPONSE_OK
 
 func _get_all_user_ids() -> Array:
-		return GameState.roster.values().map(func(player): return player["user_id"])
+	var user_ids: Array = []
 
+	for player in GameState.roster.values():
+		if player.get("is_bot", false):
+			continue
+
+		if player.has("user_id"):
+			user_ids.append(player["user_id"])
+
+	return user_ids
 func _can_join(user_id, session_token: String):
 	var validated = await _transport_method.validate(user_id, session_token)
 	print("validate =", validated)
@@ -331,3 +357,67 @@ func _can_join(user_id, session_token: String):
 		return false
 
 	return true
+
+func disconnect_connection() -> void:
+	_disconnect()
+	
+func _disconnect() -> void:
+	if is_connected:
+		_disconnect_from_events()
+		GameState.clear()
+		Network.close_connection()
+		is_connected = false
+		StateHandler.change_state(NetCodes.States.TITLE)
+
+func _disconnect_from_events():
+	if Network.joined_server.is_connected(_on_joined_server):
+		Network.joined_server.disconnect(_on_joined_server)
+
+	if Network.connection_failed.is_connected(_on_connection_failed):
+		Network.connection_failed.disconnect(_on_connection_failed)
+
+	if Network.server_disconnected.is_connected(_on_server_disconnected):
+		Network.server_disconnected.disconnect(_on_server_disconnected)
+
+func _on_connection_failed() -> void:
+	_disconnect()
+
+func _on_server_disconnected() -> void:
+	_disconnect()
+	
+func _on_all_peers_left() -> void:
+	if !GameState.is_dedicated_server():
+		return
+
+	# IMPORTANT:
+	# Empty lobby should NOT be destroyed here.
+	# Let the backend idle timeout handle it normally.
+	if current_scene != NetCodes.States.WORLD:
+		return
+
+	print("All players left during game. Destroying dedicated match.")
+
+	_empty_shutdown_started = true
+	call_deferred("_shutdown_empty_game_server")
+
+func _shutdown_empty_game_server() -> void:
+	if !GameState.is_dedicated_server():
+		return
+
+	# Someone rejoined before shutdown.
+	if multiplayer.get_peers().size() > 0:
+		_empty_shutdown_started = false
+		return
+
+	# Stop heartbeat FIRST.
+	disable_broadcast()
+
+	print("No players remain in WORLD.")
+	print("Stopping heartbeat and shutting down dedicated game.")
+
+	# Remove server from backend immediately.
+	if _transport_method != null and _transport_method.has_method("unregister"):
+		await _transport_method.unregister(server_info.get("id", ""))
+
+	# Destroy dedicated server process.
+	get_tree().quit()

@@ -2,6 +2,7 @@ extends Node
 class_name ClientSession
 
 signal auth_failed
+signal rejected
 signal joined_server
 signal server_found(info)
 
@@ -16,7 +17,7 @@ var server_id := 1
 var sync : Node
 var ENDPOINTS = preload("res://scripts/shared/endpoints.gd")
 const C = preload("res://scripts/shared/scene.gd")
-const REQUEST_TIMEOUT_MS = 10.0  # seconds
+const REQUEST_TIMEOUT_MS = 30.0  # seconds
 var client_password
 
 var _timeout_timer: SceneTreeTimer = null
@@ -105,7 +106,8 @@ func handle_data(msg, data):
 		sync.send_data_id(1, NetCodes.Msg.REGISTER_PEER, payload)
 	if msg == NetCodes.Msg.AUTH_FAILED:
 		auth_failed.emit()
-	
+	if msg == NetCodes.Msg.REJECT:
+		rejected.emit()
 	var state = data.get("state")
 	if state == NetCodes.States.SESSION:
 		if msg == NetCodes.Msg.STATE_DATA:
@@ -195,6 +197,7 @@ func _disconnect() -> void:
 		is_connected = false
 		StateHandler.change_state(NetCodes.States.TITLE)
 
+
 func _cl_sync_roster(server_info):
 	BlockingOverlay.hide()
 	server_id = server_info.get("server_id", 1)
@@ -210,6 +213,7 @@ func _disconnect_from_events():
 
 	if Network.server_disconnected.is_connected(_on_server_disconnected):
 		Network.server_disconnected.disconnect(_on_server_disconnected)
+
 func _exit_tree():
 	_disconnect_from_events()
 func close_connection():

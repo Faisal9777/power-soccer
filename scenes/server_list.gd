@@ -37,6 +37,7 @@ func _ready():
 	#_populate_server_list()
 	session_node.server_found.connect(_on_server_found)
 	session_node.auth_failed.connect(_on_auth_failed)
+	session_node.rejected.connect(_on_rejected)
 
 	session_node.start_discovery()
 	filter_options.visible = false
@@ -141,8 +142,6 @@ func _remove_server(key):
 
 func _on_connect_button_pressed(data) -> void:
 	GameState.reset_lobby()
-	var value = data.get("is_public")
-
 	# If server is private → ask password first
 	if not data.get("is_public", true):
 		pending_join_data = data
@@ -223,7 +222,15 @@ func _show_password_popup():
 	popup.popup_centered()
 func _on_auth_failed():
 	session_node.close_connection()
+	session_node.start_discovery()
+
 	_show_auth_failed_popup()
+
+func _on_rejected():
+	session_node.close_connection()
+	session_node.start_discovery()
+
+	_show_lobby_full_popup()
 	
 func _show_auth_failed_popup():
 	var popup := Window.new()
@@ -258,11 +265,14 @@ func _show_auth_failed_popup():
 	ok_btn.pressed.connect(func():
 		popup.queue_free()
 		_show_password_popup()
-		session_node.start_discovery()
 	)
 
 	popup.popup_centered()
 func _passes_filters(data) -> bool:
+		# Never show servers where the match has already started.
+	if int(data.get("current_state", NetCodes.States.LOBBY)) != NetCodes.States.LOBBY:
+		return false
+
 	# LAN / Cloud
 	if data.get("is_lan", true):
 		if !filter_lan:
@@ -315,3 +325,36 @@ func _on_back_pressed():
 func _on_search_changed(new_text: String):
 	filter_name = new_text.strip_edges()
 	_refresh_filters()
+	
+func _show_lobby_full_popup() -> void:
+	var popup := Window.new()
+	popup.title = "Lobby Full"
+	popup.size = Vector2i(350, 180)
+	popup.initial_position = Window.WINDOW_INITIAL_POSITION_CENTER_MAIN_WINDOW_SCREEN
+	popup.unresizable = true
+
+	add_child(popup)
+
+	var vbox := VBoxContainer.new()
+	vbox.set_anchors_preset(Control.PRESET_FULL_RECT)
+	vbox.add_theme_constant_override("separation", 15)
+	popup.add_child(vbox)
+
+	var label := Label.new()
+	label.text = "Lobby is full."
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	vbox.add_child(label)
+
+	var ok_btn := Button.new()
+	ok_btn.text = "OK"
+	ok_btn.custom_minimum_size = Vector2i(100, 40)
+	vbox.add_child(ok_btn)
+
+	ok_btn.pressed.connect(func():
+		popup.queue_free()
+	)
+	
+
+	popup.popup_centered()

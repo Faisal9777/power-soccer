@@ -598,9 +598,10 @@ func _try_start_match() -> void:
 		return
 	for pid in GameState.roster.keys():
 		GameState.roster[pid]["ready"] = false
+	if multiplayer.is_server():
+		SessionManager.session_node.change_state(NetCodes.States.WORLD)
 	rpc("_rpc_start_match", WORLD_SCENE)
 	SessionManager.change_state(NetCodes.States.WORLD)
-
 
 func _broadcast_lobby_state() -> void:
 	# server -> all
@@ -891,19 +892,21 @@ func _rpc_request_cycle_ability(pid: int) -> void:
 
 
 func _on_peer_left(id):
-		# If the host (peer 1) disappears and we are a client, leave lobby
-		if id == 1 and !GameState.is_host:
-			_on_host_gone()
-			return
+	# If the host (peer 1) disappears and we are a client, leave lobby
+	if id == 1 and !GameState.is_host:
+		_on_host_gone()
+		return
 
-		if multiplayer.is_server() and GameState.roster.has(id):
-			_ensure_leader_exists()   # ✅ leader might have left
+	if multiplayer.is_server() and GameState.roster.has(id):
+		if GameState.roster.has(id):
+			GameState.roster.erase(id)
+		_ensure_leader_exists()   # ✅ leader might have left
 
-			if fill_bots_check and fill_bots_check.button_pressed:
-				_update_bots_for_team_size()
-
-		_refresh_ui()
-		_update_start_enabled()
+		if fill_bots_check and fill_bots_check.button_pressed:
+			_update_bots_for_team_size()
+		_broadcast_lobby_state()
+	_refresh_ui()
+	_update_start_enabled()
 
 func _on_peer_joined(id):
 		if GameState.is_host and fill_bots_check and fill_bots_check.button_pressed:
