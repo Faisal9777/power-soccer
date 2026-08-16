@@ -10,7 +10,7 @@ var current_scene := 1
 var server_password: int  = 0
 var _empty_shutdown_started = false
 var peer_identities := {}
-
+var banned_user_ids: Dictionary = {}
 var current_state : Node
 var scene_data = {}
 var scene_after_server = ""
@@ -219,6 +219,18 @@ func _srv_register_player(payload: Dictionary):
 	print("[register] incoming id=%s user_id=%s can_other_join=%s is_cloud_session=%s" % [id, user_id, can_other_join, is_cloud_session])
 	var lobby_full := GameState.get_players_connected() >= GameState.get_lobby_size()
 
+	if user_id <= 0:
+		print("[register] REJECTING id=%s: invalid_identity" % id)
+		sync.send_data_id(id, NetCodes.Msg.REJECT, {"message": "invalid_identity"})
+		#Network.disconnect_peer(id)
+		return
+
+	if banned_user_ids.has(user_id):
+		print("[register] REJECTING id=%s: banned" % id)
+		sync.send_data_id(id, NetCodes.Msg.REJECT, {"message": "banned"})
+		#Network.disconnect_peer(id)
+		return
+		
 	if lobby_full:
 		print("[register] REJECTING id=%s: lobby full" % id)
 		sync.send_data_id(id, NetCodes.Msg.REJECT, {"message": "Lobby is full"})
@@ -319,6 +331,7 @@ func _verify_token_with_backend(token: String) -> Dictionary:
 			var data = json.data
 			if data.has("player_tag"):
 				return {
+					"user_id": int(data["player_id"]),
 					"player_tag": data["player_tag"],
 					"player_name": data.get("player_name", "Player")
 				}

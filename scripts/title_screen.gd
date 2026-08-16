@@ -52,7 +52,7 @@ func _ready() -> void:
 		var session = await SessionManager.create_cloud_server_session(SCRIPT_PATHS.SERVER_SESSION, id, port)
 		session.host(player_name, is_public, "Lobby")
 		return
-
+	
 	# -------- normal client flow below --------
 	# (show title screen buttons, etc.)
 	
@@ -62,7 +62,11 @@ func _ready() -> void:
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 	if OS.has_feature("mobile") and quit_btn:
 		quit_btn.visible = false
+	if GameState.lobby_removal_reason != "":
+		var reason = GameState.lobby_removal_reason
+		GameState.lobby_removal_reason = ""
 
+		_show_popup("You have been %s from the lobby." % reason)
 	# Title buttons
 	btn_play.pressed.connect(_start_game)
 	btn_multi.pressed.connect(_open_multiplayer_screen)
@@ -87,7 +91,6 @@ func _ready() -> void:
 	btn_create.pressed.connect(_on_create_cloud_server)
 	#btn_connect.pressed.connect(_on_connect_to_ip)
 	btn_lan_create.pressed.connect(_on_create_server)
-
 	# Network callbacks while we are on the title screen
 	Network.connection_failed.connect(_on_connection_failed)
 	Network.server_disconnected.connect(_on_server_disconnected)
@@ -842,7 +845,7 @@ func _on_auth_completed(success: bool, player_info: Dictionary) -> void:
 		# Update Settings & GameState player name
 		Settings.set_player_name_and_save(player_info["player_name"])
 		GameState.player_name = player_info["player_name"]
-		
+		GameState.user_id = int(player_info.get("player_id", 0))
 		# Disconnect signals to prevent double-connects on scene reload
 		if AuthManager.auth_status_changed.is_connected(_on_auth_status_changed):
 			AuthManager.auth_status_changed.disconnect(_on_auth_status_changed)
@@ -858,3 +861,51 @@ func _on_auth_completed(success: bool, player_info: Dictionary) -> void:
 			_login_btn.disabled = false
 		# The specific error was already printed to the label via auth_status_changed
 		# just leave it there so the player knows what actually went wrong!
+
+func _show_popup(message: String) -> void:
+	var popup := Window.new()
+	popup.title = "Disconnected"
+	popup.size = Vector2i(420, 220)
+	popup.initial_position = Window.WINDOW_INITIAL_POSITION_CENTER_MAIN_WINDOW_SCREEN
+	popup.unresizable = true
+
+	add_child(popup)
+
+	# Main container
+	var margin := MarginContainer.new()
+	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	margin.add_theme_constant_override("margin_left", 24)
+	margin.add_theme_constant_override("margin_right", 24)
+	margin.add_theme_constant_override("margin_top", 18)
+	margin.add_theme_constant_override("margin_bottom", 18)
+	popup.add_child(margin)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 18)
+	margin.add_child(vbox)
+
+	# Message
+	var label := Label.new()
+	label.text = message
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	label.add_theme_font_size_override("font_size", 22)
+	label.size_flags_vertical = Control.SIZE_EXPAND_FILL
+
+	vbox.add_child(label)
+
+	# OK button
+	var ok_btn := Button.new()
+	ok_btn.text = "OK"
+	ok_btn.custom_minimum_size = Vector2(0, 48)
+	ok_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	ok_btn.add_theme_font_size_override("font_size", 20)
+
+	vbox.add_child(ok_btn)
+
+	ok_btn.pressed.connect(func() -> void:
+		popup.queue_free()
+	)
+
+	popup.popup_centered()

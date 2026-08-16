@@ -12,6 +12,7 @@ var is_paused: bool = false
 var user_id:int = randi()
 var is_dedicated: bool = false 
 var lobby_leader_id: int = 0
+var lobby_removal_reason: String = ""
 signal lobby_leader_changed(id: int)
 # { peer_id: { "name": String, "ready": bool, "team": int(Team) } }
 var roster: Dictionary = {}

@@ -226,11 +226,11 @@ func _on_auth_failed():
 
 	_show_auth_failed_popup()
 
-func _on_rejected():
+func _on_rejected(message):
 	session_node.close_connection()
 	session_node.start_discovery()
 
-	_show_lobby_full_popup()
+	_show_rejected_popup(message)
 	
 func _show_auth_failed_popup():
 	var popup := Window.new()
@@ -326,9 +326,9 @@ func _on_search_changed(new_text: String):
 	filter_name = new_text.strip_edges()
 	_refresh_filters()
 	
-func _show_lobby_full_popup() -> void:
+func _show_rejected_popup(message: String) -> void:
 	var popup := Window.new()
-	popup.title = "Lobby Full"
+	popup.title = "Join Failed"
 	popup.size = Vector2i(350, 180)
 	popup.initial_position = Window.WINDOW_INITIAL_POSITION_CENTER_MAIN_WINDOW_SCREEN
 	popup.unresizable = true
@@ -341,7 +341,7 @@ func _show_lobby_full_popup() -> void:
 	popup.add_child(vbox)
 
 	var label := Label.new()
-	label.text = "Lobby is full."
+	label.text = message
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	label.size_flags_vertical = Control.SIZE_EXPAND_FILL

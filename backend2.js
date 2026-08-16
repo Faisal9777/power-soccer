@@ -335,7 +335,7 @@ async function createServer(isPublic = false, playerName = "Player") {
         lastSeen: Date.now(),
         players: 0,
         maxPlayers: DEFAULT_MAX_PLAYERS,
-        serverInfo: { }
+        serverInfo: { is_public: isPublic}
     };
 
     servers.set(server.id, server);
@@ -469,7 +469,7 @@ app.post("/create-lobby", authenticatePlayer, async (req, res) => {
     try {
         const playerId = req.playerId;
         const isPublic = req.body.is_public;
-        const playerName = req.body.player_name 
+        const playerName = req.body.player_name
         let server = checkIfPlayerIsInLobby(playerId);
 
         if (server) {

@@ -52,7 +52,7 @@ func login_as_guest() -> void:
 	
 	var rand_num = randi() % 100000
 	player_name = "Guest" + str(rand_num)
-	player_id = 0
+	player_id = randi()
 	session_token = ""
 	player_tag = ""
 	guest_id = _get_or_create_guest_id()
@@ -332,7 +332,7 @@ func _on_verify_response(result: int, response_code: int, headers: PackedStringA
 		var json = JSON.new()
 		if json.parse(response_text) == OK:
 			var data = json.data
-			player_id = data["player_id"]
+			player_id = int(data["player_id"])
 			player_tag = data["player_tag"]
 			player_name = data.get("player_name", "Player")
 			auth_mode = AuthMode.GOOGLE

@@ -2,7 +2,7 @@ extends Node
 class_name ClientSession
 
 signal auth_failed
-signal rejected
+signal rejected(message)
 signal joined_server
 signal server_found(info)
 
@@ -107,7 +107,8 @@ func handle_data(msg, data):
 	if msg == NetCodes.Msg.AUTH_FAILED:
 		auth_failed.emit()
 	if msg == NetCodes.Msg.REJECT:
-		rejected.emit()
+		var message = data.get("message", "")
+		rejected.emit(message)
 	var state = data.get("state")
 	if state == NetCodes.States.SESSION:
 		if msg == NetCodes.Msg.STATE_DATA:

@@ -10,6 +10,12 @@ extends Control
 @onready var fill_bots_check: CheckButton = $PanelContainer/VBoxContainer/HBoxContainer/FillBotsCheck
 @onready var password_label: Label = $PasswordLabel
 
+const KEBAB_ICON: Texture2D = preload("res://Texture/kebab.png")
+const KEBAB_BUTTON_ID := 100
+
+var _player_menu: PopupMenu
+var _player_menu_pid: int = -1
+
 const C = preload("res://scripts/shared/scene.gd")
 const MIN_TEAM_SIZE := 1
 const MAX_TEAM_SIZE := 10
@@ -163,7 +169,11 @@ func _ready() -> void:
 	for pid in GameState.roster.keys():
 		var rec: Dictionary = GameState.roster[pid]
 		print("pid=", pid, " team=", rec.get("team", null))
-
+	_player_menu = PopupMenu.new()
+	_player_menu.add_item("Kick", 1)
+	_player_menu.add_item("Ban", 2)
+	_player_menu.id_pressed.connect(_on_player_menu_option_pressed)
+	add_child(_player_menu)
 	# --- First paint ---
 	_refresh_ui()
 	_update_start_enabled()
@@ -183,7 +193,7 @@ func _peer_name(pid: int) -> String:
 # -------------------- Tree setup / UI --------------------
 
 func _setup_player_tree() -> void:
-	player_list.columns = 4              # ⬅ was 3
+	player_list.columns = 4           # ⬅ was 3
 	player_list.hide_root = true
 	player_list.set_column_titles_visible(true)
 	player_list.set_column_title(0, "Player")
@@ -196,6 +206,8 @@ func _setup_player_tree() -> void:
 	player_list.set_column_expand(2, false)
 	player_list.set_column_expand(3, false)  # role is compact
 	player_list.set_column_custom_minimum_width(3, 140)
+	
+
 	# Per-row button signal
 	player_list.button_clicked.connect(_on_tree_button_clicked)
 
@@ -228,7 +240,15 @@ func _refresh_ui() -> void:
 
 		# Column 0: Player label
 		item.set_text(0, "%s%s%s" % [name_str, host_tag, ready_tag])
-
+		
+		if _i_am_leader() and pid != multiplayer.get_unique_id():
+			item.add_button(
+				0,
+				KEBAB_ICON,
+				KEBAB_BUTTON_ID,
+				false,
+				"Player menu"
+			)
 		# Column 1: Team text + color
 		var team_text := "UNASSIGNED" if team_val == -1 else ("BLUE" if team_val == Team.BLUE else "RED")
 		item.set_text(1, team_text)
@@ -277,6 +297,19 @@ func _on_tree_button_clicked(item: TreeItem, column: int, id: int, mouse_button_
 	if !_i_am_leader():
 		return
 
+	if id == KEBAB_BUTTON_ID:
+		_player_menu_pid = int(item.get_metadata(0))
+
+		# Ask the Tree for this row's actual button rect (local coords)
+		var btn_index := item.get_button_by_id(column, id)
+		var rect: Rect2i = player_list.get_item_area_rect(item, column, btn_index)
+
+		# Convert to global space and drop the menu right under the button
+		var global_pos := Vector2i(player_list.global_position) + rect.position
+		_player_menu.position = global_pos + Vector2i(0, rect.size.y)
+
+		_player_menu.popup()
+		return
 	var pid := int(item.get_metadata(0))
 	if !GameState.roster.has(pid):
 		return
@@ -933,3 +966,55 @@ func _exit_tree():
 func _notification(what):
 	if what == NOTIFICATION_PREDELETE:
 		print("Lobby deleted:", get_instance_id())
+
+func _on_player_menu_option_pressed(id: int) -> void:
+	if _player_menu_pid == -1:
+		return
+	var target_pid := _player_menu_pid
+	_player_menu_pid = -1
+	if !_i_am_leader():
+		return
+	match id:
+		1:
+			if multiplayer.is_server():
+				_kick_player(target_pid)
+			else:
+				rpc_id(1, "_rpc_request_kick", target_pid)
+		2:
+			print("[Lobby] Ban clicked for player: ", _player_menu_pid)
+
+	_player_menu_pid = -1
+	
+@rpc("authority", "call_local", "reliable")
+func _rpc_kicked_from_lobby() -> void:
+	if multiplayer.is_server():
+		return
+
+	print("[Lobby] You have been kicked from the lobby.")
+	
+	GameState.reset_lobby()
+	GameState.lobby_removal_reason = "kicked"
+ 
+	Network.close_connection()
+
+	SessionManager.change_state(NetCodes.States.TITLE)
+@rpc("any_peer", "reliable")
+func _rpc_request_kick(target_pid: int) -> void:
+	if !multiplayer.is_server():
+		return
+
+	if !_sender_is_leader():
+		return
+
+	_kick_player(target_pid)
+
+func _kick_player(target_pid: int) -> void:
+	if !GameState.roster.has(target_pid):
+		return
+
+	# Tell ONLY the target player.
+	rpc_id(target_pid, "_rpc_kicked_from_lobby")
+
+	# Remove them from the server's roster.
+	GameState.roster.erase(target_pid)
+	_broadcast_lobby_state()
