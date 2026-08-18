@@ -171,7 +171,6 @@ func _ready() -> void:
 		print("pid=", pid, " team=", rec.get("team", null))
 	_player_menu = PopupMenu.new()
 	_player_menu.add_item("Kick", 1)
-	_player_menu.add_item("Ban", 2)
 	_player_menu.id_pressed.connect(_on_player_menu_option_pressed)
 	add_child(_player_menu)
 	# --- First paint ---
@@ -232,7 +231,7 @@ func _refresh_ui() -> void:
 		var role_val  := int(e.get("role", GameState.Role.MIDFIELDER))  # ⬅ NEW
 		var is_bot    := bool(e.get("is_bot", false))                   # ⬅ NEW
 		var ability_id := _get_ability_id(e)
-		var host_tag  := " (Host)" if pid == 1 else ""
+		var host_tag := " (Host)" if pid == GameState.lobby_leader_id else ""
 		var ready_tag := " ✓" if is_ready else ""
 
 		var item := player_list.create_item(root)
@@ -299,7 +298,18 @@ func _on_tree_button_clicked(item: TreeItem, column: int, id: int, mouse_button_
 
 	if id == KEBAB_BUTTON_ID:
 		_player_menu_pid = int(item.get_metadata(0))
+		# Rebuild the menu for this specific player
+		_player_menu.clear()
 
+		# Kick is available for both humans and bots
+		_player_menu.add_item("Kick", 1)
+
+		# Ban is available only for human players
+		var rec: Dictionary = GameState.roster.get(_player_menu_pid, {})
+		var is_bot := bool(rec.get("is_bot", false))
+
+		if !is_bot:
+			_player_menu.add_item("Ban", 2)
 		# Ask the Tree for this row's actual button rect (local coords)
 		var btn_index := item.get_button_by_id(column, id)
 		var rect: Rect2i = player_list.get_item_area_rect(item, column, btn_index)
@@ -813,22 +823,32 @@ func _current_bot_count() -> int:
 
 func _remove_all_bots() -> void:
 	var to_remove: Array[int] = []
+
 	for id in GameState.roster.keys():
 		var e: Dictionary = GameState.roster[id]
+
 		if _is_bot_entry(e):
 			to_remove.append(int(id))
-	#for id in to_remove:
-		#GameState.roster.erase(id)
+
+	for id in to_remove:
+		GameState.roster.erase(id)
+
+	print("[Lobby] Removed ", to_remove.size(), " bots")
+
 func _update_bots_for_team_size() -> void:
 	if !GameState.is_host:
 		return
 # CHANGE: Check the variable, not the UI element
 	if !_server_bots_enabled:
 		_remove_all_bots()
-		_refresh_ui()
-		_update_start_enabled()
-		return
 
+		if multiplayer.is_server():
+			_broadcast_lobby_state()
+		else:
+			_refresh_ui()
+			_update_start_enabled()
+
+		return
 	var need := _required_team_size()
 	if need <= 0:
 		return
@@ -875,9 +895,12 @@ func _update_bots_for_team_size() -> void:
 			}
 
 			counts[team] += 1
+	if multiplayer.is_server():
+		_broadcast_lobby_state()
+	else:
+		_refresh_ui()
+		_update_start_enabled()
 
-	_refresh_ui()
-	_update_start_enabled()
 
 func _on_fill_bots_toggled(pressed: bool) -> void:
 	if !_i_am_leader():
@@ -977,26 +1000,26 @@ func _on_player_menu_option_pressed(id: int) -> void:
 	match id:
 		1:
 			if multiplayer.is_server():
-				_kick_player(target_pid)
+				_remove_player(target_pid, NetCodes.Lobby_action.KICK)
 			else:
 				rpc_id(1, "_rpc_request_kick", target_pid)
 		2:
-			print("[Lobby] Ban clicked for player: ", _player_menu_pid)
-
+			if multiplayer.is_server():
+				_ban_player(target_pid)
+			else:
+				rpc_id(1, "_rpc_request_ban", target_pid)
 	_player_menu_pid = -1
 	
 @rpc("authority", "call_local", "reliable")
-func _rpc_kicked_from_lobby() -> void:
+func _rpc_kicked_from_lobby(action: int) -> void:
 	if multiplayer.is_server():
 		return
-
-	print("[Lobby] You have been kicked from the lobby.")
-	
-	GameState.reset_lobby()
-	GameState.lobby_removal_reason = "kicked"
- 
+	if action == NetCodes.Lobby_action.BAN:
+		GameState.lobby_removal_reason = "banned"
+	else:
+		GameState.lobby_removal_reason = "kicked"
+	GameState.reset_lobby() 
 	Network.close_connection()
-
 	SessionManager.change_state(NetCodes.States.TITLE)
 @rpc("any_peer", "reliable")
 func _rpc_request_kick(target_pid: int) -> void:
@@ -1006,15 +1029,48 @@ func _rpc_request_kick(target_pid: int) -> void:
 	if !_sender_is_leader():
 		return
 
-	_kick_player(target_pid)
+	_remove_player(target_pid , NetCodes.Lobby_action.KICK)
 
-func _kick_player(target_pid: int) -> void:
+func _remove_player(target_pid: int, action: int) -> void:
 	if !GameState.roster.has(target_pid):
 		return
 
 	# Tell ONLY the target player.
-	rpc_id(target_pid, "_rpc_kicked_from_lobby")
+	rpc_id(target_pid, "_rpc_kicked_from_lobby", action)
 
 	# Remove them from the server's roster.
 	GameState.roster.erase(target_pid)
 	_broadcast_lobby_state()
+@rpc("any_peer", "reliable")
+func _rpc_request_ban(target_pid: int) -> void:
+	if !multiplayer.is_server():
+		return
+
+	if !_sender_is_leader():
+		return
+
+	_ban_player(target_pid)
+
+func _ban_player(target_pid: int) -> void:
+	if !GameState.roster.has(target_pid):
+		return
+
+	var rec: Dictionary = GameState.roster[target_pid]
+
+	if bool(rec.get("is_bot", false)):
+		return
+
+	var user_id = rec.get("user_id", 0)
+
+	if user_id == 0:
+		print("[Lobby] Cannot ban player without user_id: ", target_pid)
+		return
+
+	if multiplayer.is_server():
+	# Add user to server-owned ban list
+		SessionManager.session_node.banned_user_ids[user_id] = true
+
+	print("[Lobby] Banned user_id=", user_id, " peer_id=", target_pid)
+
+	# Reuse existing kick behavior
+	_remove_player(target_pid, NetCodes.Lobby_action.BAN)

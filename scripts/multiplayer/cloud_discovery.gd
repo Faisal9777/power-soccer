@@ -46,10 +46,15 @@ func _on_request_completed(result, response_code, headers, body):
 		return
 
 	var data = json.data
-
+	print(data)
 	# Expecting something like: [{id, name, players}, ...]
-	if typeof(data) != TYPE_ARRAY:
-		discovery_failed.emit("Invalid lobby format")
+	if typeof(data) == TYPE_ARRAY:
+		lobbies_received.emit(data)
 		return
 
-	lobbies_received.emit(data)
+	if typeof(data) == TYPE_DICTIONARY:
+		# Backend returned one lobby
+		lobbies_received.emit([data])
+		return
+
+	discovery_failed.emit("Invalid lobby format")

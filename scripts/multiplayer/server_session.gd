@@ -221,13 +221,13 @@ func _srv_register_player(payload: Dictionary):
 
 	if user_id <= 0:
 		print("[register] REJECTING id=%s: invalid_identity" % id)
-		sync.send_data_id(id, NetCodes.Msg.REJECT, {"message": "invalid_identity"})
+		sync.send_data_id(id, NetCodes.Msg.REJECT, {"message": "Identity Is invalid"})
 		#Network.disconnect_peer(id)
 		return
 
 	if banned_user_ids.has(user_id):
 		print("[register] REJECTING id=%s: banned" % id)
-		sync.send_data_id(id, NetCodes.Msg.REJECT, {"message": "banned"})
+		sync.send_data_id(id, NetCodes.Msg.REJECT, {"message": "You have been banned from this lobby"})
 		#Network.disconnect_peer(id)
 		return
 		

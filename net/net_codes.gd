@@ -22,13 +22,13 @@ enum Msg {
 	DISCRETE_INPUTS = 15,
 	AUTH_REQUEST = 16,
 	AUTH_OK = 17,
-	AUTH_FAILED = 18,
-	KICK = 19,
-	BAN = 20,
+	AUTH_FAILED = 18
 }
 
 enum Lobby_action {
-	READY = 1
+	READY = 1,
+	KICK = 2,
+	BAN = 3,
 }
 
 const backend = {

@@ -8,7 +8,6 @@ extends PanelContainer
 @onready var join_button = $MarginContainer/HBoxContainer/RightGroup/JoinButton
 
 const LOCKED_ICON = preload("res://Texture/lock.png")
-const UNLOCKED_ICON = preload("res://Texture/unlock.png")
 
 var server_data
 
@@ -27,7 +26,10 @@ func setup(data):
 
 	# Public / Private
 	var is_public = data.get("is_public", true)
-	lock_icon.texture = UNLOCKED_ICON if is_public else LOCKED_ICON
+	if is_public:
+		lock_icon.texture = null
+	else:
+		lock_icon.texture = LOCKED_ICON
 
 	# LAN / Cloud
 	var is_lan = data.get("is_lan", true)
