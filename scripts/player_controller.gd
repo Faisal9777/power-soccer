@@ -44,8 +44,7 @@ scheduler : JobScheduler):
 	super._init(p_player, pid, p_name, team_name, c_cam, ball, joystick, i_buffer)
 
 func _process_interval():
-	var value := {"value" : _pending_inputs.duplicate()}
-	network.submit_input(value)
+	network.submit_input(_pending_inputs.duplicate())
 
 func physics_tick(delta: float) -> void:
 	if Input.is_action_pressed("debug"):

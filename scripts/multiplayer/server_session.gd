@@ -58,22 +58,26 @@ func host(server_name, scene):
 	Network.host(server_info)
 
 func toggle_scene_action(domain, event : int, value):
-	var scene_data = {"id": multiplayer.get_unique_id(), "state": domain, "value" : value}
-	handle_data(event, scene_data)
+	var scene_data = {"id": multiplayer.get_unique_id(), "state": domain, "value" : value, "event" : event}
+	handle_data(scene_data)
 
-func handle_data(msg, data):
-	var state = data["state"]
-	if state == NetCodes.States.SESSION:
-		if msg == NetCodes.Msg.REGISTER_PEER:
-			_srv_register_player(data)
+func handle_data(data):
+	var msg = data["message"]
+	var value = data.get("value")
+	var action = value.get("action")
+	if msg == NetCodes.message.SESSION:
+		if action == NetCodes.session_message.REGISTER_PEER:
+			_srv_register_player(value)
 	else:
-		StateHandler.handle_data(msg, data, state)
+		StateHandler.handle_data(value.get("value"))
 
-func send_data_id(target_id, msg, value):
-	sync.send_data_id(target_id, msg, value)
+func send_data_id(target_id, value):
+	var val = {"message" : NetCodes.message.STATE, "value" : {"value":value}}
+	sync.send_data_id(target_id, val)
 
-func send_data(msg, value):
-	sync.send_data_all(msg, value)
+func send_data(value):
+	var val = {"message" : NetCodes.message.STATE, "value" : {"value":value}}
+	sync.send_data_all(val)
 
 func disable_broadcast():
 	can_broadcast = false
@@ -123,10 +127,9 @@ func _broadcast():
 func _broadcast_states():
 	if not can_world_state_broadcast:
 		return
-	var state_data = {}
-	state_data["roster"] = GameState.roster
-	state_data["state"] = NetCodes.States.SESSION
-	sync.send_data_all(NetCodes.Msg.STATE_DATA, state_data)
+	var state_data = {"message" : NetCodes.message.SESSION, "value" : 
+		{"action" : NetCodes.session_message.SESSION_DATA, "roster" : GameState.roster}}
+	sync.send_data_all(state_data)
 
 func _handle_state_action(msg, data):
 	if data.get("domain") == "lobby":
@@ -194,7 +197,7 @@ func _srv_register_player(payload: Dictionary):
 	if should_reject:
 		print("[register] REJECTING id=%s" % id)
 		Network.disconnect_peer(id)
-		sync.send_data_id(id, NetCodes.Msg.REJECT, {"message": "Cannot join"})
+		sync.send_data_id(id, NetCodes.session_message.REJECT, {"message": "Cannot join"})
 		return
 
 	if not multiplayer.is_server():
@@ -213,13 +216,13 @@ func _srv_register_player(payload: Dictionary):
 
 	var temp_server_info = server_info.duplicate()
 	temp_server_info["server_id"] = multiplayer.get_unique_id()
-	temp_server_info["state"] = NetCodes.States.SESSION
+	temp_server_info["action"] = NetCodes.session_message.REGISTRATION_COMPLETE
 	temp_server_info["was_reactivated"] = _existing_player
 	print("[register] sending REGISTRATION_COMPLETE to id=%s payload=%s" % [id, temp_server_info])
 
-	sync.send_data_id(id, NetCodes.Msg.REGISTRATION_COMPLETE, temp_server_info)
+	sync.send_data_id(id, {"message":NetCodes.message.SESSION, "value":temp_server_info})
 	TaskScheduler.schedule(60, _broadcast_states)
-	StateHandler.handle_data(NetCodes.Msg.PLAYER_RECONNECT, {"value" : id, "old_id" : existing_peer_id}, null)
+	StateHandler.handle_data({"message" : NetCodes.Msg.PLAYER_RECONNECT,"value":{"id" : id, "old_id" : existing_peer_id}})
 	print("[register] broadcast scheduled, roster size=%s" % GameState.roster.size())
 
 

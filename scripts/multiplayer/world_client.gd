@@ -22,6 +22,7 @@ var _can_network := true
 
 var p_controller : PlayerController
 var controllers : Array = []
+var current_snapshots : Dictionary
 
 var blue_sp : Node
 var red_sp : Node
@@ -57,7 +58,6 @@ func process_input(cmd: Dictionary, peer_id : int) -> void:
 
 func process_input_dictionary(msg : int, value : Dictionary) -> void:
 	if msg == NetCodes.Msg.GAME_BEGIN:
-		print("the vallue sent from the server during the game beggin is: ", value)
 		#_game.start_game(value)
 		LoadingUI.hide_loading()
 		p_controller.start_process()
@@ -73,9 +73,12 @@ func process_input_dictionary(msg : int, value : Dictionary) -> void:
 		_store_snapshots(value)
 	elif msg == NetCodes.Msg.ROUND_START:
 		_game.start_game(value)
+	elif msg == NetCodes.state_message.CHANGE_STATE:
+		var state_info = value.get("value")
+		StateHandler.change_state(state_info.get("state"), state_info.get("state_data"))
 
-func handle_data(msg, value):
-	process_input_dictionary(msg, value)
+func handle_data(value):
+	process_input_dictionary(value.get("message"), value.get("value"))
 
 # ---------- Public API (call these from your world/spawner) ----------
 func set_players(players: Dictionary) -> void:
@@ -134,7 +137,7 @@ func _ready() -> void:
 # ---------- Main loop ----------
 func _physics_process(delta: float) -> void:
 	if Input.is_action_pressed("debug"):
-		_evaluate_all_phases()
+		_log_debug_state()
 	if p_controller:
 		p_controller.physics_tick(delta)
 
@@ -153,12 +156,15 @@ func _evaluate_all_phases() -> void:
 
 # ---------- Snapshot storage ----------
 func _store_snapshots(snapshots: Dictionary) -> void:
+	current_snapshots = snapshots
 	_my_id = p_controller.id
 	for k in snapshots.keys():
-		var peer_id := int(k)
-		var c_id = ArrayUtils.find(controllers, peer_id)
+		var  entry = snapshots[k]
+		var node_id = entry.get("node_id")
+		var node_id_int := int(node_id)
+		var c_id = ArrayUtils.find(controllers, node_id_int)
 		var controller = controllers[c_id]
-		if not _players.has(peer_id):
+		if not _players.has(node_id_int):
 			continue
 
 		var snap: Dictionary = snapshots[k]
@@ -232,8 +238,13 @@ func _send_network(msg, value) -> void:
 	if _can_network:
 		_network_endpoint.rpc(NetCodes.Rpc.INPUT_STREAM, msg, value)
 
-func _send_network_id(sender_id, msg, value) -> void:
-	value["id"] = sender_id
+func _send_network_id(sender_id, msg, inputs) -> void:
+	var value = {"value": {"inputs" : inputs, "id" : sender_id}, "message" : msg}
 	if _can_network:
-		StateHandler.send_data(msg, value)
-	
+		StateHandler.send_data(value)
+
+func _log_debug_state() -> void:
+	print("[DEBUG] snapshots: ", current_snapshots)
+	print("[DEBUG] controller ids: ", controllers.map(func(c): return c.get("id")))
+	print("[DEBUG] GameState.roster: ", GameState.roster)
+	print("-------------------------------")

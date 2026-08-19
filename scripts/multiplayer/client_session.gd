@@ -55,8 +55,9 @@ func change_state(state_info: int):
 	if state_info == NetCodes.States.SCOREBOARD:
 		scene_data["next_scene"] = NetCodes.States.LOBBY
 
-func send_data(msg, value):
-	sync.send_data_id(server_id, msg, value)
+func send_data(value):
+	var val = {"message" : NetCodes.message.STATE, "value" : {"value":value}}
+	sync.send_data_id(server_id, val)
 
 
 func host_cloud_server():
@@ -78,15 +79,17 @@ func join(server_info):
 	Network.joined_server.connect(_on_joined_server)
 	Network.join(ip, port)
 
-func handle_data(msg, data):
-	var state = data.get("state")
-	if state == NetCodes.States.SESSION:
-		if msg == NetCodes.Msg.STATE_DATA:
-			GameState.roster = data["roster"]
-		elif msg == NetCodes.Msg.REGISTRATION_COMPLETE:
-				_cl_sync_roster(data)
+func handle_data(data):
+	var msg = data.get("message")
+	var value = data.get("value")
+	var action = value.get("action")
+	if msg == NetCodes.message.SESSION:
+		if action == NetCodes.session_message.SESSION_DATA:
+			GameState.roster = value.get("roster")
+		elif action == NetCodes.session_message.REGISTRATION_COMPLETE:
+				_cl_sync_roster(value)
 	else:
-		StateHandler.handle_data(msg, data, state)
+		StateHandler.handle_data(value.get("value"))
 
 func disconnect_connection() -> void:
 	_disconnect()
@@ -128,9 +131,9 @@ func _on_joined_server(s):
 	Network.server_disconnected.connect(_on_server_disconnected)
 	is_connected = true
 	var payload := {"name" : Settings.player_name, "id" : multiplayer.get_unique_id(),
-	"state" : NetCodes.States.SESSION, "user_id" : GameState.user_id}
+	"action" : NetCodes.session_message.REGISTER_PEER, "user_id" : GameState.user_id}
 	sync = s
-	sync.send_data_id(1, NetCodes.Msg.REGISTER_PEER, payload)
+	sync.send_data_id(1, {"message" : NetCodes.message.SESSION,"value":payload})
 	
 
 func _on_server_disconnected() -> void:

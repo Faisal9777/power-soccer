@@ -56,19 +56,21 @@ func start_init(players: Dictionary,
 	if _is_also_player:
 		_peers_ready +=1
 		_client_game = NodeUtils.create_game_client(self, GameClient, "GameClient", ingame, score_board, controllers)
-	StateHandler.send_data(NetCodes.Msg.CHANGE_STATE, {"value" : NetCodes.States.WORLD,"state_data" : roster})
+	StateHandler.send_data({"message" : NetCodes.state_message.CHANGE_STATE,"value" : {"state" : NetCodes.States.WORLD,"state_data" : roster}})
 
-func handle_data(msg, value):
+func handle_data(val):
+	var msg = val.get("message")
+	var value = val.get("value")
 	if msg == NetCodes.Msg.INPUTS:
 		process_input_by_id(value["id"], msg, value)
 	elif msg == NetCodes.Msg.DISCRETE_INPUTS:
-		_client_discrete_input(value["id"], value)
+		_client_discrete_input(value)
 	elif msg == NetCodes.Msg.PLAYER_RECONNECT:
 		var id = value.get("value")
 		var old_id = value.get("old_id")
 		rosters[id] = rosters[old_id]
 		rosters.erase(old_id)
-		StateHandler.send_data_id(id, NetCodes.Msg.CHANGE_STATE, {"value" : NetCodes.States.WORLD, "state_data" : GameState.roster})
+		StateHandler.send_data_id(id, {"message":NetCodes.state_message.CHANGE_STATE, "value":{"state" : NetCodes.States.WORLD, "state_data" : GameState.roster}})
 
 func process_input_by_id(peer_id: int, msg, cmd : Dictionary) -> void:
 	var idx = controllers.find_custom(
@@ -79,7 +81,7 @@ func process_input_by_id(peer_id: int, msg, cmd : Dictionary) -> void:
 	if idx == -1:
 		print("the player does not exist with the id: ", idx)
 	var controller = controllers[idx]
-	var inputs = cmd.get("value", [])
+	var inputs = cmd.get("inputs", [])
 	if inputs and inputs.size() > 0:
 		var input = _get_latest_input(inputs)
 		controller.input_buffer.push_input(input)
@@ -90,7 +92,7 @@ func process_input_dictionary(msg: int, value : Dictionary) -> void:
 	if msg == NetCodes.Msg.INIT_DONE:
 		if _game and _game.is_in_game():
 			var snap = _game.get_game_snapshot()
-			StateHandler.send_data_id(value["id"], NetCodes.Msg.GAME_BEGIN, snap)
+			StateHandler.send_data_id(value["id"], {"message":NetCodes.Msg.GAME_BEGIN, "value":snap})
 		else:
 			_peers_ready += 1
 			#print("_peers_ready: ", _peers_ready)
@@ -131,7 +133,8 @@ func _broadcast_snapshots() -> void:
 	if not can_process:
 		return
 	var snapshots := _get_snapshot()
-	StateHandler.send_data(NetCodes.Msg.SNAPSHOTS,snapshots)
+	var data = {"message" : NetCodes.Msg.SNAPSHOTS, "value" : snapshots}
+	StateHandler.send_data(data)
 
 func _get_snapshot() -> Dictionary:
 	var snapshots := {}
@@ -141,18 +144,60 @@ func _get_snapshot() -> Dictionary:
 		snapshot["seq"] = controller.input_buffer.current_input.get("seq")
 		snapshots[controller.id] = snapshot
 	
-	snapshots["game_state"] = _game.current_state
+	if Input.is_action_just_pressed("jump"):
+		print("the players snapshot from the server is when jump is pressed")
+	
+	#snapshots["game_state"] = _game.current_state
 	return snapshots
 
-func _client_discrete_input(from_id: int, d: Dictionary) -> void:
+func _client_discrete_input(d: Dictionary) -> void:
+	var from_id = d.get("id")
 	if d.get("grapple_toggle", false):
 		print("World got grapple toggle from ", from_id)
-	if _players.has(from_id):
-		#print("_rpc_client_input2")
-		var p: CharacterBody3D = _players[from_id]
-		if p and p.has_method("apply_net_input"):
-			#print("_rpc_client_input3")
-			p.apply_net_input(d)
+
+	var c_id = ArrayUtils.find(controllers, from_id)
+	if c_id == -1:
+		return
+
+	var controller = controllers[c_id]
+	var player = controller.player
+	if controller and player and player.has_method("apply_net_input"):
+		if d.get("jump_pressed"):
+			print("jumpring")
+		player.apply_net_input(d)
+
+func _client_discrete_input_logs(from_id: int, d: Dictionary) -> void:
+	print("---- [_client_discrete_input] called ----")
+	print("[LOG] from_id: ", from_id)
+	print("[LOG] input dict: ", d)
+
+	if d.get("grapple_toggle", false):
+		print("[LOG] grapple_toggle == true")
+		print("World got grapple toggle from ", from_id)
+	else:
+		print("[LOG] grapple_toggle == false or absent")
+
+	var c_id = ArrayUtils.find(controllers, from_id)
+	print("[LOG] ArrayUtils.find(controllers, from_id) -> c_id = ", c_id)
+
+	if c_id == -1:
+		print("[LOG] no controller found for from_id=", from_id, " — aborting")
+		return   # no controller for this id — see guard note below
+
+	var controller = controllers[c_id]
+	print("[LOG] resolved controller: ", controller)
+
+	var player = controller.player
+	print("[LOG] controller.player: ", player)
+
+	if controller and player.has_method("apply_net_input"):
+		print("[LOG] player has apply_net_input — calling it now")
+		player.apply_net_input(d)
+		print("[LOG] apply_net_input call completed")
+	else:
+		print("[LOG] SKIPPED apply_net_input — controller null? ", controller == null, " | player has method? ", player.has_method("apply_net_input") if player else "player is null")
+
+	print("---- [_client_discrete_input] end ----")
 
 func _build_player_paths() -> Dictionary:
 	var paths := {}

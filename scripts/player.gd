@@ -891,6 +891,7 @@ func _move_server(input_dir: Vector3, delta: float, is_sprinting : bool) -> void
 func _handle_jump_server() -> void:
 	var grounded := is_on_floor() or (ground_ray and ground_ray.is_colliding())
 	if grounded and _btn_just_pressed("jump") and _cooldowns["jump"] == 0.0 and _can_perform("jump", stamina_min_to_jump):
+		print("applyiing jump from the player")
 		velocity.y = jump_velocity
 		_cooldowns["jump"] = jump_cooldownn
 

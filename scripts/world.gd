@@ -1003,12 +1003,15 @@ func _send_local_input() -> void:
 		return
 
 	var d := _gather_input()
-	d["id"] = multiplayer.get_unique_id()
+	if d.get("jump_pressed"):
+		print("jumpring")
+	d["id"] = net.p_controller.id
+	var player = net.p_controller.player
 
 	# ✅ IMPORTANT: also feed local player immediately on this machine
 	# so client-side code (_ability.client_tick, UI, etc.) can react instantly.
-	if is_instance_valid(_my_player) and _my_player.has_method("apply_net_input"):
-		_my_player.apply_net_input(d)
+	if is_instance_valid(player) and player.has_method("apply_net_input"):
+		player.apply_net_input(d)
 
 	if multiplayer.is_server():
 		if _players.has(1):
@@ -1019,7 +1022,7 @@ func _send_local_input() -> void:
 					print("PLAYER: got ability_action1 (server=", multiplayer.is_server(), ")")
 
 	else:
-		StateHandler.send_data(NetCodes.Msg.DISCRETE_INPUTS, d)
+		StateHandler.send_data({"message":NetCodes.Msg.DISCRETE_INPUTS,"value" : d})
 
 @rpc("any_peer")
 func _rpc_client_input(from_id: int, d: Dictionary) -> void:

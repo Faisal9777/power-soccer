@@ -11,6 +11,7 @@ func get_snapshot() -> Dictionary:
 	player_data["is_frozen"] = is_frozen
 	player_data["yaw"] = look_yaw
 	player_data["pitch"] = look_pitch
+	player_data["node_id"] = id
 	return player_data
 
 

@@ -45,11 +45,11 @@ func close_session() -> void:
 func change_state(state_info: int):
 	StateHandler.change_state(state_info)
 
-func send_data_id(target_id, msg, value):
-	session_node.send_data_id(target_id, msg, value)
+func send_data_id(target_id, value):
+	session_node.send_data_id(target_id, value)
 
-func send_data(msg, value):
-	session_node.send_data(msg, value)
+func send_data(value):
+	session_node.send_data(value)
 
 func register_state(state : Node):
 	StateHandler.register_state(state)
