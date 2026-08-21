@@ -323,6 +323,7 @@ func _setup_scoreboard_popup(game_data_holder : Node) -> void:
 		inner_center.add_child(root_ctrl)
 		_scoreboard_instance = root_ctrl
 		_scoreboard_instance.set_game_data_holder(game_data_holder, _scoreboard_popup)
+		_scoreboard_instance.set_back_to_lobby_visible(false)
 	else:
 		push_error("Could not load scoreboard scene at: %s" % scoreboard_scene_path)
 

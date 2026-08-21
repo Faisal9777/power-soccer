@@ -58,9 +58,16 @@ func _install_synchronizer() -> void:
 func set_roster(roster : Dictionary) -> void:
 	for peer_id in roster.keys():
 		var peer = roster[peer_id]
-		var peer_data = {"name" :  peer["name"],
-		"team" : peer["team"], "goals" : 0, "assists" : 0, "saves" : 0}
-		game_data[peer_id]  = peer_data 
+		var peer_data = {
+			"name": peer["name"],
+			"team": peer["team"],
+			"goals": 0,
+			"assists": 0,
+			"saves": 0,
+			"profile_icon_path": peer.get("profile_icon_path",
+				"res://Texture/Profile_Icons/Apple.svg"),
+		}
+		game_data[peer_id] = peer_data
 
 func toggle_process(toggle : bool) -> void:
 	can_process = toggle

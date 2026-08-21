@@ -510,17 +510,20 @@ func _ensure_leader_exists() -> void:
 	if !multiplayer.is_server():
 		return
 
-	# Keep current if valid
-	if GameState.lobby_leader_id != 0 and GameState.roster.has(GameState.lobby_leader_id):
+	# Current leader is still valid
+	if GameState.lobby_leader_id != 0 \
+	and GameState.roster.has(GameState.lobby_leader_id):
+
 		var rec: Dictionary = GameState.roster[GameState.lobby_leader_id]
+
 		if !bool(rec.get("is_bot", false)):
 			return
 
-	var next := _pick_next_leader() 
+	# Current leader is invalid/missing.
+	# Pick a new human player.
+	var next := _pick_next_leader()
+
 	GameState.lobby_leader_id = next
-	
-	# CHANGE: Call a local RPC in this script, not GameState
-	rpc("_rpc_set_lobby_leader", next)
 
 func _my_ready() -> bool:
 	var me := multiplayer.get_unique_id()
@@ -682,14 +685,23 @@ func _try_start_match() -> void:
 	SessionManager.change_state(NetCodes.States.WORLD)
 
 func _broadcast_lobby_state() -> void:
-	# server -> all
-	rpc("_rpc_lobby_state", GameState.roster)
+	# Server -> all clients
+	rpc(
+		"_rpc_lobby_state",
+		GameState.roster,
+		GameState.lobby_leader_id
+	)
 	_refresh_ui()
 
-@rpc("any_peer", "call_local")
-func _rpc_lobby_state(new_roster: Dictionary) -> void:
+@rpc("any_peer", "call_local", "reliable")
+func _rpc_lobby_state(
+	new_roster: Dictionary,
+	leader_id: int
+) -> void:
 	# Keep everyone in sync
 	GameState.roster = new_roster.duplicate(true)
+	GameState.lobby_leader_id = leader_id
+
 	_refresh_ui()
 
 @rpc("any_peer", "reliable")

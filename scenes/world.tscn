@@ -414,6 +414,7 @@ script = ExtResource("26_npbic")
 camera_path = NodePath("../../../Scene/Camera3D")
 blue_goal_path = NodePath("../../../Teams/TeamBlue/Goal_A")
 green_goal_path = NodePath("../../../Teams/TeamRed/Goal_B")
+ball_path = NodePath("../../../BallHolder/Ball")
 blue_offset_below_m = 10.0
 green_offset_below_m = 10.0
 ball_offset_above_m = 0.0

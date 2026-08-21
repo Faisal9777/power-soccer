@@ -205,6 +205,7 @@ func setup() -> void:
 	var logout_dialog := ConfirmationDialog.new()
 	logout_dialog.name = "LogoutDialog"
 	logout_dialog.dialog_text = "Are you sure you want to log out?"
+	logout_dialog.ok_button_text = "Yes"
 	logout_dialog.confirmed.connect(_do_logout)
 	add_child(logout_dialog)
 

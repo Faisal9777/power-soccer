@@ -72,6 +72,12 @@ func set_game_data_holder(holder: Node, sc_popup : Control) -> void:
 	_sc_popup = sc_popup
 	# Team he
 
+func set_back_to_lobby_visible(v: bool) -> void:
+	if _back_btn:
+		_back_btn.visible = v
+	if _status:
+		_status.visible = v
+
 func show_score(toggle : bool) -> void:
 	var data : Dictionary = _game_data_holder.get_game_data()
 	var stats : Array = _get_stats_in_array(data)
@@ -101,6 +107,12 @@ func set_stats(snapshot: Array) -> void:
 		var team := int(r.get("team", Team.BLUE))
 		var parent := (blue if team == Team.BLUE else red)
 		var it := _tree.create_item(parent)
+		# Icon: load the player's profile icon and display it left of the name
+		var icon_path := String(r.get("profile_icon_path",
+				"res://Texture/Profile_Icons/Apple.svg"))
+		var profile_icon := load(icon_path) as Texture2D
+		if profile_icon:
+			it.set_icon(0, profile_icon)
 		it.set_text(0, String(r.get("name", "Player")))
 		it.set_text(1, str(int(r.get("goals", 0))))
 		it.set_text(2, str(int(r.get("assists", 0))))
@@ -145,7 +157,6 @@ func _get_stats_in_array(game: Dictionary) -> Array[Dictionary]:
 		# team: derive from your helper
 		var team_val := e["team"] as int
 
-
 		# build one row
 		var row: Dictionary = {
 			"id": k,
@@ -153,7 +164,9 @@ func _get_stats_in_array(game: Dictionary) -> Array[Dictionary]:
 			"team": team_val,
 			"goals": int(e.get("goals", 0)),
 			"assists": int(e.get("assists", 0)),
-			"saves": int(e.get("saves", 0)),  # default to 0 if you don't track it
+			"saves": int(e.get("saves", 0)),
+			"profile_icon_path": String(e.get("profile_icon_path",
+				"res://Texture/Profile_Icons/Apple.svg")),
 		}
 		stats.append(row)
 
@@ -164,5 +177,6 @@ func _get_stats_in_array(game: Dictionary) -> Array[Dictionary]:
 func _on_back_pressed() -> void:
 	_back_btn.disabled = true
 	_status.text = "Waiting for other players..."
-
+	if multiplayer.is_server():
+		SessionManager.session_node.change_state(NetCodes.States.LOBBY)
 	SessionManager.change_state(NetCodes.States.LOBBY)

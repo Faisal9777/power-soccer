@@ -167,14 +167,15 @@ func _handle_lobby_action(msg, data):
 
 func _check_all_players():
 	for key in GameState.roster.keys():
-		var is_active = GameState.roster[key].get("is_active", false)
+		var is_active = GameState.roster[key].get("is_active", true)
 		if not is_active:
-			var body = JSON.stringify({
-				"user_id": GameState.roster[key].get("user_id"),
-				"server_id": server_info.get("id")
-			})
-			var token = GameState.roster[key].get("session_token", "")
-			await _transport_method.post(NetCodes.backend.PLAYER_DISCONNECTED, body, token) == HTTPClient.RESPONSE_OK
+			if is_cloud_session:
+				var body = JSON.stringify({
+					"user_id": GameState.roster[key].get("user_id"),
+					"server_id": server_info.get("id")
+				})
+				var token = GameState.roster[key].get("session_token", "")
+				await _transport_method.post(NetCodes.backend.PLAYER_DISCONNECTED, body, token) == HTTPClient.RESPONSE_OK
 			GameState.roster.erase(key)
 
 func _check_server_status():
