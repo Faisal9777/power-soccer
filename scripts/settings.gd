@@ -14,6 +14,7 @@ var tex_quality := 2      # 0=Low, 1=Med, 2=High (Textures)
 var scale_3d: float = 1.0
 var key_bindings: Dictionary = {}
 var _default_key_bindings: Dictionary = {}
+var profile_icon_path: String = "res://Texture/Profile_Icons/Apple.svg"
 # Layout state for CanvasLayer UI
 var layout_state: Dictionary = {}
 func _enter_tree() -> void:
@@ -89,7 +90,11 @@ func _load() -> void:
 		scale_3d = float(cfg.get_value("video", "scale_3d", scale_3d))
 
 		player_name = cfg.get_value("profile", "name", player_name)
-
+		profile_icon_path = cfg.get_value(
+			"profile",
+			"icon_path",
+			profile_icon_path
+		)
 		key_bindings = cfg.get_value("input", "bindings", {})
 
 		layout_state = cfg.get_value("layout", "state", {})
@@ -108,6 +113,12 @@ func _save() -> void:
 	cfg.set_value("video", "scale_3d", scale_3d)
 
 	cfg.set_value("profile", "name", player_name)
+	cfg.set_value(
+		"profile",
+		"icon_path",
+		profile_icon_path
+	)
+	
 	cfg.set_value("input", "bindings", key_bindings)
 	cfg.set_value("layout", "state", layout_state)
 
@@ -123,6 +134,13 @@ func set_player_name_and_save(name: String) -> void:
 	player_name = name.strip_edges()
 	if player_name == "":
 		player_name = "Player_%d" % randi()
+	_save()
+
+func set_profile_icon_and_save(path: String) -> void:
+	if path == "":
+		return
+
+	profile_icon_path = path
 	_save()
 
 func get_bindable_actions() -> Array:

@@ -139,6 +139,7 @@ func logout() -> void:
 	player_name = ""
 	guest_id = ""
 	auth_mode = AuthMode.NONE
+	authenticated = false
 
 	auth_completed.emit(false, {})
 # ==========================================

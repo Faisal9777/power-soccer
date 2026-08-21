@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" width="40" height="40">
+  <!-- Vivid Background -->
+  <rect width="40" height="40" rx="8" fill="#C62828"/>
+  <!-- Body -->
+  <circle cx="20" cy="22" r="13" fill="#FF1744"/>
+  <!-- Stem & Leaves -->
+  <path d="M20 11 L20 7" stroke="#1B5E20" stroke-width="2" stroke-linecap="round"/>
+  <path d="M20 11 L15 10 M20 11 L25 10 M20 11 L17 14 M20 11 L23 14" stroke="#76FF03" stroke-width="2" stroke-linecap="round"/>
+  <!-- Highlight -->
+  <circle cx="15" cy="17" r="2.5" fill="#FF8A80"/>
+</svg>

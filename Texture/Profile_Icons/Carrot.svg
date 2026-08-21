@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" width="40" height="40">
+  <!-- Vivid Background -->
+  <rect width="40" height="40" rx="8" fill="#FF6D00"/>
+  <!-- Greens -->
+  <path d="M20 12 Q14 5 12 8 Q17 11 19 14" fill="#00E676"/>
+  <path d="M20 12 Q20 4 20 7 Q20 10 20 14" fill="#76FF03"/>
+  <path d="M20 12 Q26 5 28 8 Q23 11 21 14" fill="#00E676"/>
+  <!-- Root Body -->
+  <path d="M13 14 C13 12, 27 12, 27 14 C27 20, 22 32, 20 36 C18 32, 13 20, 13 14 Z" fill="#FF3D00"/>
+  <!-- Texture Lines -->
+  <path d="M16 19 H21 M18 24 H23 M17 29 H21" stroke="#DD2C00" stroke-width="1.5" stroke-linecap="round"/>
+</svg>

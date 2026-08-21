@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" width="40" height="40">
+  <!-- Vivid Background -->
+  <rect width="40" height="40" rx="8" fill="#4A148C"/>
+  <!-- Body -->
+  <path d="M22 12 C18 12, 13 18, 12 24 C11 31, 16 36, 22 36 C29 36, 32 29, 30 22 C29 17, 26 12, 22 12 Z" fill="#AA00FF"/>
+  <!-- Stem Cap -->
+  <path d="M22 12 C24 10, 25 7, 25 7 C23 8, 20 10, 20 10 C20 10, 18 12, 17 13 L22 16 L25 13 Z" fill="#76FF03"/>
+  <!-- Stem Top -->
+  <path d="M23 8 Q26 5 28 6" stroke="#1B5E20" stroke-width="2" stroke-linecap="round" fill="none"/>
+  <!-- Highlight -->
+  <path d="M16 23 C16 28, 18 32, 22 33" stroke="#E040FB" stroke-width="2" stroke-linecap="round" fill="none" opacity="0.8"/>
+</svg>

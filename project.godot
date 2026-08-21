@@ -32,8 +32,6 @@ AuthManager="*res://scripts/autoload/auth_manager.gd"
 
 [display]
 
-window/size/viewport_width=1280
-window/size/viewport_height=600
 window/stretch/mode="canvas_items"
 
 [editor]

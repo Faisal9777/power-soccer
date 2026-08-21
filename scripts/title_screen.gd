@@ -21,10 +21,12 @@ extends Control
 @onready var status_label: Label = $MultiplayerPopup/VBox/Label if has_node("MultiplayerPopup/VBox/Label") else null
 const C = preload("res://scripts/shared/scene.gd")
 const SCRIPT_PATHS = preload("res://scripts/shared/script_path.gd")
+const PROFILE_UI = preload("res://scripts/ui/ProfileUI.gd")
 var _gfx_ui: Control = null
 var _login_ui: Control = null
 var _login_status_label: Label = null
 var _login_btn: Button = null
+var _profile_ui: Control = null
 var _is_public : bool 
 
 const LOBBY_SCENE := "res://scenes/Lobby.tscn"
@@ -58,6 +60,8 @@ func _ready() -> void:
 	
 	if !AuthManager.is_authenticated():
 		_setup_login_flow()
+	else:
+		_setup_profile_ui()
 	
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 	if OS.has_feature("mobile") and quit_btn:
@@ -264,6 +268,7 @@ func _open_create_server_popup(is_lan: bool) -> void:
 	vbox.add_child(name_label)
 
 	var name_input := LineEdit.new()
+	name_input.max_length = 100
 	name_input.placeholder_text = "My Server"
 	vbox.add_child(name_input)
 
@@ -332,6 +337,7 @@ func _open_create_server_popup(is_lan: bool) -> void:
 
 		root.queue_free()
 	)
+
 
 func _on_create_server_with_data(name: String, is_public: bool) -> void:
 	print("LAN SERVER:", name, is_public)
@@ -856,6 +862,7 @@ func _on_auth_completed(success: bool, player_info: Dictionary) -> void:
 		if _login_ui:
 			_login_ui.queue_free()
 		$CenterContainer.visible = true
+		_setup_profile_ui()
 	else:
 		if _login_btn:
 			_login_btn.disabled = false
@@ -909,3 +916,14 @@ func _show_popup(message: String) -> void:
 	)
 
 	popup.popup_centered()
+
+func _setup_profile_ui() -> void:
+	if _profile_ui != null and is_instance_valid(_profile_ui):
+		return
+
+	_profile_ui = PROFILE_UI.new()
+	_profile_ui.name = "ProfileUI"
+
+	add_child(_profile_ui)
+
+	_profile_ui.setup()

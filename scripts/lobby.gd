@@ -105,14 +105,19 @@ func _ready() -> void:
 				"name": GameState.player_name,
 				"ready": false,
 				"team": GameState.pick_balanced_team(),
-				"ability": "grapple", # ✅ ADD HERE
+				"ability": "grapple",
+				"profile_icon_path": Settings.profile_icon_path,
 			}
 		else:
 			# Ensure required fields exist even if entry was created earlier
 			if !host.has("team"):
 				host["team"] = GameState.pick_balanced_team()
+
 			if !host.has("ability"):
-				host["ability"] = "grapple" # ✅ BACKFILL HERE
+				host["ability"] = "grapple"
+
+			if !host.has("profile_icon_path"):
+				host["profile_icon_path"] = Settings.profile_icon_path
 
 			GameState.roster[host_id] = host
 
@@ -181,11 +186,15 @@ func _process(delta) -> void:
 	_refresh_ui()
 
 func _on_connected_to_server() -> void:
-	# Client: tell server our name right after connect
-	#print("CLIENT ID %d" % GameState.)
-	rpc_id(1, "_rpc_submit_name", GameState.player_name)
+	# Client: tell server our name + profile icon right after connect
+	print("[client] sending name + profile icon to host…")
 
-
+	rpc_id(
+		1,
+		"_rpc_submit_name",
+		GameState.player_name,
+		Settings.profile_icon_path
+	)
 func _peer_name(pid: int) -> String:
 	return GameState.roster.get(pid, {}).get("name", "Player %d" % pid)
 
@@ -237,9 +246,22 @@ func _refresh_ui() -> void:
 		var item := player_list.create_item(root)
 		item.set_metadata(0, pid)  # store peer_id on row
 
-		# Column 0: Player label
-		item.set_text(0, "%s%s%s" % [name_str, host_tag, ready_tag])
-		
+		# Column 0: Profile icon + Player label
+		var icon_path := String(e.get(
+			"profile_icon_path",
+			"res://Texture/Profile_Icons/Apple.svg"
+		))
+
+		var profile_icon := load(icon_path) as Texture2D
+
+		if profile_icon:
+			item.set_icon(0, profile_icon)
+
+		item.set_text(0, "%s%s%s" % [
+			name_str,
+			host_tag,
+			ready_tag
+		])
 		if _i_am_leader() and pid != multiplayer.get_unique_id():
 			item.add_button(
 				0,
@@ -420,8 +442,8 @@ func _handle_lobby_action(msg, data):
 
 func _submit_name_to_host() -> void:
 	if multiplayer.multiplayer_peer == null: return
-	print("[client] sending name to host…")
-	rpc_id(1, "_rpc_submit_name", GameState.player_name)
+	print("[client] sending name + profile icon to host…")
+	rpc_id(1, "_rpc_submit_name", GameState.player_name, Settings.profile_icon_path)
 
 func _on_ready_toggle() -> void:
 	
@@ -515,19 +537,28 @@ func _set_my_ready_local(v: bool) -> void:
 # -------------------- RPCs --------------------
 
 @rpc("any_peer")
-func _rpc_submit_name(name: String) -> void:
-	if !multiplayer.is_server(): return
+func _rpc_submit_name(name: String, profile_icon_path: String) -> void:
+	if !multiplayer.is_server():
+		return
 
 	var from := multiplayer.get_remote_sender_id()
 	var team := GameState.pick_balanced_team()
-	GameState.roster[from]["name"] = name
-	GameState.roster[from]["team"] = team
-	#GameState.roster[from] = {"name": name, "ready": false, "team": team, "ability": "grapple"}
+
+	var rec: Dictionary = GameState.roster.get(from, {})
+
+	rec["name"] = name
+	rec["ready"] = bool(rec.get("ready", false))
+	rec["team"] = team
+	rec["ability"] = String(rec.get("ability", "grapple"))
+	rec["profile_icon_path"] = profile_icon_path
+
+	GameState.roster[from] = rec
 
 	# Send password only to the newly joined client
 	rpc_id(from, "_rpc_set_server_password", _password)
 
-	_ensure_leader_exists()   # ✅ IMPORTANT
+	_ensure_leader_exists()
+	_broadcast_lobby_state()
 
 @rpc("any_peer", "call_local")
 func _rpc_set_ready(peer_id: int, ready: bool) -> void:
@@ -561,7 +592,11 @@ func _rpc_set_roster(snapshot: Array) -> void:
 			"team": int(e.get("team", Team.BLUE)),
 			"is_bot": bool(e.get("is_bot", false)),
 			"role": int(e.get("role", GameState.Role.MIDFIELDER)),  # ⬅ NEW
-			"ability": String(e.get("ability", "grapple")), # ✅ NEW
+			"ability": String(e.get("ability", "grapple")),
+			"profile_icon_path": String(e.get(
+				"profile_icon_path",
+				"res://Texture/Profile_Icons/Apple.svg"
+			)), # ✅ NEW
 			"is_active" : e.get("is_active", false)
 		}
 
