@@ -10,7 +10,7 @@ extends Control
 # --- Per-target vertical offsets (in meters) ---
 @export var blue_offset_below_m:  float = 1.0   # meters below blue goal center
 @export var green_offset_below_m: float = 1.0   # meters below green goal center
-@export var ball_offset_above_m:  float = 0.2   # meters above ball (so icon doesn't sit on it)  # NEW
+@export var ball_marker_gap_px:   float = 24.0  # constant on-screen gap above the ball, in pixels  # NEW
 
 # --- Marker nodes under this Control ---
 @export var blue_marker_path:  NodePath = NodePath("BlueMarker")
@@ -35,22 +35,27 @@ const ARROW_UP_BIAS := PI * 0.5
 @onready var m_green: TextureRect   = get_node_or_null(green_marker_path)
 @onready var m_ball: TextureRect    = get_node_or_null(ball_marker_path)     # NEW
 
-func _ready() -> void:
-	# optional: if ball is spawned later, try to find it by group
-	if ball == null:
-		var balls := get_tree().get_nodes_in_group("ball")
-		if balls.size() > 0 and balls[0] is Node3D:
-			ball = balls[0]
 
 func _process(_dt: float) -> void:
 	if not cam:
 		return
 
+	if not ball:
+		var balls := get_tree().get_nodes_in_group("ball")
+		if balls.size() > 0 and balls[0] is Node3D:
+			ball = balls[0]
+
 	_update_marker(goal_blue,  m_blue,  Vector3(0.0, -blue_offset_below_m, 0.0))
 	_update_marker(goal_green, m_green, Vector3(0.0, -green_offset_below_m, 0.0))
-	_update_marker(ball,       m_ball,  Vector3(0.0,  ball_offset_above_m, 0.0))  # NEW
+	_update_marker(ball,       m_ball,  Vector3.ZERO, false, ball_marker_gap_px)   # CHANGED: no rotation, fixed pixel gap
 
-func _update_marker(target: Node3D, marker: TextureRect, world_offset: Vector3) -> void:
+func _update_marker(
+	target: Node3D,
+	marker: TextureRect,
+	world_offset: Vector3,
+	rotate_with_direction: bool = true,   # NEW — default keeps blue/green unchanged
+	screen_gap_px: float = 0.0            # NEW — default keeps blue/green unchanged
+) -> void:
 	if not marker:
 		return
 	if not target or not cam:
@@ -94,10 +99,17 @@ func _update_marker(target: Node3D, marker: TextureRect, world_offset: Vector3) 
 		pos.x = clamp(pos.x, edge_margin, vp_size.x - edge_margin)
 		pos.y = clamp(pos.y, edge_margin, vp_size.y - edge_margin)
 
-	# Place + rotate (arrow points from screen center to marker)
-	marker.position = pos - marker.size * 0.5
 	marker.visible = true
 
-	var v: Vector2 = (pos - vp_size * 0.5)
-	if v.length_squared() > 0.0001:
-		marker.rotation = atan2(v.y, v.x) - ARROW_UP_BIAS
+	# CHANGED: branch so the ball marker skips the arrow-rotation math entirely
+	if rotate_with_direction:
+		# Place + rotate (arrow points from screen center to marker)
+		marker.position = pos - marker.size * 0.5
+		var v: Vector2 = (pos - vp_size * 0.5)
+		if v.length_squared() > 0.0001:
+			marker.rotation = atan2(v.y, v.x) - ARROW_UP_BIAS
+	else:
+		# Stay upright; anchor the icon's bottom-center tip a fixed pixel
+		# gap above the target, so the gap looks the same near or far.
+		marker.rotation = 0.0
+		marker.position = Vector2(pos.x - marker.size.x * 0.5, pos.y - marker.size.y - screen_gap_px)

@@ -417,7 +417,6 @@ green_goal_path = NodePath("../../../Teams/TeamRed/Goal_B")
 ball_path = NodePath("../../../BallHolder/Ball")
 blue_offset_below_m = 10.0
 green_offset_below_m = 10.0
-ball_offset_above_m = 0.0
 ball_marker_path = NodePath("../BallMarker/BallMarker")
 
 [node name="GreenMarker" type="TextureRect" parent="CanvasLayer/UI/GoalMarkers"]

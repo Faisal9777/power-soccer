@@ -3,6 +3,10 @@ class_name Ball
 
 var _last_player_hits: Array[int] = [-1, -1]
 
+# ball.gd
+func _ready() -> void:
+	add_to_group("ball")
+
 func apply_hit(J: Vector3, position: Vector3, player_id: int) -> void:
 	if _last_player_hits.size() > 1 and _last_player_hits[0] != player_id:
 		var last_player_id = _last_player_hits[0]
