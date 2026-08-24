@@ -629,7 +629,6 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, -109)
 [node name="Goal_B" type="Node3D" parent="Teams/TeamRed"]
 transform = Transform3D(-2.5, 0, -3.01992e-07, 0, 2, 0, 3.77489e-07, 0, -2, 0, -0.5, 116)
 script = ExtResource("8_e75v4")
-score_for = 0
 ball_spawn_path = NodePath("../../../BallSpawn")
 
 [node name="GoalBody" type="StaticBody3D" parent="Teams/TeamRed/Goal_B"]

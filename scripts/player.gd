@@ -376,7 +376,15 @@ func update_player_states(input: Dictionary, delta) -> void:
 	#_yaw_delta_accum = 0.0
 	#_pitch_delta_accum = 0.0
 
-func handle_movement(inp, delta) -> void:
+func handle_movement(inp, delta, apply_prediction_gravity: bool = false) -> void:
+	if apply_prediction_gravity:
+		apply_gravity(delta)
+		var has_movement := Vector2(float(inp.get("mvx", 0.0)), float(inp.get("mvz", 0.0))).length() > 0.01
+		_using_sprint = bool(inp.get("sprint", false)) and has_movement and _stamina > stamina_min_to_sprint
+		if _using_sprint:
+			_stamina = maxf(0.0, _stamina - stamina_sprint_drain * delta)
+		elif not tackle_active and is_on_floor():
+			_stamina = minf(stamina_max, _stamina + stamina_regen_rate * delta)
 	if _cooldowns["move"] == 0.0:
 		var yaw := rotation.y
 		var fwd := Vector3.FORWARD.rotated(Vector3.UP, yaw); fwd.y = 0.0; fwd = fwd.normalized()
@@ -385,7 +393,7 @@ func handle_movement(inp, delta) -> void:
 		var mvz := float(inp["mvz"])
 		var input_dir := (right * mvx + fwd * mvz).normalized()
 		var is_sprinting : bool = inp.get("sprint")
-		_move_server(input_dir, delta, is_sprinting)
+		_move_server(input_dir, delta, is_sprinting, float(inp.get("move_magnitude", 1.0)))
 
 func stop_replication() -> void:
 	$MultiplayerSynchronizer.public_visibility = false
@@ -854,15 +862,14 @@ func _handle_action_server(input_dir: Vector3, delta: float) -> void:
 	_handle_kick_action_server()
 
 
-func _move_server(input_dir: Vector3, delta: float, is_sprinting : bool) -> void:
-	var mag := 1.0
-	if is_mobile and is_instance_valid(joystick):
-		# 0..1 how hard the stick is pushed
-		mag = clamp(joystick.mag, 0.0, 1.0)
+func _move_server(input_dir: Vector3, delta: float, is_sprinting : bool, move_magnitude: float = 1.0) -> void:
+	# Magnitude is command data, not a property of the machine simulating it.
+	var mag := clampf(move_magnitude, 0.0, 1.0)
 
 	# Base speed is picked ONLY from sprint toggle.
 	# Joystick magnitude just scales it down (analog walk).
-	var base_speed := sprint_speed if is_sprinting and _can_perform("sprint", stamina_sprint_drain * delta) else walk_speed
+	# Stamina drain is updated once per simulation step; movement only checks it.
+	var base_speed := sprint_speed if is_sprinting and _can_perform("sprint", 0.0, false) else walk_speed
 	var target_speed := base_speed * mag
 	
 # ✅ LATCH slow only on ground (NOT grapple)

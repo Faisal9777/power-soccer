@@ -63,6 +63,9 @@ func change_state(state_info: int):
 func send_data_id(msg, value):
 	sync.send_data_id(server_id, msg, value)
 
+func send_data_id_reliable(msg, value):
+	sync.send_data_id_reliable(server_id, msg, value)
+
 func send_data(msg, value):
 	value["state"] = current_scene
 	sync.send_data_all(msg, value)
@@ -221,3 +224,10 @@ func close_connection():
 	is_connected = false
 
 	Network.close_connection()
+# client_session.gd — add
+func send_movement_id(msg, value):
+	sync.send_movement_id(server_id, msg, value)
+
+func send_movement(msg, value):
+	value["state"] = current_scene
+	sync.send_movement_all(msg, value)

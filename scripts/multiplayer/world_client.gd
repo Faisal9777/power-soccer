@@ -122,6 +122,7 @@ func init(p : Node3D,
 	scoreboard = score_board 
 	
 	init_phase_completed = true
+	GameState.is_paused = false
 	_evaluate_all_phases()
 
 
@@ -169,10 +170,16 @@ func _evaluate_all_phases() -> void:
 
 # ---------- Snapshot storage ----------
 func _store_snapshots(snapshots: Dictionary) -> void:
+	if p_controller == null:
+		return
 	_my_id = p_controller.id
 	for k in snapshots.keys():
+		if not (k is int or (k is String and k.is_valid_int())):
+			continue
 		var peer_id := int(k)
 		var c_id = ArrayUtils.find(controllers, peer_id)
+		if c_id < 0:
+			continue
 		var controller = controllers[c_id]
 		if not _players.has(peer_id):
 			continue
@@ -225,7 +232,7 @@ func _send_network(msg, value) -> void:
 func _send_network_id(sender_id, msg, value) -> void:
 	value["id"] = sender_id
 	if _can_network:
-		StateHandler.send_data_id(msg, value)
-	
+		#StateHandler.send_data_id(msg, value)
+		StateHandler.send_movement_id(msg, value) 
 func _get_player_controller() -> PlayerController:
 	return p_controller

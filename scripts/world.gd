@@ -86,6 +86,7 @@ var net: Node = null
 @onready var local_view_proxy := $LocalViewProxy
 var _my_player: Node = null
 var _input_accum: float = 0.0
+var _next_action_seq: int = 0
 var ball_scene : Node3D = null
 var  tackle_edge_latched := false
 var  stop_ball_edge_latched := false
@@ -181,7 +182,7 @@ func _ready() -> void:
 		var ids: Array[int] = []
 		for k in GameState.roster.keys():
 			ids.append(int(k))   # ensure int
-			_server_begin_match(ids)
+		_server_begin_match(ids)
 		net = WorldServerScript.new()
 		_initialize_multiplayer("NetServer", net)
 		net.start_init(_players, _scoreboard_instance, ingame, replication_manager, blue_spawns, red_spawns, ball_spawn,
@@ -1106,6 +1107,9 @@ func _gather_input() -> Dictionary:
 
 	var shoot_down := Input.is_action_pressed(_shoot_action())
 	var shoot_up := shoot_edge_latched
+	var aim_pressed := Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)
+	if is_mobile and cam and cam.has_method("is_aim_mode_active"):
+		aim_pressed = cam.is_aim_mode_active()
 
 	if gm:
 		shoot_down = false
@@ -1120,7 +1124,7 @@ func _gather_input() -> Dictionary:
 	"stop_ball": stop_ball_edge_latched,
 	"shoot_down": shoot_down,
 	"shoot_up": shoot_up,
-	"rmb": Input.is_action_pressed("aim"),
+	"rmb": aim_pressed,
 	"facing": facing,
 	"aim_position": _my_player.get_aim_arrow_position() if _my_player and shoot_edge_latched else null,
 	"cam_yaw": yaw,
@@ -1139,6 +1143,8 @@ func _send_local_input() -> void:
 
 	var d := _gather_input()
 	d["id"] = multiplayer.get_unique_id()
+	d["action_seq"] = _next_action_seq
+	_next_action_seq += 1
 
 	# ✅ IMPORTANT: also feed local player immediately on this machine
 	# so client-side code (_ability.client_tick, UI, etc.) can react instantly.
@@ -1154,7 +1160,8 @@ func _send_local_input() -> void:
 					print("PLAYER: got ability_action1 (server=", multiplayer.is_server(), ")")
 
 	else:
-		StateHandler.send_data_id(NetCodes.Msg.DISCRETE_INPUTS, d)
+		# One-shot gameplay edges (notably shoot_up) must arrive once and in order.
+		StateHandler.send_data_id_reliable(NetCodes.Msg.DISCRETE_INPUTS, d)
 
 @rpc("any_peer")
 func _rpc_client_input(from_id: int, d: Dictionary) -> void:

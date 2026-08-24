@@ -48,6 +48,9 @@ func change_state(state_info: int):
 func send_data_id(msg, value):
 	session_node.send_data_id(msg, value)
 
+func send_data_id_reliable(msg, value):
+	session_node.send_data_id_reliable(msg, value)
+
 func send_data(msg, value):
 	session_node.send_data(msg, value)
 
@@ -82,3 +85,10 @@ func _create_server_session(session_path: String, transport_method, id, port, is
 	session_node = await _create_node(session_path, SESSION_NAME)
 	session_node.setup(transport_method, id, port, is_cloud_session)
 	return session_node
+
+# session_manager.gd — add
+func send_movement_id(msg, value):
+	session_node.send_movement_id(msg, value)
+
+func send_movement(msg, value):
+	session_node.send_movement(msg, value)

@@ -29,11 +29,17 @@ func physics_tick(delta: float) -> void:
 
 
 func _apply_inputs(input, delta) -> void:
-	_generate_facing_direction_with_input(input)
+	# With no newly queued command, preserve the last accepted facing rather than
+	# interpreting an empty packet gap as an explicit yaw/pitch of zero.
+	if not input.is_empty():
+		_generate_facing_direction_with_input(input)
 	var p_input = _get_player_input(input)
 	if not is_frozen:
-		player.handle_movement(p_input, delta)
-	player.set_look_rotation(look_yaw, look_pitch)
+		# The server applies gravity in Player.simulate_server(); a predicting client
+		# must apply the same movement-only gravity step here.
+		player.handle_movement(p_input, delta, not player.get_tree().get_multiplayer().is_server())
+	if not input.is_empty():
+		player.set_look_rotation(look_yaw, look_pitch)
 
 func _get_player_input(input) -> Dictionary:
 	var mov_input = _get_player_movement(input)
@@ -53,7 +59,8 @@ func _get_player_movement(input) -> Dictionary:
 		return {
 			"mvx": float(input["mvx"]),
 			"mvz": float(input["mvz"]),
-			"sprint": bool(input.get("sprint", false))
+			"sprint": bool(input.get("sprint", false)),
+			"move_magnitude": clampf(float(input.get("move_magnitude", 1.0)), 0.0, 1.0)
 		}
 	var mvx: float = (
 		float(input.get("move_right", 0.0)) -
@@ -68,7 +75,8 @@ func _get_player_movement(input) -> Dictionary:
 	return {
 		"mvx": mvx,
 		"mvz": mvz,
-		"sprint": bool(input.get("sprint", false))
+		"sprint": bool(input.get("sprint", false)),
+		"move_magnitude": 1.0
 	}
 
 func _generate_facing_direction_with_input(input) -> void:

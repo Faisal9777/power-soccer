@@ -32,9 +32,22 @@ func send_data_id(msg, value):
 	value["state"] = current_scene
 	SessionManager.send_data_id(msg, value)
 
+func send_data_id_reliable(msg, value):
+	value["state"] = current_scene
+	SessionManager.send_data_id_reliable(msg, value)
+
 func send_data(msg, value):
 	value["state"] = current_scene
 	SessionManager.send_data(msg, value)
 
 func on_connected_to_server(server_info):
 	change_state(server_info.get("current_state"))
+
+# state_handler.gd — add
+func send_movement_id(msg, value):
+	value["state"] = current_scene
+	SessionManager.send_movement_id(msg, value)
+
+func send_movement(msg, value):
+	value["state"] = current_scene
+	SessionManager.send_movement(msg, value)

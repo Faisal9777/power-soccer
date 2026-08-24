@@ -104,8 +104,13 @@ func activate() -> void:
 		Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 
 func _touch_on_joystick(pos: Vector2) -> bool:
-	if joystick:
-		return joystick.get_global_rect().has_point(pos)
+	if is_instance_valid(joystick) and joystick.is_visible_in_tree():
+		var g_pos := joystick.global_position
+		var g_scale := joystick.get_global_transform().get_scale()
+		var g_size := Vector2(joystick.size.x * abs(g_scale.x), joystick.size.y * abs(g_scale.y))
+		var margin := 24.0
+		var rect := Rect2(g_pos - Vector2(margin, margin), g_size + Vector2(margin * 2.0, margin * 2.0))
+		return rect.has_point(pos)
 	return false
 
 func deactivate() -> void:
@@ -137,6 +142,9 @@ func set_aim_mode(on: bool) -> void:
 	if not _is_mobile:
 		_captured = not on
 		Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED if _captured else Input.MOUSE_MODE_VISIBLE)
+
+func is_aim_mode_active() -> bool:
+	return _aim_mode
 
 # ----------------------------
 # Desktop input (mouse)
@@ -174,7 +182,6 @@ func _input(event: InputEvent) -> void:
 	# Don't process camera touch input while paused/frozen.
 	if _is_frozen:
 		return
-	var vp_size := get_viewport().get_visible_rect().size
 
 	if event is InputEventScreenTouch:
 		var st := event as InputEventScreenTouch
@@ -189,17 +196,21 @@ func _input(event: InputEvent) -> void:
 
 	elif event is InputEventScreenDrag:
 		var sd := event as InputEventScreenDrag
-		if _touch_on_joystick(sd.position):
-			return
-		if sd.index == _look_touch_id:
+		if sd.index == _look_touch_id and rotation_manager != null:
 			var sy: float = (1.0 if invert_y else -1.0)
-			rotation_manager.look_yaw -= sd.relative.x * rotation_manager.mouse_sens
-			rotation_manager.look_pitch += sd.relative.y * rotation_manager.mouse_sens * sy
-			rotation_manager.look_pitch = clamp(
-				rotation_manager.look_pitch,
-				rotation_manager.min_pitch,
-				rotation_manager.max_pitch
-			)
+			# Write directly to camera's own _yaw/_pitch — never overwritten by reconciliation
+			_yaw -= sd.relative.x * rotation_manager.mouse_sens
+			_pitch += sd.relative.y * rotation_manager.mouse_sens * sy
+			_pitch = clamp(_pitch, rotation_manager.min_pitch, rotation_manager.max_pitch)
+
+# Returns the camera's live yaw (for player_controller to snapshot)
+func get_cam_yaw() -> float:
+	return _yaw
+
+# Returns the camera's live pitch (for player_controller to snapshot)
+func get_cam_pitch() -> float:
+	return _pitch
+
 func consume_facing_delta() -> Dictionary:
 	var dy := _dy_accum
 	var dp := _dp_accum
@@ -272,15 +283,18 @@ func init(proxy, joystick) -> void:
 
 func _update_facing(delta) -> void:
 	if rotation_manager:
-		var sy: float = (-1.0 if invert_y else 1.0)
-
-		_yaw = rotation_manager.look_yaw
-		_pitch = rotation_manager.look_pitch * sy
-
-		_pitch = clamp(_pitch,
-			rotation_manager.min_pitch,
-			rotation_manager.max_pitch
-		)
+		if _is_mobile:
+			# On mobile, _yaw/_pitch are maintained directly by touch drag events.
+			# Do NOT read from rotation_manager here — reconciliation constantly
+			# overwrites rotation_manager.look_yaw/pitch and would kill camera movement.
+			_pitch = clamp(_pitch, rotation_manager.min_pitch, rotation_manager.max_pitch)
+		else:
+			# Desktop: rotation_manager accumulates mouse deltas each tick, safe to read.
+			_yaw = rotation_manager.look_yaw
+			_pitch = clamp(rotation_manager.look_pitch,
+				rotation_manager.min_pitch,
+				rotation_manager.max_pitch
+			)
 
 		_apply_rotation(delta)
 

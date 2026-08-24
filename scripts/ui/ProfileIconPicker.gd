@@ -138,37 +138,27 @@ func _create_popup() -> void:
 
 
 func _load_icons() -> void:
-	var dir := DirAccess.open(ICONS_PATH)
+	var entries := ResourceLoader.list_directory(ICONS_PATH)
 
-	if dir == null:
-		push_error("Could not open profile icon directory: " + ICONS_PATH)
+	if entries.is_empty():
+		push_error("Could not list profile icon directory: " + ICONS_PATH)
 		return
 
 	var files: Array[String] = []
 
-	dir.list_dir_begin()
-
-	while true:
-		var file_name := dir.get_next()
-
-		if file_name == "":
-			break
-
-		if dir.current_is_dir():
+	for entry in entries:
+		# Subdirectories come back with a trailing "/"
+		if entry.ends_with("/"):
 			continue
 
-		if file_name.to_lower().ends_with(".svg"):
-			files.append(file_name)
-
-	dir.list_dir_end()
+		if entry.to_lower().ends_with(".svg"):
+			files.append(entry)
 
 	files.sort()
 
 	for file_name in files:
 		var path := ICONS_PATH + file_name
 		_create_icon_button(path)
-
-
 func _create_icon_button(icon_path: String) -> void:
 	var button := Button.new()
 

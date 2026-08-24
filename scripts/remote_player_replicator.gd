@@ -7,6 +7,7 @@ extends Controller
 var _snapshot_queue: Array[Dictionary] = []
 var remote_buffer_max: int = 10
 var remote_interp_delay_ms: int = 120
+var _latest_server_tick: int = -1
 
 # =========================================================
 # INIT
@@ -20,6 +21,10 @@ func _init(target_player: Node3D, p_name, p_id, team_name) -> void:
 # SERVER PUSHES SNAPSHOTS HERE
 # =========================================================
 func store_snapshot(snap: Dictionary) -> void:
+	var server_tick := int(snap.get("server_tick", -1))
+	if server_tick <= _latest_server_tick:
+		return
+	_latest_server_tick = server_tick
 	var now := Time.get_ticks_msec()
 	var xform := _snap_to_xform(snap, player)
 
@@ -40,39 +45,25 @@ func store_snapshot(snap: Dictionary) -> void:
 # CALLED EVERY FRAME/TICK
 # =========================================================
 func process_tick(delta: float) -> void:
-
-	if not is_instance_valid(player):
+	if not is_instance_valid(player) or _snapshot_queue.is_empty():
 		return
 
-	if _snapshot_queue.is_empty():
-		return
-
-	var snapshot : Dictionary= _snapshot_queue.pop_front()
-
-	_apply_snapshot(snapshot, delta)
-
-
-
-# =========================================================
-# APPLY AUTHORITATIVE STATE
-# =========================================================
-func _apply_snapshot(snapshot: Dictionary, delta: float) -> void:
-	var snap = snapshot.get("snap")
-	look_yaw = snap.get("yaw", 0)
-	look_pitch = snap.get("pitch", 0)
-	# Remote interpolation runs every render frame for smoothness
 	var now := Time.get_ticks_msec()
 	var render_time := now - remote_interp_delay_ms
 
-	if _snapshot_queue.is_empty():
-		return
-	# Drop snapshots that are definitely older than our render_time
+	# Drop snapshots that are older than render_time, keeping the bounding pair
 	while _snapshot_queue.size() >= 2 and int(_snapshot_queue[1]["t"]) <= render_time:
 		_snapshot_queue.pop_front()
 
 	if _snapshot_queue.size() == 1:
-		# Not enough points to interpolate; just snap to the only sample we have.
-		player.global_transform = _snapshot_queue[0]["xform"]
+		var s := _snapshot_queue[0]
+		player.global_transform = s["xform"]
+		var snap: Dictionary = s["snap"]
+		look_yaw = snap.get("yaw", look_yaw)
+		look_pitch = snap.get("pitch", look_pitch)
+		player.set_look_rotation(look_yaw, look_pitch)
+		if snap.has("vel"):
+			player.velocity = snap["vel"]
 		return
 
 	var a := _snapshot_queue[0] as Dictionary
@@ -81,13 +72,24 @@ func _apply_snapshot(snapshot: Dictionary, delta: float) -> void:
 	var tb := int(b["t"])
 	var alpha := 0.0
 	if tb > ta:
-		alpha = clamp(float(render_time - ta) / float(tb - ta), 0.0, 1.0)
+		alpha = clampf(float(render_time - ta) / float(tb - ta), 0.0, 1.0)
+	else:
+		alpha = 1.0
 
 	var xa := a["xform"] as Transform3D
 	var xb := b["xform"] as Transform3D
-	#dbg_print_if_moved_xz(p)
-	if not player:
-		print("client error")
 	player.global_transform = xa.interpolate_with(xb, alpha)
-	player.velocity = snap.get("vel")
+
+	var snap_a: Dictionary = a["snap"]
+	var snap_b: Dictionary = b["snap"]
+	var yaw_a: float = snap_a.get("yaw", 0.0)
+	var yaw_b: float = snap_b.get("yaw", 0.0)
+	var pitch_a: float = snap_a.get("pitch", 0.0)
+	var pitch_b: float = snap_b.get("pitch", 0.0)
+
+	look_yaw = lerp_angle(yaw_a, yaw_b, alpha)
+	look_pitch = lerp(pitch_a, pitch_b, alpha)
 	player.set_look_rotation(look_yaw, look_pitch)
+
+	if snap_b.has("vel"):
+		player.velocity = snap_b["vel"]

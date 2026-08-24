@@ -10,7 +10,33 @@ extends "res://scripts/player.gd"
 @export var red_goal_rel_path:  NodePath = ^"Teams/TeamRed/Goal_B"
 
 # How far in front of the goal line the bot should stand (in meters)
+
 @export var guard_depth: float = 2.5
+@export var dive_extra_distance := 0.40  # meters
+@export var dive_ball_speed := 18.0
+@export var dive_speed := 4.0
+@export var dive_duration := 0.35
+@export var dive_cooldown := 1.0
+@export var prediction_time := 0.35
+
+@export var recovery_time := 3.0
+const DIVE_TILT := deg_to_rad(90.0)
+var _is_diving := false
+var _dive_timer := 0.0
+var _dive_cd := 0.0
+var _dive_dir := Vector3.ZERO
+var _dive_velocity := Vector3.ZERO
+var _dive_target := Vector3.ZERO
+var _recovery_timer := 0.0
+var _hold_timer := 0.0
+
+const MIN_DIVE_SPEED := 20.0
+const MAX_DIVE_SPEED := 40.0
+
+const MIN_DIVE_TIME := 0.12
+const MAX_DIVE_TIME := 0.35
+
+const MAX_EXTRA_TIME := 0.50
 
 const GUARD_RADIUS: float = 30.0      # how close to goal center before "keeper mode" starts
 const SLIDE_DEADZONE: float = 0.1     # how close along the line before we stop sliding
@@ -137,11 +163,17 @@ func _ready() -> void:
 	_pick_goal_point()
 
 
+
 func _physics_process(delta: float) -> void:
+
 	if multiplayer.is_server():
 		_update_bot_input(delta)
-		super._physics_process(delta)
 
+		super._physics_process(delta)
+		if not _is_frozen and not tackle_active and not _external_pull_active and _cooldowns["move"] == 0.0:
+
+
+			_move_server(_get_input_dir_server(), delta, bool(_net.get("sprint", false)))
 
 
 # ---------- TEAM RESOLUTION ----------
@@ -298,6 +330,7 @@ func _update_bot_input(delta: float) -> void:
 
 	var role := _get_my_role()
 
+
 	if role == ROLE_GOALKEEPER:
 		_update_goalkeeper_input(delta)
 	else:
@@ -307,63 +340,161 @@ func _update_bot_input(delta: float) -> void:
 # ---------- GOALKEEPER ----------
 
 func _update_goalkeeper_input(delta: float) -> void:
+	if _recovery_timer > 0.0:
+		_recovery_timer -= delta
+		_reset_net()
+
+		if _recovery_timer <= 0.0:
+			rotation.z = 0.0
+
+		return
+
+	if _hold_timer > 0.0:
+		_hold_timer -= delta
+		_reset_net()
+		if _hold_timer <= 0.0:
+			var held_ball := _get_ball()
+			if held_ball and held_ball.latched and held_ball.latched_to == self:
+				held_ball.unlatch()
+				var fwd := _goal_forward
+				held_ball.apply_hit(fwd * 18.0 + Vector3(0, 6.0, 0), held_ball.global_transform.origin, owner_peer_id)
+		return
+
 	var pos3: Vector3 = global_transform.origin
+	if _dive_cd > 0.0:
+		_dive_cd -= delta
+
+	var ball := _get_ball()
+	if ball and not ball.latched:
+		if global_transform.origin.distance_to(ball.global_transform.origin) < 2.5:
+			ball.latch_to_keeper(self)
+			_hold_timer = 0.8
+			_is_diving = false
+			return
+
+	if _is_diving:
+		_dive_timer -= delta
+		if _dive_timer <= 0.0 or _dive_velocity.length() < 1.0 or ball_latched:
+			_is_diving = false
+		return
 	var pos2 := Vector2(pos3.x, pos3.z)
 	var home2 := Vector2(_home_goal_point.x, _home_goal_point.z)
 
-	var ball := _get_ball()
 	var dist_to_home := pos2.distance_to(home2)
 
-	# ---------- GUARD MODE: slide along a line in front of the posts ----------
+	# ---------- GUARD MODE: keeper holds center, dives to predicted ball impact ----------
 	if ball != null and _has_goal_line and dist_to_home <= GUARD_RADIUS and _goal_forward != Vector3.ZERO:
 		var ball3 := ball.global_transform.origin
-		var ball2 := Vector2(ball3.x, ball3.z)
+		var ball_vel := ball.linear_velocity
+		var speed := ball_vel.length()
+		var predicted_ball := ball3
+
+		if speed > 0.1:
+			predicted_ball += ball_vel * prediction_time
+		var ball2 := Vector2(predicted_ball.x, predicted_ball.z)
 
 		# Line we are actually guarding: posts line shifted forward by guard_depth
 		var base_center3: Vector3 = _goal_line_center + _goal_forward * guard_depth
 		var base_center2 := Vector2(base_center3.x, base_center3.z)
 		var dir2 := Vector2(_goal_line_dir.x, _goal_line_dir.z)  # normalized
 
-		# project ball onto *guard line*
+		# Project ball onto guard line → this is where we need to be to make the save
 		var rel_ball := ball2 - base_center2
 		var t_ball: float = rel_ball.dot(dir2)
-		# clamp inside posts span, so we never go beyond them
 		t_ball = clampf(t_ball, -_goal_line_half_len, _goal_line_half_len)
 
-		# target point on the guard line where we want to stand
-		var slide_point3: Vector3 = base_center3 + _goal_line_dir * t_ball
-		slide_point3.y = _home_goal_point.y
-		_goal_point = slide_point3
+		# Dive target: the predicted ball impact point on the guard line
+		var dive_target3 := base_center3 + _goal_line_dir * t_ball
+		dive_target3.y = _home_goal_point.y
 
-		# distance from us to that point (in XZ)
-		var target2 := Vector2(slide_point3.x, slide_point3.z)
-		var delta2 := target2 - pos2
+		# Keeper's normal guard position: always the CENTER of the goal line
+		var keeper_guard_point := base_center3
+		keeper_guard_point.y = _home_goal_point.y
+		_goal_point = keeper_guard_point
+
+		# delta2 / dist_slide: used for normal walk-back-to-center movement
+		var delta2 := Vector2(keeper_guard_point.x, keeper_guard_point.z) - pos2
 		var dist_slide := delta2.length()
 
-		# close enough → just stand and be a wall
-		if dist_slide <= SLIDE_DEADZONE:
+		# Always run dive check first — being centered must NOT block it
+		var dangerous := false
+		var keeper_time := 0.0
+		var ball_time := 0.0
+		var extra_time := 0.0
+
+		if speed > dive_ball_speed:
+			var toward_goal := ball_vel.normalized().dot(-_goal_forward)
+
+			if toward_goal > 0.8 and _dive_cd <= 0.0:
+				# Keeper dives whenever a fast shot is heading for goal — no extra_time requirement
+				dangerous = true
+
+				var dist_to_dive_target := Vector2(dive_target3.x, dive_target3.z).distance_to(pos2)
+				keeper_time = dist_to_dive_target / slide_move_strength
+				ball_time = prediction_time
+				extra_time = keeper_time - ball_time
+
+		if dangerous:
+			var dive_delta := Vector2(dive_target3.x, dive_target3.z) - pos2
+			var dive_dir3 := Vector3(dive_delta.x, 0.0, dive_delta.y).normalized()
+
+			var dive_strength = clamp(
+				extra_time / MAX_EXTRA_TIME,
+				0.0,
+				1.0
+			)
+
+			var dive_speed := lerpf(
+				MIN_DIVE_SPEED,
+				MAX_DIVE_SPEED,
+				dive_strength
+			)
+
+			_is_diving = true
+			_dive_timer = lerpf(
+				MIN_DIVE_TIME,
+				MAX_DIVE_TIME,
+				dive_strength
+			)
+			_dive_cd = dive_cooldown
+			_dive_dir = dive_dir3
+			if _dive_dir.dot(Vector3.RIGHT) > 0.0:
+				rotation.z = -DIVE_TILT   # Diving right
+			else:
+				rotation.z = DIVE_TILT    # Diving left
+			_dive_velocity = dive_dir3 * dive_speed
+			_dive_target = dive_target3  + dive_dir3 * dive_extra_distance
+
+			print("--------------------------------")
+			print("dist_to_dive_target =", Vector2(dive_target3.x, dive_target3.z).distance_to(pos2))
+			print("keeper_time =", keeper_time)
+			print("ball_time =", ball_time)
+			print("extra_time =", extra_time)
+			print("dive_strength =", dive_strength)
+			print("dive_speed =", dive_speed)
+			print("dive_Adir =", dive_dir3)
+
 			return
 
-		# world direction along the ground toward our slide_point
-		var slide_dir3 := Vector3(delta2.x, 0.0, delta2.y).normalized()
+		# Only walk back to center if keeper is not already there
+		if dist_slide > SLIDE_DEADZONE:
+			var center_dir3 := Vector3(delta2.x, 0.0, delta2.y).normalized()
+			var yaw := rotation.y
+			var fwd := Vector3.BACK.rotated(Vector3.UP, yaw)
+			fwd.y = 0.0
+			fwd = fwd.normalized()
 
-		# decompose that direction into mvx/mvz using our own yaw
-		var yaw := rotation.y
-		var fwd := Vector3.FORWARD.rotated(Vector3.UP, yaw)
-		fwd.y = 0.0
-		fwd = fwd.normalized()
+			var right := Vector3.LEFT.rotated(Vector3.UP, yaw)
+			right.y = 0.0
+			right = right.normalized()
 
-		var right := Vector3.RIGHT.rotated(Vector3.UP, yaw)
-		right.y = 0.0
-		right = right.normalized()
+			var mvx := center_dir3.dot(right) * slide_move_strength
+			var mvz := center_dir3.dot(fwd) * slide_move_strength
 
-		var mvx := slide_dir3.dot(right) * slide_move_strength
-		var mvz := slide_dir3.dot(fwd) * slide_move_strength
+			_net["mvx"] = clampf(mvx, -1.0, 1.0)
+			_net["mvz"] = clampf(mvz, -1.0, 1.0)
+			_net["sprint"] = true
 
-		_net["mvx"] = clampf(mvx, -1.0, 1.0)
-		_net["mvz"] = clampf(mvz, -1.0, 1.0)
-		_net["sprint"] = true
-		
 		return
 
 	# ---------- DEFAULT: walk to home guard point in front of goal ----------
@@ -378,11 +509,11 @@ func _update_goalkeeper_input(delta: float) -> void:
 	var dir_move3: Vector3 = to_home3 / max(dist_home, 0.0001)
 
 	var yaw2 := rotation.y
-	var fwd2 := Vector3.FORWARD.rotated(Vector3.UP, yaw2)
+	var fwd2 := Vector3.BACK.rotated(Vector3.UP, yaw2)
 	fwd2.y = 0.0
 	fwd2 = fwd2.normalized()
 
-	var right2 := Vector3.RIGHT.rotated(Vector3.UP, yaw2)
+	var right2 := Vector3.LEFT.rotated(Vector3.UP, yaw2)
 	right2.y = 0.0
 	right2 = right2.normalized()
 
@@ -427,14 +558,13 @@ func _reset_net() -> void:
 func _move_towards_direction(dir3: Vector3, sprint: bool) -> void:
 	if dir3 == Vector3.ZERO:
 		return
-
 	var yaw := rotation.y
 
-	var fwd := Vector3.FORWARD.rotated(Vector3.UP, yaw)
+	var fwd := Vector3.BACK.rotated(Vector3.UP, yaw)
 	fwd.y = 0.0
 	fwd = fwd.normalized()
 
-	var right := Vector3.RIGHT.rotated(Vector3.UP, yaw)
+	var right := Vector3.LEFT.rotated(Vector3.UP, yaw)
 	right.y = 0.0
 	right = right.normalized()
 
@@ -443,6 +573,7 @@ func _move_towards_direction(dir3: Vector3, sprint: bool) -> void:
 
 	_net["mvx"] = clampf(mvx, -1.0, 1.0)
 	_net["mvz"] = clampf(mvz, -1.0, 1.0)
+	_net["cam_yaw"] = yaw
 	_net["sprint"] = sprint
 
 
@@ -999,7 +1130,7 @@ func _try_pass_to_forward_only(ball: RigidBody3D, ignore_cooldown: bool = false,
 	ball.set_meta(LAST_PASS_FROM_META, get_path())
 	ball.set_meta(LAST_PASS_TIME_META, now_sec)
 
-	ball.apply_impulse(impulse, Vector3.ZERO)
+	ball.apply_hit(impulse, Vector3.ZERO, owner_peer_id)
 	_next_pass_time_sec = now_sec + PASS_COOLDOWN_SEC
 
 	# mark trap for receiver
@@ -1054,7 +1185,7 @@ func _try_pass_to_forward(ball: RigidBody3D) -> void:
 	ball.set_meta(LAST_PASS_FROM_META, get_path())
 	ball.set_meta(LAST_PASS_TIME_META, now_sec)
 
-	ball.apply_impulse(impulse, Vector3.ZERO)
+	ball.apply_hit(impulse, Vector3.ZERO, owner_peer_id)
 	_next_pass_time_sec = now_sec + PASS_COOLDOWN_SEC
 
 	# 👇 NEW: mark that this was a MID → FORWARD pass,
@@ -1149,7 +1280,7 @@ func _forward_try_safety_pass(ball: RigidBody3D) -> bool:
 	ball.set_meta(LAST_PASS_FROM_META, get_path())
 	ball.set_meta(LAST_PASS_TIME_META, now_sec)
 
-	ball.apply_impulse(impulse, Vector3.ZERO)
+	ball.apply_hit(impulse, Vector3.ZERO,owner_peer_id )
 	_next_pass_time_sec = now_sec + PASS_COOLDOWN_SEC
 
 	# 👇 NEW: if this was FORWARD → FORWARD (or to a human forward),
@@ -1865,7 +1996,7 @@ func _forward_handle_kick(ball: RigidBody3D, ball_pos: Vector3) -> void:
 	if dist_goal <= FWD_FINAL_SHOT_DIST and ball_speed < 6.0 and now_sec >= _next_forward_kick_time_sec:
 		ball.linear_velocity = Vector3.ZERO
 		var dir_final := to_goal.normalized()
-		ball.apply_impulse(dir_final * FWD_FINAL_SHOT_FORCE, Vector3.ZERO)
+		ball.apply_hit(dir_final * FWD_FINAL_SHOT_FORCE, Vector3.ZERO,owner_peer_id)
 		_next_forward_kick_time_sec = now_sec + FWD_KICK_COOLDOWN_SEC
 		_forward_dribble_phase = 0
 		print("FORWARD", owner_peer_id, " FINAL SHOT dist_goal=", dist_goal)
@@ -1882,7 +2013,7 @@ func _forward_handle_kick(ball: RigidBody3D, ball_pos: Vector3) -> void:
 		# Phase 0: small push towards goal
 		var dir_dribble := to_goal.normalized()
 		ball.linear_velocity = ball_vel      # keep current ground speed
-		ball.apply_impulse(dir_dribble * FWD_DRIBBLE_FORCE, Vector3.ZERO)
+		ball.apply_hit(dir_dribble * FWD_DRIBBLE_FORCE, Vector3.ZERO, owner_peer_id)
 		_forward_dribble_phase = 1
 		_next_forward_kick_time_sec = now_sec + FWD_KICK_COOLDOWN_SEC
 		print("FORWARD", owner_peer_id, " DRIBBLE KICK dist_goal=", dist_goal)
@@ -1919,3 +2050,30 @@ func _flat_angle_to_point(target: Vector3) -> float:
 	dir = dir.normalized()
 	var fwd := _flat_forward_dir()
 	return acos(clampf(fwd.dot(dir), -1.0, 1.0))
+
+func get_bot_input() -> Dictionary:
+	return _net
+
+#func _move_server(input_dir: Vector3, delta: float, is_sprinting: bool, inp: Dictionary = {}) -> void:
+	#if _is_diving:
+		#var to_target := _dive_target - global_transform.origin
+		#to_target.y = 0.0
+#
+		#var max_move := _dive_velocity.length() * delta
+#
+		#if to_target.length() <= max_move:
+			## Snap exactly to the target and stop — no overshoot
+			#global_transform.origin.x = _dive_target.x
+			#global_transform.origin.z = _dive_target.z
+			#velocity = Vector3.ZERO
+			#_dive_velocity = Vector3.ZERO
+			#_is_diving = false
+			#_recovery_timer = recovery_time
+			#return
+#
+		#velocity.x = _dive_velocity.x
+		#velocity.z = _dive_velocity.z
+		#move_and_slide()
+		#return
+#
+	#super._move_server(input_dir, delta, is_sprinting, inp)

@@ -93,6 +93,9 @@ func handle_data(msg, data):
 func send_data_id(target_id, msg, value):
 	sync.send_data_id(target_id, msg, value)
 
+func send_data_id_reliable(target_id, msg, value):
+	sync.send_data_id_reliable(target_id, msg, value)
+
 func send_data(msg, value):
 	sync.send_data_all(msg, value)
 
@@ -435,3 +438,10 @@ func _shutdown_empty_game_server() -> void:
 
 	# Destroy dedicated server process.
 	get_tree().quit()
+
+# server_session.gd — add
+func send_movement_id(target_id, msg, value):
+	sync.send_movement_id(target_id, msg, value)
+
+func send_movement(msg, value):
+	sync.send_movement_all(msg, value)

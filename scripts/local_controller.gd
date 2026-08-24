@@ -37,41 +37,57 @@ func _get_player_movement(input) -> Dictionary:
 	if _paused:
 		return {"mvx": 0.0, "mvz": 0.0, "sprint": false}
 	
-	var mvx : float = 0.0
-	var mvz : float = 0.0
-	var mov_input = {}
+	if typeof(input) == TYPE_DICTIONARY and input != null:
+		if input.has("mvx") and input.has("mvz"):
+			return {
+				"mvx": float(input["mvx"]),
+				"mvz": float(input["mvz"]),
+				"sprint": bool(input.get("sprint", false)),
+				"move_magnitude": clampf(float(input.get("move_magnitude", 1.0)), 0.0, 1.0)
+			}
+
 	if is_mobile and is_instance_valid(joystick):
+		var mvx : float = 0.0
+		var mvz : float = 0.0
 		var v2: Vector2 = joystick.vector
 		if v2.length() > 0.01:
 			mvx = v2.x
 			mvz = v2.y	
-		mov_input = {"mvx" : mvx, "mvz":mvz, "sprint" : input.get("sprint") }
+		return {
+			"mvx" : mvx,
+			"mvz": mvz,
+			"sprint" : bool(input.get("sprint", false)) if typeof(input) == TYPE_DICTIONARY else false,
+			"move_magnitude": clampf(joystick.mag, 0.0, 1.0)
+		}
 
-	else:
-		mov_input = super._get_player_movement(input)
-	return mov_input
+	return super._get_player_movement(input)
 
 func _generate_facing_direction_with_input(input) -> void:
 	if _paused:
 		return
+	if typeof(input) != TYPE_DICTIONARY or input == null:
+		return
+
+	if input.has("yaw") and input.has("pitch"):
+		look_yaw = float(input["yaw"])
+		look_pitch = clamp(float(input["pitch"]), min_pitch, max_pitch)
+		return
+
 	if is_mobile:
 		return
+
 	if input.get('rmb'):
-	# Direction FROM camera TO target
+		# Direction FROM camera TO target
 		var dir : Vector3 = (w_ball.global_position - player.global_position).normalized()
-		
-		# Flip the direction to match your yaw/pitch convention
 		look_yaw = atan2(-dir.x, -dir.z)
-		
 		look_pitch = clamp(
 			asin(dir.y),
 			min_pitch,
 			max_pitch
 		)
 	else:
-		var look_delta = input.get("mouse_delta")
-		var facing = {"yaw" : look_yaw - look_delta.x * mouse_sens, 
-		"pitch" : look_pitch - look_delta.y * mouse_sens}
-		super._generate_facing_direction_with_input(facing)
-		look_pitch = clamp(look_pitch, min_pitch, max_pitch)
+		var look_delta = input.get("mouse_delta", Vector2.ZERO)
+		if look_delta is Vector2:
+			look_yaw = look_yaw - look_delta.x * mouse_sens
+			look_pitch = clamp(look_pitch - look_delta.y * mouse_sens, min_pitch, max_pitch)
 	

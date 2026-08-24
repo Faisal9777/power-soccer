@@ -18,6 +18,8 @@ var ball: Node
 # Input pump
 const NET_INPUT_HZ: float = 30.0
 var last_server_seq:= {}
+var _server_tick: int = 0
+var _last_action_seq_by_peer: Dictionary = {}
 var can_process := false
 var _replication_manager : ReplicationManager
 
@@ -76,11 +78,15 @@ func process_input_by_id(peer_id: int, msg, cmd : Dictionary) -> void:
 
 	if idx == -1:
 		print("the player does not exist with the id: ", idx)
+		return
 	var controller = controllers[idx]
-	var inputs = cmd.get("inputs", [])
-	if inputs and inputs.size() > 0:
-		var input = _get_latest_input(inputs)
-		controller.input_buffer.push_input(input)
+	var inputs = cmd.get("inputs", []) as Array
+	if inputs.is_empty():
+		return
+	inputs.sort_custom(func(a: Dictionary, b: Dictionary): return int(a.get("seq", -1)) < int(b.get("seq", -1)))
+	for input in inputs:
+		if input is Dictionary:
+			controller.input_buffer.push_input(input)
 
 
 func process_input_dictionary(msg: int, value : Dictionary) -> void:
@@ -118,6 +124,7 @@ func _physics_process(delta: float) -> void:
 	if Input.is_action_pressed("debug"):
 		_game._process_game_end()
 	if can_process:
+		_server_tick += 1
 		_simulate_remote_players(delta)
 
 func _simulate_remote_players(delta) -> void:
@@ -131,13 +138,20 @@ func _broadcast_snapshots() -> void:
 
 	for controller in controllers:  # your list of Player nodes on server
 		var snapshot := controller.get_snapshot() as Dictionary
-		snapshot["seq"] = controller.input_buffer.current_input.get("seq")
+		snapshot["server_tick"] = _server_tick
+		snapshot["ack_input_seq"] = controller.input_buffer.get_last_processed_seq()
 		snapshots[controller.id] = snapshot
 	
 	snapshots["game_state"] = _game.current_state
-	StateHandler.send_data(NetCodes.Msg.SNAPSHOTS,snapshots)
+	StateHandler.send_movement(NetCodes.Msg.SNAPSHOTS, snapshots)
 
 func _client_discrete_input(from_id: int, d: Dictionary) -> void:
+	var action_seq := int(d.get("action_seq", -1))
+	if action_seq >= 0:
+		var last_action_seq := int(_last_action_seq_by_peer.get(from_id, -1))
+		if action_seq <= last_action_seq:
+			return
+		_last_action_seq_by_peer[from_id] = action_seq
 	if d.get("grapple_toggle", false):
 		print("World got grapple toggle from ", from_id)
 	if _players.has(from_id):
@@ -246,13 +260,6 @@ func _debug_data(roster: Dictionary, ingame: Node, ball_scene: Node, blue_spawns
 		print("red_path =", red_spawns.get_path(), " empty? ", red_spawns.get_path().is_empty())
 
 	print("--- END BUILD DATA DEBUG ---")
-
-
-func _get_latest_input(inputs: Array) -> Dictionary:
-	return inputs.reduce(func(a, b):
-		if a.seq > b.seq:
-			return a
-		return b)
 
 
 func _exit_tree():
