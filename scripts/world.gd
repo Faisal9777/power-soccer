@@ -111,6 +111,12 @@ var _pass_cd_local: float = 0.0
 var _pass_cd_last_from_player: float = -999.0
 
 func _ready() -> void:
+	#var bounce_material := PhysicsMaterial.new()
+	#bounce_material.bounce = 0.8
+	#bounce_material.friction = 0.2
+#
+	#for node in find_children("*", "CollisionShape3D", true, false):
+		#node.physics_material_override = bounce_material
 	var replication_manager = ReplicationManager.new()
 	replication_manager.name = "ReplicationManager"
 	add_child(replication_manager)

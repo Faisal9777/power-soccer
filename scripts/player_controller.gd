@@ -12,7 +12,7 @@ var _pending_inputs: Array[Dictionary] = []   # only for LOCAL player
 var _fixed_dt: float = 1.0 / 60.0
 var _scheduler : JobScheduler
 var _task : Node
-var send_interval := 1.0 / 20.0  # 20 Hz
+var send_interval := 1.0 / 60.0  # 60 Hz
 var send_accumulator := 0.0
 var can_process := false
 var task_id := 0

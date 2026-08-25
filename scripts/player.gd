@@ -1029,7 +1029,9 @@ func _kick_at_contact_server() -> void:
 		hit_point = C + dir_to.normalized() * R
 
 	# Impulse direction from contact → center (pure geometry)
-	var dir: Vector3 = (C - hit_point).normalized()
+	var dir: Vector3 = C - hit_point
+	dir.y = 0.0
+	dir = dir.normalized()
 
 	# Strength from charge (tweak exponent as you like)
 	var q: float = clampf(_charge, 0.0, 1.0)

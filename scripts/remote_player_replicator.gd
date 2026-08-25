@@ -6,8 +6,15 @@ extends Controller
 # =========================================================
 var _snapshot_queue: Array[Dictionary] = []
 var remote_buffer_max: int = 10
-var remote_interp_delay_ms: int = 120
+var remote_interp_delay_ms: int = 33
 var _latest_server_tick: int = -1
+
+var _visual_err: Vector3 = Vector3.ZERO
+var _was_extrapolating: bool = false
+
+@export var extrapolation_cap_ms: int = 200   # freeze, don't guess forever
+@export var error_catchup_speed: float = 18.0 # same idea as proxy_follower's catchup_speed
+@export var error_snap_dist: float = 3.0      # beyond this, hard snap (goal reset, respawn, etc.)
 
 # =========================================================
 # INIT
@@ -56,16 +63,31 @@ func process_tick(delta: float) -> void:
 		_snapshot_queue.pop_front()
 
 	if _snapshot_queue.size() == 1:
+		#var s := _snapshot_queue[0]
+		#player.global_transform = s["xform"]
+		#var snap: Dictionary = s["snap"]
+		#look_yaw = snap.get("yaw", look_yaw)
+		#look_pitch = snap.get("pitch", look_pitch)
+		#player.set_look_rotation(look_yaw, look_pitch)
+		#if snap.has("vel"):
+			#player.velocity = snap["vel"]
+		#return
 		var s := _snapshot_queue[0]
-		player.global_transform = s["xform"]
 		var snap: Dictionary = s["snap"]
-		look_yaw = snap.get("yaw", look_yaw)
-		look_pitch = snap.get("pitch", look_pitch)
-		player.set_look_rotation(look_yaw, look_pitch)
-		if snap.has("vel"):
-			player.velocity = snap["vel"]
-		return
+		var elapsed_ms := now - int(s["t"])
+		var ideal_pos := (s["xform"] as Transform3D).origin
 
+		if not bool(snap.get("is_frozen", false)) and elapsed_ms <= extrapolation_cap_ms and snap.has("vel"):
+			var t := elapsed_ms / 1000.0
+			ideal_pos += (snap["vel"] as Vector3) * t
+			
+			# optional refinement, see below
+		# past the cap, or frozen, or no vel → ideal_pos just stays at the last known point (same as today)
+
+		_apply_visual_position(ideal_pos, delta)
+		_was_extrapolating = true
+		# rotation: no angular velocity is sent, so just hold last known yaw/pitch as you do today
+		return
 	var a := _snapshot_queue[0] as Dictionary
 	var b := _snapshot_queue[1] as Dictionary
 	var ta := int(a["t"])
@@ -93,3 +115,8 @@ func process_tick(delta: float) -> void:
 
 	if snap_b.has("vel"):
 		player.velocity = snap_b["vel"]
+
+func _apply_visual_position(ideal_pos: Vector3, delta: float) -> void:
+	var a := 1.0 - pow(0.001, delta * error_catchup_speed)
+	_visual_err = _visual_err.lerp(Vector3.ZERO, a)
+	player.global_position = ideal_pos + _visual_err
