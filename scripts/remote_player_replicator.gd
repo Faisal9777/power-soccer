@@ -6,7 +6,7 @@ extends Controller
 # =========================================================
 var _snapshot_queue: Array[Dictionary] = []
 var remote_buffer_max: int = 10
-var remote_interp_delay_ms: int = 33
+var remote_interp_delay_ms: int = 60
 var _latest_server_tick: int = -1
 
 var _visual_err: Vector3 = Vector3.ZERO

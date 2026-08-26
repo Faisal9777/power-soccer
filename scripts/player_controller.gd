@@ -12,14 +12,14 @@ var _pending_inputs: Array[Dictionary] = []   # only for LOCAL player
 var _fixed_dt: float = 1.0 / 60.0
 var _scheduler : JobScheduler
 var _task : Node
-var send_interval := 1.0 / 60.0  # 60 Hz
+var send_interval := 1.0 / 45.0  # 60 Hz
 var send_accumulator := 0.0
 var can_process := false
 var task_id := 0
 
 func start_process() -> void:
 	can_process = true
-	_task = _scheduler.schedule_repeating(_process_interval, 1.0 / 20.0)
+	_task = _scheduler.schedule_repeating(_process_interval, send_interval)
 
 func stop_process() -> void:
 	can_process = false
@@ -78,8 +78,8 @@ func process_input(delta):
 	_next_input_seq = int(input["seq"]) + 1
 	var stored := input.duplicate(true)
 	_pending_inputs.append(stored)
-	if _pending_inputs.size() > 256:
-		_pending_inputs = _pending_inputs.slice(_pending_inputs.size() - 256, _pending_inputs.size())
+	if _pending_inputs.size() > 40:
+		_pending_inputs = _pending_inputs.slice(_pending_inputs.size() - 40, _pending_inputs.size())
 
 	on_predicted.emit(player.global_transform)
 

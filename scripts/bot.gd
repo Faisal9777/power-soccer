@@ -159,6 +159,8 @@ var _mid_return_home_until_sec := 0.0
 
 func _ready() -> void:
 	super._ready()
+	if multiplayer.is_server():
+		add_to_group("bots")
 	# We can pick the goal on all peers; only the server will actually drive the bot.
 	_pick_goal_point()
 
@@ -168,7 +170,6 @@ func _physics_process(delta: float) -> void:
 
 	if multiplayer.is_server():
 		_update_bot_input(delta)
-
 		super._physics_process(delta)
 		if not _is_frozen and not tackle_active and not _external_pull_active and _cooldowns["move"] == 0.0:
 
@@ -480,11 +481,11 @@ func _update_goalkeeper_input(delta: float) -> void:
 		if dist_slide > SLIDE_DEADZONE:
 			var center_dir3 := Vector3(delta2.x, 0.0, delta2.y).normalized()
 			var yaw := rotation.y
-			var fwd := Vector3.BACK.rotated(Vector3.UP, yaw)
+			var fwd := Vector3.FORWARD.rotated(Vector3.UP, yaw)
 			fwd.y = 0.0
 			fwd = fwd.normalized()
 
-			var right := Vector3.LEFT.rotated(Vector3.UP, yaw)
+			var right := Vector3.RIGHT.rotated(Vector3.UP, yaw)
 			right.y = 0.0
 			right = right.normalized()
 
@@ -509,11 +510,11 @@ func _update_goalkeeper_input(delta: float) -> void:
 	var dir_move3: Vector3 = to_home3 / max(dist_home, 0.0001)
 
 	var yaw2 := rotation.y
-	var fwd2 := Vector3.BACK.rotated(Vector3.UP, yaw2)
+	var fwd2 := Vector3.FORWARD.rotated(Vector3.UP, yaw2)
 	fwd2.y = 0.0
 	fwd2 = fwd2.normalized()
 
-	var right2 := Vector3.LEFT.rotated(Vector3.UP, yaw2)
+	var right2 := Vector3.RIGHT.rotated(Vector3.UP, yaw2)
 	right2.y = 0.0
 	right2 = right2.normalized()
 
@@ -560,11 +561,11 @@ func _move_towards_direction(dir3: Vector3, sprint: bool) -> void:
 		return
 	var yaw := rotation.y
 
-	var fwd := Vector3.BACK.rotated(Vector3.UP, yaw)
+	var fwd := Vector3.FORWARD.rotated(Vector3.UP, yaw)
 	fwd.y = 0.0
 	fwd = fwd.normalized()
 
-	var right := Vector3.LEFT.rotated(Vector3.UP, yaw)
+	var right := Vector3.RIGHT.rotated(Vector3.UP, yaw)
 	right.y = 0.0
 	right = right.normalized()
 
@@ -2054,26 +2055,35 @@ func _flat_angle_to_point(target: Vector3) -> float:
 func get_bot_input() -> Dictionary:
 	return _net
 
-#func _move_server(input_dir: Vector3, delta: float, is_sprinting: bool, inp: Dictionary = {}) -> void:
-	#if _is_diving:
-		#var to_target := _dive_target - global_transform.origin
-		#to_target.y = 0.0
-#
-		#var max_move := _dive_velocity.length() * delta
-#
-		#if to_target.length() <= max_move:
-			## Snap exactly to the target and stop — no overshoot
-			#global_transform.origin.x = _dive_target.x
-			#global_transform.origin.z = _dive_target.z
-			#velocity = Vector3.ZERO
-			#_dive_velocity = Vector3.ZERO
-			#_is_diving = false
-			#_recovery_timer = recovery_time
-			#return
-#
-		#velocity.x = _dive_velocity.x
-		#velocity.z = _dive_velocity.z
-		#move_and_slide()
-		#return
-#
-	#super._move_server(input_dir, delta, is_sprinting, inp)
+func _move_server(
+	input_dir: Vector3,
+	delta: float,
+	is_sprinting: bool,
+	move_magnitude: float = 1.0
+) -> void:
+	if _is_diving:
+		var to_target := _dive_target - global_transform.origin
+		to_target.y = 0.0
+
+		var max_move := _dive_velocity.length() * delta
+
+		if to_target.length() <= max_move:
+			global_transform.origin.x = _dive_target.x
+			global_transform.origin.z = _dive_target.z
+			velocity = Vector3.ZERO
+			_dive_velocity = Vector3.ZERO
+			_is_diving = false
+			_recovery_timer = recovery_time
+			return
+
+		velocity.x = _dive_velocity.x
+		velocity.z = _dive_velocity.z
+		move_and_slide()
+		return
+
+	super._move_server(
+		input_dir,
+		delta,
+		is_sprinting,
+		move_magnitude
+	)

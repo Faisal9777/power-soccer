@@ -173,6 +173,8 @@ func _start_game() -> void:
 	for controller in p_controllers:
 		controller.freeze(false)
 	#_toggle_player_process(false)
+	# Unfreeze server-controlled bots
+	_unfreeze_bots()
 
 func _toggle_player_process(toggle : bool) -> void:
 	var switch := false
@@ -576,3 +578,8 @@ func transmission_completed() -> void:
 	#print("the player with id ", goal_player,
 	  #" goaled who belongs to ", scoring_team,
 	  #" whose goal is now ", GameState.roster[goal_player]["goals"])
+
+func _unfreeze_bots() -> void:
+	for bot in get_tree().get_nodes_in_group("bots"):
+		if is_instance_valid(bot) and bot.has_method("freeze"):
+			bot.freeze(false)
