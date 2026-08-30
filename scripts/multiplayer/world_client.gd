@@ -51,6 +51,10 @@ var _remote_buf: Dictionary[int, Array] = {}
 
 var _my_id: int = -1
 var _fixed_dt: float = 1.0 / 60.0
+const POS_RANGE := 150.0
+const VEL_RANGE := 30.0
+const ANGLE_RANGE := PI
+
 
 @onready var _network_endpoint: Node = get_parent()
 
@@ -60,7 +64,7 @@ func set_local_pause(p):
 func process_input(cmd: Dictionary, peer_id : int) -> void:
 	_store_snapshots(cmd)
 
-func process_input_dictionary(msg : int, value : Dictionary) -> void:
+func process_input_dictionary(msg : int, value : Variant) -> void:
 	if msg == NetCodes.Msg.INIT_BEGIN:
 		var roster := value.get("roster") as Dictionary
 		GameState.roster = roster
@@ -78,7 +82,9 @@ func process_input_dictionary(msg : int, value : Dictionary) -> void:
 		_game.end_game(value)
 	
 	elif msg == NetCodes.Msg.SNAPSHOTS:
-		_store_snapshots(value)
+		if value is PackedByteArray:
+			print("[SNAP] packet in, bytes=", value.size())
+		_store_snapshots(_decode_snapshots(value) if value is PackedByteArray else value)
 	elif msg == NetCodes.Msg.ROUND_START:
 		_game.start_game(value)
 
@@ -177,18 +183,17 @@ func _store_snapshots(snapshots: Dictionary) -> void:
 		if not (k is int or (k is String and k.is_valid_int())):
 			continue
 		var peer_id := int(k)
+		if peer_id == _my_id:
+			print("[SNAP] mine! is_frozen=", snapshots[k].get("is_frozen"), " id=", _my_id)
 		var c_id = ArrayUtils.find(controllers, peer_id)
 		if c_id < 0:
+			if peer_id == _my_id:
+				print("[SNAP] my id ", _my_id, " has no matching controller!")
 			continue
 		var controller = controllers[c_id]
 		if not _players.has(peer_id):
 			continue
-
-		var snap: Dictionary = snapshots[k]
-
-		# Prefer server_tick if you add it later; fallback to last_server_seq
-
-		controller.store_snapshot(snap)
+		controller.store_snapshot(snapshots[k])
 	#_game.current_state = snapshots.game_state
 
 func _resolve_players_from_roster(rosters) -> void:
@@ -236,3 +241,45 @@ func _send_network_id(sender_id, msg, value) -> void:
 		StateHandler.send_movement_id(msg, value) 
 func _get_player_controller() -> PlayerController:
 	return p_controller
+
+func _dequantize(q: int, range: float) -> float:
+	return (float(q) / 32767.0) * range
+	
+func _decode_snapshots(data: PackedByteArray) -> Dictionary:
+	var buf := StreamPeerBuffer.new()
+	buf.big_endian = false
+	buf.data_array = data
+
+	var snapshots := {}
+	var server_tick := buf.get_u32()
+	var game_state := buf.get_u8()
+	var count := buf.get_u8()
+
+	for i in count:
+		var pid := buf.get_u32()
+		var flags := buf.get_u8()
+		var pos := Vector3(
+			_dequantize(buf.get_16(), POS_RANGE),
+			_dequantize(buf.get_16(), POS_RANGE),
+			_dequantize(buf.get_16(), POS_RANGE)
+		)
+		var vel := Vector3(
+			_dequantize(buf.get_16(), VEL_RANGE),
+			_dequantize(buf.get_16(), VEL_RANGE),
+			_dequantize(buf.get_16(), VEL_RANGE)
+		)
+		var yaw := _dequantize(buf.get_16(), ANGLE_RANGE)
+		var pitch := _dequantize(buf.get_16(), ANGLE_RANGE)
+		var ack_seq := buf.get_u32()
+
+		snapshots[pid] = {
+			"pos": pos, "vel": vel,
+			"is_frozen": (flags & 1) != 0,
+			"bursting": (flags & 2) != 0,
+			"yaw": yaw, "pitch": pitch,
+			"server_tick": server_tick,
+			"ack_input_seq": ack_seq,
+		}
+
+	snapshots["game_state"] = game_state
+	return snapshots

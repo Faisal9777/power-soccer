@@ -139,9 +139,17 @@ func stop_focus() -> void:
 # ----------------------------
 func set_aim_mode(on: bool) -> void:
 	_aim_mode = on
+
+	# IMPORTANT:
+	# Do NOT change distance here.
+	# Focus works in both first-person and third-person.
+
 	if not _is_mobile:
 		_captured = not on
-		Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED if _captured else Input.MOUSE_MODE_VISIBLE)
+		Input.set_mouse_mode(
+			Input.MOUSE_MODE_CAPTURED if _captured
+			else Input.MOUSE_MODE_VISIBLE
+		)
 
 func is_aim_mode_active() -> bool:
 	return _aim_mode
@@ -299,27 +307,29 @@ func _update_facing(delta) -> void:
 		_apply_rotation(delta)
 
 func _apply_rotation(delta: float) -> void:
-
 	var target_transform := (
 		_follow_target.global_transform
 		if is_instance_valid(_follow_target)
 		else global_transform
 	)
 
-	#if not _is_frozen:
-#
-		#if is_instance_valid(_target):
-			## Direction FROM camera TO target
-			#var dir := (_target.global_position - global_position).normalized()
-			#
-			## Flip the direction to match your yaw/pitch convention
-			#_yaw = atan2(-dir.x, -dir.z)
-			#
-			#_pitch = clamp(
-				#asin(dir.y),
-				#rotation_manager.min_pitch,
-				#rotation_manager.max_pitch
-			#)
+	# Focus / aim mode — point camera at the actual ball
+	if _aim_mode:
+		var ball := get_tree().get_first_node_in_group("ball") as Node3D
+
+		if is_instance_valid(ball):
+			var focus := target_transform.origin + Vector3(0.0, height, 0.0)
+			var dir := (ball.global_position - focus).normalized()
+
+			if dir.length_squared() > 0.0001:
+				_yaw = atan2(-dir.x, -dir.z)
+
+				var horizontal := Vector2(dir.x, dir.z).length()
+				_pitch = clamp(
+					atan2(dir.y, horizontal),
+					rotation_manager.min_pitch,
+					rotation_manager.max_pitch
+				)
 
 	var cam_basis := (
 		Basis(Vector3.UP, _yaw)
@@ -332,15 +342,10 @@ func _apply_rotation(delta: float) -> void:
 		target_transform,
 		fwd_3d
 	)
-	# -------------------------------------------------
-	# SMOOTH FOLLOW
-	# -------------------------------------------------
+
 	var t := 1.0 - exp(-follow_speed * delta)
 
-	global_position = global_position.lerp(
-		desired_pos,
-		t
-	)
+	global_position = global_position.lerp(desired_pos, t)
 
 	look_at(
 		global_position + fwd_3d,
@@ -352,10 +357,15 @@ func _apply_rotation(delta: float) -> void:
 # ----------------------------
 func set_goal_third_person_view() -> void:
 	_aim_mode = false
-	distance = clamp(goal_third_person_distance, min_distance, max_distance)
+	distance = clamp(
+		goal_third_person_distance,
+		min_distance,
+		max_distance
+	)
 	_apply_fp_tp_self_visibility()
 
 func set_first_person_view() -> void:
+	_aim_mode = false
 	distance = min_distance
 	_apply_fp_tp_self_visibility()
 

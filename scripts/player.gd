@@ -8,7 +8,7 @@ class_name Player
 @export var air_control: float = 0.4
 
 @export var tackle_cooldown_dur: float = 20.0  # 20 seconds cooldown
-@export var kick_force: float = 16.0
+@export var kick_force: float = 24.0
 @export var kick_up: float = 3.0
 @export var shoot_cooldown: float = 0.25
 @export var cooldown_per_impulse: float = 0.05
@@ -58,6 +58,7 @@ class_name Player
 # --- Tackle phasing (pass through other players while tackling) ---
 @export var tackle_phase_through_players: bool = true
 
+var _arrow_origin_smoothed: Vector3
 var _saved_body_layer: int = 0
 var _saved_body_mask: int = 0
 var _tackle_phasing: bool = false
@@ -307,13 +308,16 @@ func get_yaw() -> Dictionary:
 	return {"yaw_delta" : yaw_delta, "pitch_delta" : pitch_delta}
 
 
+# player.gd — get_snapshot()
 func get_snapshot() -> Dictionary:
 	var snapshot := {
 			"pos" : global_position,
 			"vel": velocity,
-			"is_frozen" : _is_frozen
+			"is_frozen" : _is_frozen,
+			"bursting": tackle_active,
 		}
 	return snapshot
+	
 func apply_snapshot(snap: Dictionary) -> void:
 	velocity = snap["vel"]
 	var yaw := snap.get("yaw", 0) as float
@@ -379,21 +383,57 @@ func update_player_states(input: Dictionary, delta) -> void:
 func handle_movement(inp, delta, apply_prediction_gravity: bool = false) -> void:
 	if apply_prediction_gravity:
 		apply_gravity(delta)
-		var has_movement := Vector2(float(inp.get("mvx", 0.0)), float(inp.get("mvz", 0.0))).length() > 0.01
-		_using_sprint = bool(inp.get("sprint", false)) and has_movement and _stamina > stamina_min_to_sprint
-		if _using_sprint:
-			_stamina = maxf(0.0, _stamina - stamina_sprint_drain * delta)
-		elif not tackle_active and is_on_floor():
-			_stamina = minf(stamina_max, _stamina + stamina_regen_rate * delta)
+
+		var has_movement := Vector2(
+			float(inp.get("mvx", 0.0)),
+			float(inp.get("mvz", 0.0))
+		).length() > 0.01
+
+		_using_sprint = bool(inp.get("sprint", false)) \
+			and has_movement \
+			and _stamina > stamina_min_to_sprint
+
+		if not tackle_active and is_on_floor():
+			_stamina = minf(
+				stamina_max,
+				_stamina + stamina_regen_rate * delta
+			)
+
 	if _cooldowns["move"] == 0.0:
-		var yaw := rotation.y
-		var fwd := Vector3.FORWARD.rotated(Vector3.UP, yaw); fwd.y = 0.0; fwd = fwd.normalized()
-		var right := Vector3.RIGHT.rotated(Vector3.UP, yaw); right.y = 0.0; right = right.normalized()
-		var mvx := float(inp["mvx"])
-		var mvz := float(inp["mvz"])
-		var input_dir := (right * mvx + fwd * mvz).normalized()
-		var is_sprinting : bool = inp.get("sprint")
-		_move_server(input_dir, delta, is_sprinting, float(inp.get("move_magnitude", 1.0)))
+		# Use the camera/input yaw for camera-relative movement.
+		# Fall back to player rotation for bots/legacy input.
+		var yaw := float(inp.get("yaw", rotation.y))
+
+		var fwd := Vector3.FORWARD.rotated(
+			Vector3.UP,
+			yaw
+		)
+		fwd.y = 0.0
+		fwd = fwd.normalized()
+
+		var right := Vector3.RIGHT.rotated(
+			Vector3.UP,
+			yaw
+		)
+		right.y = 0.0
+		right = right.normalized()
+
+		var mvx := float(inp.get("mvx", 0.0))
+		var mvz := float(inp.get("mvz", 0.0))
+
+		var input_dir := (
+			right * mvx +
+			fwd * mvz
+		).normalized()
+
+		var is_sprinting: bool = inp.get("sprint", false)
+
+		_move_server(
+			input_dir,
+			delta,
+			is_sprinting,
+			float(inp.get("move_magnitude", 1.0))
+		)
 
 func stop_replication() -> void:
 	$MultiplayerSynchronizer.public_visibility = false
@@ -559,7 +599,6 @@ func _update_arrow_position(delta: float) -> void:
 	var P: Vector3 = pxf.origin
 	var C: Vector3 = bxf.origin
 	var R: float   = _get_ball_radius(ball)
-
 	var contact: Vector3 = C  # RMB not held => center of ball
 
 	if _is_aiming():
@@ -587,15 +626,16 @@ func _update_arrow_position(delta: float) -> void:
 	# Smooth & draw
 	var smooth: float = 1.0 - pow(1.0 - 0.14, maxf(delta * 60.0, 0.0))
 	aim_contact = aim_contact.lerp(contact, clamp(smooth, 0.0, 1.0))
-
-	var vec: Vector3 = aim_contact - P
+	_arrow_origin_smoothed = _arrow_origin_smoothed.lerp(P, clamp(smooth, 0.0, 1.0))
+	
+	var vec: Vector3 = aim_contact - _arrow_origin_smoothed
 	if vec == Vector3.ZERO:
 		_show_arrow(false)
 		return
 
 	_show_arrow(is_owner)
-	aim_arrow.global_position = P
-	aim_arrow.look_at(P + vec.normalized(), Vector3.UP)
+	aim_arrow.global_position = _arrow_origin_smoothed
+	aim_arrow.look_at(_arrow_origin_smoothed + vec.normalized(), Vector3.UP)
 	aim_arrow.scale = Vector3(1.0, 1.0, maxf(vec.length(), aim_min_len))
 
 func _resolve_ball() -> RigidBody3D:
@@ -854,6 +894,51 @@ func _get_input_dir_server() -> Vector3:
 	var mvz := float(_net["mvz"])
 	return (right * mvx + fwd * mvz).normalized()
 
+func _get_shoot_direction_server() -> Vector3:
+	var mvx := float(_net.get("mvx", 0.0))
+	var mvz := float(_net.get("mvz", 0.0))
+
+	var input_vec := Vector2(mvx, mvz)
+
+	# No directional input.
+	# Fall back to camera-forward direction.
+	if input_vec.length_squared() < 0.0001:
+		var yaw := float(_net.get("cam_yaw", rotation.y))
+
+		var fwd := Vector3.FORWARD.rotated(Vector3.UP, yaw)
+		fwd.y = 0.0
+
+		if fwd.length_squared() > 0.0001:
+			return fwd.normalized()
+
+		return -global_transform.basis.z.normalized()
+
+	# Same camera-relative coordinate system as movement.
+	var yaw := float(_net.get("cam_yaw", rotation.y))
+
+	var fwd := Vector3.FORWARD.rotated(
+		Vector3.UP,
+		yaw
+	)
+	fwd.y = 0.0
+	fwd = fwd.normalized()
+
+	var right := Vector3.RIGHT.rotated(
+		Vector3.UP,
+		yaw
+	)
+	right.y = 0.0
+	right = right.normalized()
+
+	# This automatically gives:
+	# left       -> left
+	# right      -> right
+	# forward    -> forward
+	# back       -> back
+	# left+forward -> diagonal
+	# etc.
+	return (right * mvx + fwd * mvz).normalized()
+
 func _handle_action_server(input_dir: Vector3, delta: float) -> void:
 	#if _cooldowns["move"] == 0.0:
 		#_move_server(input_dir, delta, _using_sprint)
@@ -986,69 +1071,55 @@ func _handle_shoot_server() -> void:
 func _kick_at_contact_server() -> void:
 	if current_ball == null or !is_instance_valid(current_ball):
 		return
-	if aim_arrow == null or !is_instance_valid(aim_arrow):
-		return
+
 	if _charge <= 0.0:
 		return
 
-	# Ball center and radius
-	var C: Vector3 = current_ball.global_transform.origin
-	var R: float = _get_ball_radius(current_ball)
+	# -----------------------------------------
+	# SHOOT DIRECTION = MOVEMENT INPUT DIRECTION
+	# -----------------------------------------
+	var dir := _get_shoot_direction_server()
 
-	# Ray from the aim arrow (forward is -Z after look_at)
-	var axf: Transform3D = _net["aim_position"]
-	var ro: Vector3 = axf.origin
-	var rd: Vector3 = (-axf.basis.z).normalized()
+	if dir.length_squared() < 0.0001:
+		return
 
-	# ---- Ray → sphere (ball) ----
-	var oc: Vector3 = ro - C
-	var bq: float = 2.0 * rd.dot(oc)
-	var cq: float = oc.dot(oc) - R * R
-	var disc: float = bq * bq - 4.0 * cq
-
-	var hit_point: Vector3 = Vector3.ZERO
-	if disc >= 0.0:
-		var sd: float = sqrt(disc)
-		var t1: float = (-bq - sd) * 0.5
-		var t2: float = (-bq + sd) * 0.5
-		var t: float = -1.0
-		if t1 > 0.0:
-			t = t1
-		elif t2 > 0.0:
-			t = t2
-		if t > 0.0:
-			hit_point = ro + rd * t
-
-	# Fallback: closest point along the arrow ray projected to the sphere surface
-	if hit_point == Vector3.ZERO:
-		var t_closest: float = maxf(-rd.dot(oc), 0.0)
-		var closest: Vector3 = ro + rd * t_closest
-		var dir_to: Vector3 = closest - C
-		if dir_to == Vector3.ZERO:
-			dir_to = ro - C
-		hit_point = C + dir_to.normalized() * R
-
-	# Impulse direction from contact → center (pure geometry)
-	var dir: Vector3 = C - hit_point
-	dir.y = 0.0
 	dir = dir.normalized()
 
-	# Strength from charge (tweak exponent as you like)
+	# -----------------------------------------
+	# POWER FROM CHARGE
+	# -----------------------------------------
 	var q: float = clampf(_charge, 0.0, 1.0)
 	var exponent: float = 2.0
 	var strength: float = kick_force * pow(q, exponent)
 
-	var J: Vector3 = dir * strength
+	var J := dir * strength
+
+	# -----------------------------------------
+	# Kick the ball from the opposite side of
+	# the ball relative to the desired direction.
+	#
+	# Example:
+	#     shoot right  -> hit left side
+	#     shoot left   -> hit right side
+	#     shoot forward -> hit back side
+	# -----------------------------------------
+	var R := _get_ball_radius(current_ball)
+	var contact_offset := -dir * R
 
 	current_ball.sleeping = false
-	#current_ball.apply_impulse(J,  hit_point - C)
+
 	var ball := current_ball as Ball
-	if not ball : print("ball bcame null when casted")
-	ball.apply_hit(J,  hit_point - C, owner_peer_id)
-	#_debug_red_dot(current_ball, hit_point, 500)
-	# housekeeping
+	if ball != null:
+		ball.apply_hit(J, contact_offset, owner_peer_id)
+	else:
+		current_ball.apply_impulse(J, contact_offset)
+
+	# -----------------------------------------
+	# HOUSEKEEPING
+	# -----------------------------------------
 	_cooldowns["shoot"] = shoot_cooldown
 	_charge = 0.0
+
 	if is_instance_valid(_charge_bar):
 		_charge_bar.value = 0.0
 

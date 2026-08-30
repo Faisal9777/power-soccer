@@ -143,13 +143,13 @@ func _broadcast():
 			server_info["players"] = _get_all_user_ids()
 
 		server_info["id"] = lobby_id
-		print(
-			"HEARTBEAT STATE: current_scene=",
-			current_scene,
-			" current_state=",
-			server_info.get("current_state")
-		)
-		print("Sending heartbeat with lobby_id=", lobby_id, "server_info=", server_info)
+		#print(
+			#"HEARTBEAT STATE: current_scene=",
+			#current_scene,
+			#" current_state=",
+			#server_info.get("current_state")
+		#)
+		#print("Sending heartbeat with lobby_id=", lobby_id, "server_info=", server_info)
 		_transport_method.send(server_info)
 
 func _broadcast_states():
@@ -442,6 +442,7 @@ func _shutdown_empty_game_server() -> void:
 # server_session.gd — add
 func send_movement_id(target_id, msg, value):
 	sync.send_movement_id(target_id, msg, value)
+
 
 func send_movement(msg, value):
 	sync.send_movement_all(msg, value)

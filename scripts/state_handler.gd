@@ -49,5 +49,6 @@ func send_movement_id(msg, value):
 	SessionManager.send_movement_id(msg, value)
 
 func send_movement(msg, value):
-	value["state"] = current_scene
+	if value is Dictionary:
+		value["state"] = current_scene
 	SessionManager.send_movement(msg, value)

@@ -98,6 +98,10 @@ func join(server_info, password):
 	Network.join(ip, port)
 
 func handle_data(msg, data):
+	if data is PackedByteArray:
+		StateHandler.handle_data(msg, data, current_scene)
+		return
+
 	if msg == NetCodes.Msg.AUTH_OK:
 		var payload := {
 			"name" : Settings.player_name,
@@ -120,7 +124,6 @@ func handle_data(msg, data):
 				_cl_sync_roster(data)
 	else:
 		StateHandler.handle_data(msg, data, state)
-
 func disconnect_connection() -> void:
 	_disconnect()
 

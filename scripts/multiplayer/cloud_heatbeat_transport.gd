@@ -12,8 +12,8 @@ func _init(endpoint: String, http_service):
 func send(payload: Dictionary) -> void:
 	var json = JSON.stringify(payload)
 	var headers = ["Content-Type: application/json"]
-	print("Heartbeat payload=", json)
-	print("Heartbeat URL=", _endpoint)
+	#print("Heartbeat payload=", json)
+	#print("Heartbeat URL=", _endpoint)
 	_http_service.post(_endpoint, headers, json)
 
 func validate(user_id, session_token: String = "") -> bool:

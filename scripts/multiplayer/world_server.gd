@@ -23,6 +23,12 @@ var _last_action_seq_by_peer: Dictionary = {}
 var can_process := false
 var _replication_manager : ReplicationManager
 
+const POS_RANGE := 150.0   # must comfortably cover your field's max extent from origin
+const VEL_RANGE := 30.0    # must cover your fastest possible speed (tackle burst included)
+const ANGLE_RANGE := PI    # yaw/pitch both fit within ±PI
+var _snap_buf := StreamPeerBuffer.new()  # reused every tick instead of allocated fresh
+
+
 func start_init(players: Dictionary,
 	score_board : Control,
 	ingame: Node,
@@ -38,6 +44,8 @@ func start_init(players: Dictionary,
 	var Joystick : Node = get_node("/root/World/CanvasLayer/UI/JoyStick")
 
 	ball = ball_scene
+	GameState.is_paused = false   # <-- added: world_client.gd's init() does this, start_init() never did
+
 	if GameState.roster.has(1):
 		_is_also_player = true
 	_players = players
@@ -93,10 +101,11 @@ func process_input_dictionary(msg: int, value : Dictionary) -> void:
 	#print("the msg recieved in receive_network_input_dictionary is: ", msg)
 	if msg == NetCodes.Msg.INIT_DONE:
 		_peers_ready += 1
-		#print("_peers_ready: ", _peers_ready)
+		print("[INIT] got INIT_DONE, _peers_ready=", _peers_ready, " / roster.size()=", GameState.roster.size())
 		_check_start_game()
 
 func _check_start_game() -> void:
+	print("[INIT] check: _peers_ready=", _peers_ready, " roster.size()=", GameState.roster.size(), " can_process=", can_process)
 	if _peers_ready == GameState.roster.size() and not can_process:
 		_game.game_reset.connect(_on_game_reset)
 		_game.start_game(get_parent())
@@ -131,17 +140,31 @@ func _simulate_remote_players(delta) -> void:
 	for controller in controllers:
 		controller.physics_tick(delta)
 
+#func _broadcast_snapshots() -> void:
+	#if not can_process:
+		#return
+	#var snapshots := {}
+#
+	#for controller in controllers:  # your list of Player nodes on server
+		#var snapshot := controller.get_snapshot() as Dictionary
+		#snapshot["server_tick"] = _server_tick
+		#snapshot["ack_input_seq"] = controller.input_buffer.get_last_processed_seq()
+		#snapshots[controller.id] = snapshot
+	#
+	#snapshots["game_state"] = _game.current_state
+	#StateHandler.send_movement(NetCodes.Msg.SNAPSHOTS, snapshots)
+
 func _broadcast_snapshots() -> void:
 	if not can_process:
 		return
 	var snapshots := {}
 
-	for controller in controllers:  # your list of Player nodes on server
+	for controller in controllers:
 		var snapshot := controller.get_snapshot() as Dictionary
 		snapshot["server_tick"] = _server_tick
 		snapshot["ack_input_seq"] = controller.input_buffer.get_last_processed_seq()
 		snapshots[controller.id] = snapshot
-	
+
 	snapshots["game_state"] = _game.current_state
 	StateHandler.send_movement(NetCodes.Msg.SNAPSHOTS, snapshots)
 
@@ -267,3 +290,6 @@ func _exit_tree():
 
 func get_local_controller() -> LocalController:
 	return p_controller
+
+func _quantize(value: float, range: float) -> int:
+	return int(clampf(value / range, -1.0, 1.0) * 32767.0)

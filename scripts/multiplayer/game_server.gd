@@ -26,6 +26,7 @@ var _end_ms: int = -1             # replicated ALWAYS during prestart
 var _cd_ms: int = -2
 var _all_team_assinged_color := false   
 var _network_endpoint : Node
+var _countdown_done := false
 
 var game : Dictionary = {}
 
@@ -165,8 +166,8 @@ func _start_countdown_server() -> void:
 	state.countdown_started = true
 	var now := Time.get_ticks_msec()
 	_cd_ms = now + 3* 1000
-	state.countdown_ms = 3 * 1000  # will sync to clients on first tick
-
+	state.countdown_ms = 3  # will sync to clients on first tick
+	_countdown_done = false
 func _start_game() -> void:
 	_end_ms = Time.get_ticks_msec() + state.time_left_ms
 	state.is_paused = false
@@ -248,11 +249,13 @@ func _physics_process_server(delta: float) -> void:
 				_on_time_up_server()
 
 	# Countdown timer
-	if state.countdown_ms > -2:
+	if not _countdown_done:
 		var now := Time.get_ticks_msec()
 		var remaining := _cd_ms - now
 		state.countdown_ms = int(ceil(remaining / 1000.0))
-
+		if state.countdown_ms <= -1:
+			state.countdown_ms = -1
+			_countdown_done = true
 
 func _on_time_up_server() -> void:
 	_end_ms = -1
@@ -269,35 +272,41 @@ func _end_match_authoritative(reason: String) -> void:
 func _position_players2() -> void:
 	var blue_placed := 1
 	var red_placed := 1
-
 	var ball := ball_scene
-
-	var game_data = {
-		"ball_position": ball.global_transform.origin
-	}
+	var game_data = {"ball_position": ball.global_transform.origin}
 
 	for controller in p_controllers:
+		if controller.player == null:
+			print("[POS] controller id=", controller.id, " has a NULL player — skipping")
+			continue
 		var team: int = controller.team
-
-		# CREATE INNER DICTIONARY FIRST
 		game_data[controller.id] = {}
 
 		if team == GameState.Team.BLUE:
 			var sp := spawns_blue.get_node_or_null("Spawn%d" % blue_placed) as Node3D
 			if sp:
 				controller.set_position(sp.global_transform)
+				if controller.player.has_method("set_spawn_to_current"):
+					controller.player.set_spawn_to_current()
 				game_data[controller.id]["position"] = sp.global_transform
 				blue_placed += 1
+			else:
+				print("[POS] no blue spawn for slot ", blue_placed, " (id=", controller.id, ") — using current position")
+				game_data[controller.id]["position"] = controller.player.global_transform
 		else:
 			var sp := spawns_red.get_node_or_null("Spawn%d" % red_placed) as Node3D
 			if sp:
 				controller.set_position(sp.global_transform)
+				if controller.player.has_method("set_spawn_to_current"):
+					controller.player.set_spawn_to_current()
 				game_data[controller.id]["position"] = sp.global_transform
 				red_placed += 1
+			else:
+				print("[POS] no red spawn for slot ", red_placed, " (id=", controller.id, ") — using current position")
+				game_data[controller.id]["position"] = controller.player.global_transform
 
 		controller.face_at(ball.global_transform.origin)
 		controller.freeze(true)
-
 		game_data[controller.id]["face_at"] = ball.global_transform.origin
 		game_data[controller.id]["freeze"] = true
 	

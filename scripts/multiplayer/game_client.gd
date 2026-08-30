@@ -144,7 +144,7 @@ func _update_countdown_ui(ms:int) -> void:
 		_countdown_label.text = "GO!"
 		_countdown_label.show()
 
-	elif ms == -1:
+	else:
 		_countdown_label.hide()
 
 func _color_all_players(controllers : Array) -> void:
@@ -252,11 +252,12 @@ func ww(toggle : bool) -> void:
 func _position_players2(game_data) -> void:
 	var ball_position : Vector3 = game_data["ball_position"]
 	for controller in p_controllers:
-		controller.set_position(game_data[controller.id]["position"])
-		
+		var pdata: Dictionary = game_data.get(controller.id, {})
+		if pdata.has("position"):
+			controller.set_position(pdata["position"])
 		_init_entry(controller.id, controller.name, controller.team)
 		controller.face_at(ball_position)
-		controller.freeze(game_data[controller.id]["freeze"])
+		controller.freeze(pdata.get("freeze", true))
 	
 
 func process_data(data : Dictionary, msg : StringName) -> void:

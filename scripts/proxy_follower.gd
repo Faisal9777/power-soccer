@@ -41,7 +41,8 @@ func _smooth_local_view(delta: float) -> void:
 	base.origin += _err
 	global_transform = base
 
-func _calculate_error(error_delta : Vector3, new_transform : Transform3D) -> void:
+
+func _calculate_error(error_delta: Vector3, new_transform: Transform3D, is_bursting: bool = false) -> void:
 	if not _have: return
 
 	_t_prev = _t_curr
@@ -50,7 +51,7 @@ func _calculate_error(error_delta : Vector3, new_transform : Transform3D) -> voi
 	var d := error_delta.length()
 	if d < deadzone:
 		return
-	if d > snap_dist:
+	if is_bursting or d > snap_dist:
 		_err = Vector3.ZERO
 	else:
 		_err += error_delta

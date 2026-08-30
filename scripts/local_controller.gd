@@ -8,6 +8,8 @@ var joystick: Node
 var is_mobile: bool = OS.has_feature("mobile")
 var applied_cmd_id := -1
 var _paused := false
+var _next_input_seq : int = 0
+var _pending_inputs: Array[Dictionary] = []
 
 func set_paused(state: bool) -> void:
 	print("SET PAUSED CALLED: ", id, " -> ", state)
@@ -15,6 +17,42 @@ func set_paused(state: bool) -> void:
 	_paused = state
 	cam.freeze_rotation(state)
 
+func process_input(delta):
+	if GameState.is_paused:
+		return
+
+	var input = input_buffer.get_input()
+
+	if is_mobile and is_instance_valid(joystick):
+		input["mvx"] = joystick.vector.x
+		input["mvz"] = joystick.vector.y
+		input["move_magnitude"] = joystick.mag
+
+		# IMPORTANT: get camera yaw BEFORE movement is calculated
+		if is_instance_valid(cam) and cam.has_method("get_cam_yaw"):
+			look_yaw = cam.get_cam_yaw()
+			look_pitch = cam.get_cam_pitch()
+
+		input["yaw"] = look_yaw
+		input["pitch"] = look_pitch
+	else:
+		input["move_magnitude"] = 1.0
+
+	_apply_inputs(input, delta)
+
+	if not input.has("yaw"):
+		input["yaw"] = look_yaw
+		input["pitch"] = look_pitch
+
+	_next_input_seq = int(input["seq"]) + 1
+	var stored := input.duplicate(true)
+	_pending_inputs.append(stored)
+
+	if _pending_inputs.size() > 100:
+		_pending_inputs = _pending_inputs.slice(
+			_pending_inputs.size() - 100,
+			_pending_inputs.size()
+		)
 
 func set_position(gb_transform : Transform3D) -> void:
 	super.set_position(gb_transform)

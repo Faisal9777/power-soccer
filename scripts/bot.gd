@@ -137,7 +137,8 @@ var _home_goal_point: Vector3 = Vector3.ZERO
 var _goal_valid: bool = false
 var _cached_team: int = -1
 
-var _spawn_point: Vector3
+var _spawn_point: Vector3 = Vector3.ZERO
+var _spawn_point_valid := false
 
 var ROLE_GOALKEEPER = GameState.Role.GOALKEEPER
 var ROLE_MIDFIELDER = GameState.Role.MIDFIELDER
@@ -618,13 +619,23 @@ func _is_ball_in_my_half(ball: Node3D) -> bool:
 
 	var ball_z := ball.global_transform.origin.z
 
-	var pid := owner_peer_id
-	var am_blue := GameState.is_blue(pid)
+	# Prefer the actual side where this bot spawned.
+	if _spawn_point_valid:
+		var home_z := _spawn_point.z
 
-	if am_blue:
-		return ball_z <= FIELD_MID_Z             # blue half
+		# Ball and home are on the same side of midfield.
+		if home_z < FIELD_MID_Z:
+			return ball_z <= FIELD_MID_Z
+		elif home_z > FIELD_MID_Z:
+			return ball_z >= FIELD_MID_Z
+
+	# Fallback only if home hasn't been initialized yet.
+	var my_team := _get_my_team()
+
+	if my_team == GameState.Team.BLUE:
+		return ball_z <= FIELD_MID_Z
 	else:
-		return ball_z >= FIELD_MID_Z             # red half
+		return ball_z >= FIELD_MID_Z
 
 
 func _is_ball_in_opponent_half(ball: Node3D) -> bool:
@@ -1638,14 +1649,14 @@ func _pick_best_forward_idle_home_by_opponents() -> void:
 
 func _update_midfielder_input(delta: float) -> void:
 	var ball := _get_ball()
+
 	if ball == null:
-		# no ball? just go home and stand there
 		_go_home_idle()
 		return
 
 	var now_sec := Time.get_ticks_msec() / 1000.0
 
-	# If we recently received+released the ball, ignore it and go home
+	# After receiving/releasing the ball, immediately return home.
 	if now_sec < _mid_return_home_until_sec:
 		_go_home_idle()
 		return
@@ -1653,32 +1664,47 @@ func _update_midfielder_input(delta: float) -> void:
 	var origin := global_transform.origin
 	var ball_pos := ball.global_transform.origin
 
-	# ✅ If this forward is the intended receiver, prioritize pass-receive logic
+	# =========================================================
+	# MIDFIELDER ENGAGEMENT RULE
+	# ONLY engage when ball is in our own half.
+	# =========================================================
+	if not _is_ball_in_my_half(ball):
+		_go_home_idle()
+		return
+
+	# =========================================================
+	# From here onward, all midfielder ball logic is allowed.
+	# =========================================================
+
+	# Designated pass receiver
 	var pending_trap := _has_pending_pass_trap(ball, now_sec)
 
-	# Only do generic "incoming trap" if NOT a designated pass receiver
+	# Incoming ball interception
 	if not pending_trap:
 		if _try_trap_incoming_ball(ball, now_sec):
 			return
 
-	# ✅ If a forward safety-passed to THIS midfielder, chase + first-touch trap anywhere
+	# Special pass-receive logic
 	if pending_trap:
 		var flat := ball_pos - origin
 		flat.y = 0.0
+
 		var dist_flat := flat.length()
 		var height_diff = abs(ball_pos.y - origin.y)
 
 		_face_point(ball_pos)
 
-		# close enough → trap like the forward does
-		if dist_flat <= MID_FIRST_TRAP_RADIUS and height_diff <= BALL_CONTROL_MAX_HEIGHT:
+		if dist_flat <= MID_FIRST_TRAP_RADIUS \
+		and height_diff <= BALL_CONTROL_MAX_HEIGHT:
+
 			if _consume_pass_trap(ball, now_sec):
 				ball.linear_velocity = Vector3.ZERO
 
-				# ✅ EXCLUDE the passer so we don't return it
 				var exclude_path := NodePath("")
+
 				if ball.has_meta(PASS_TRAP_META_KEY):
 					var info = ball.get_meta(PASS_TRAP_META_KEY)
+
 					if info is Dictionary and info.has("from_path"):
 						exclude_path = info["from_path"]
 
@@ -1688,67 +1714,86 @@ func _update_midfielder_input(delta: float) -> void:
 				_go_home_idle()
 				return
 
-
-		# not there yet → sprint to receive it
 		var dir3 = flat / max(dist_flat, 0.0001)
 		_move_towards_direction(dir3, true)
 		return
 
-	# 1) Only chase if ball is in my half
-	if _is_ball_in_my_half(ball):
-		# ✅ if teammate owns the ball, midfielder goes home
-		if _teammate_controls_ball(ball_pos):
+	# =========================================================
+	# NORMAL MIDFIELDER LOGIC
+	# =========================================================
+
+	# If teammate already controls the ball, go home.
+	if _teammate_controls_ball(ball_pos):
+		_go_home_idle()
+		return
+
+	var flat := ball_pos - origin
+	flat.y = 0.0
+
+	var my_dist_flat := flat.length()
+	var height_diff = abs(ball_pos.y - origin.y)
+
+	_face_point(ball_pos)
+
+	# Tackle logic
+	var opp := _find_nearest_opponent_to_ball(
+		ball_pos,
+		OPP_HUG_RADIUS,
+		BALL_CONTROL_MAX_HEIGHT
+	)
+
+	var do_tackle := false
+
+	if opp != null:
+		if my_dist_flat <= BOT_TACKLE_RADIUS \
+		and my_dist_flat > MID_ARRIVE_RADIUS \
+		and height_diff <= BALL_CONTROL_MAX_HEIGHT:
+			do_tackle = true
+
+	_net["tackle_pressed"] = do_tackle
+
+	## Ball reached
+	#if my_dist_flat <= MID_ARRIVE_RADIUS \
+	#and height_diff <= BALL_CONTROL_MAX_HEIGHT:
+#
+		#_reset_net()
+		#_face_point(ball_pos)
+#
+		#if my_dist_flat <= BOT_CONTROL_RADIUS:
+			#_try_pass_to_forward(ball)
+#
+		#return
+	if my_dist_flat <= MID_ARRIVE_RADIUS \
+	and height_diff <= BALL_CONTROL_MAX_HEIGHT:
+
+		_reset_net()
+
+		if my_dist_flat <= BOT_CONTROL_RADIUS:
+			var kick_direction := origin - ball_pos
+			kick_direction.y = 0.0
+
+			if kick_direction.length_squared() > 0.0001:
+				kick_direction = kick_direction.normalized()
+
+				ball.linear_velocity = Vector3.ZERO
+				ball.apply_hit(
+					kick_direction * 24.0,
+					Vector3.ZERO,
+					owner_peer_id
+				)
+
+			_mid_return_home_until_sec = now_sec + 0.5
 			_go_home_idle()
 			return
 
-		# horizontal distance (XZ)
-		var flat := ball_pos - origin
-		flat.y = 0.0
-		var my_dist_flat := flat.length()
-
-		# vertical distance
-		var height_diff = abs(ball_pos.y - origin.y)
-
-		# Always look at the ball while in chase mode
 		_face_point(ball_pos)
-
-		# --- TACKLE CONDITIONS (only if ball is not too high) ---
-		var opp := _find_nearest_opponent_to_ball(ball_pos, OPP_HUG_RADIUS, BALL_CONTROL_MAX_HEIGHT)
-		var do_tackle := false
-
-		if opp != null:
-			if my_dist_flat <= BOT_TACKLE_RADIUS and my_dist_flat > MID_ARRIVE_RADIUS and height_diff <= BALL_CONTROL_MAX_HEIGHT:
-				do_tackle = true
-
-		_net["tackle_pressed"] = do_tackle
-
-		# If we are very close to the ball AND it's not a high lob → we "own" it
-		if my_dist_flat <= MID_ARRIVE_RADIUS and height_diff <= BALL_CONTROL_MAX_HEIGHT:
-			_reset_net()
-			_face_point(ball_pos)
-
-			print("BOT", owner_peer_id, " AT BALL | dist_flat=", my_dist_flat, " height_diff=", height_diff)
-
-			if my_dist_flat <= BOT_CONTROL_RADIUS:
-				print("BOT", owner_peer_id, " CONTROL BALL → try pass")
-				_try_pass_to_forward(ball)
-			else:
-				print("BOT", owner_peer_id, " within arrive radius but not CONTROL radius (",
-					BOT_CONTROL_RADIUS, ")")
-
-			return
-		# If we're under the ball but it's too high, just keep moving under it (no pass)
-
-		# --- SPRINT LOGIC ---
-		var want_sprint := my_dist_flat > 10  # far = sprint, close = jog
-		var dir3 = flat / max(my_dist_flat, 0.0001)
-		_move_towards_direction(dir3, want_sprint)
 		return
+	# Chase
+	var want_sprint := my_dist_flat > 10.0
 
+	var dir3 = flat / max(my_dist_flat, 0.0001)
 
-
-	# 2) ball NOT in my half → go back to spawn and idle
-	_go_home_idle()
+	_move_towards_direction(dir3, want_sprint)
 
 
 # ---------- FORWARD (DRIBBLE + FINAL SHOT) ----------
@@ -2033,6 +2078,14 @@ func _forward_handle_kick(ball: RigidBody3D, ball_pos: Vector3) -> void:
 
 func set_spawn_to_current() -> void:
 	_spawn_point = global_transform.origin
+	_spawn_point_valid = true
+
+	print(
+		"BOT HOME SET | id=", owner_peer_id,
+		" home=", _spawn_point,
+		" team=", _get_my_team()
+	)
+
 func _is_human_player(rec: Dictionary) -> bool:
 	# Assumes your roster sets `is_bot = true` for bot entries.
 	# Humans either don't have `is_bot` or have it = false.
