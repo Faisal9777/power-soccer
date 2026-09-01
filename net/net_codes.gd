@@ -22,8 +22,7 @@ enum Msg {
 	SNAPSHOTS = 9,
 	ROUND_START = 10,
 	INPUTS = 11,
-	DISCRETE_INPUTS = 15,
-	PLAYER_RECONNECT = 17
+	DISCRETE_INPUTS = 15
 }
 
 enum Lobby_action {
@@ -53,9 +52,10 @@ enum message {
 }
 
 enum state_message {
-	PLAYER_RECONNECT = -1,
+	PLAYER_RECONNECT = 17,
 	CHANGE_STATE = 0,
-	STATE = 1
+	STATE = 1,
+	PLAYER_CONNECT = 18
 }
 
 enum ResponseType{

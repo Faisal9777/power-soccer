@@ -24,6 +24,12 @@ func get_player(last_hit_index: int) -> int:
 		return -1
 	return _last_player_hits[last_hit_index]
 
+func get_snapshot() -> Dictionary:
+	return {"global_transform" : global_transform}
+
+func apply_snapshot(snap):
+	global_transform = snap.get("global_transform")
+
 func stop_replication() -> void:
 	$MultiplayerSynchronizer.public_visibility = false
 
@@ -31,3 +37,20 @@ func _physics_process(delta: float) -> void:
 	# Enable CCD only when the ball is moving fast (prevents tunneling through walls)
 	var speed := linear_velocity.length()
 	continuous_cd = speed > 18.0  # tune this threshold
+	
+
+
+# --- DEBUG: sync test, remove after diagnosing reconnect issue ---
+var debug_counter: int = 0:
+	set(value):
+		debug_counter = value
+		if not multiplayer.is_server():
+			print("[sync test] peer_id=", multiplayer.get_unique_id(),
+				" debug_counter arrived: ", value, " at t=", Time.get_ticks_msec())
+
+func _debug_tick_counter() -> void:
+	print("[sync test] peer_id=", multiplayer.get_unique_id(),
+				" path of the ball is: ", get_path())
+	if multiplayer.is_server():
+		debug_counter += 1
+# --- END DEBUG ---

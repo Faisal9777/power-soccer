@@ -15,7 +15,7 @@ var server_id := 1
 var sync : Node
 var ENDPOINTS = preload("res://scripts/shared/endpoints.gd")
 const C = preload("res://scripts/shared/scene.gd")
-const REQUEST_TIMEOUT_MS = 10.0  # seconds
+const REQUEST_TIMEOUT_MS = 1000.0  # seconds
 
 var _timeout_timer: SceneTreeTimer = null
 
@@ -153,7 +153,7 @@ func _disconnect() -> void:
 func _cl_sync_roster(server_info):
 	BlockingOverlay.hide()
 	server_id = server_info.get("server_id", 1)
-	StateHandler.on_connected_to_server(server_info)
+	#StateHandler.on_connected_to_server(server_info)
 	stop_discovery()
 
 func _disconnect_from_events():

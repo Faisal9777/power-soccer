@@ -222,7 +222,11 @@ func _srv_register_player(payload: Dictionary):
 
 	sync.send_data_id(id, {"message":NetCodes.message.SESSION, "value":temp_server_info})
 	TaskScheduler.schedule(60, _broadcast_states)
-	StateHandler.handle_data({"message" : NetCodes.Msg.PLAYER_RECONNECT,"value":{"id" : id, "old_id" : existing_peer_id}})
+	var message = NetCodes.state_message.PLAYER_CONNECT
+	var value = {"id" : id}
+	if _existing_player:
+		message = NetCodes.state_message.PLAYER_RECONNECT
+	StateHandler.handle_data({"message" : message,"value":value})
 	print("[register] broadcast scheduled, roster size=%s" % GameState.roster.size())
 
 

@@ -25,6 +25,13 @@ var _gfx_ui: Control = null
 
 const LOBBY_SCENE := "res://scenes/Lobby.tscn"
 
+func handle_data(data):
+	var msg = data.get("message")
+	if msg == NetCodes.state_message.CHANGE_STATE:
+		var state_info = data.get("value")
+		StateHandler.change_state(state_info.get("state"), state_info.get("state_data"))
+
+
 func _ready() -> void:
 	GameState.player_name = Settings.player_name
 	var args := OS.get_cmdline_args()
@@ -79,6 +86,7 @@ func _ready() -> void:
 	# Network callbacks while we are on the title screen
 	Network.connection_failed.connect(_on_connection_failed)
 	Network.server_disconnected.connect(_on_server_disconnected)
+	StateHandler.register_state(self)
 
 func _get_arg_value2(flag: String, args: Array) -> String:
 	var prefix := flag + "="

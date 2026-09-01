@@ -8,11 +8,18 @@ var known_servers := {}
 var cleanup_timer := 0.0
 var session_node : Node
 
+func handle_data(data):
+	var msg = data.get("message")
+	if msg == NetCodes.state_message.CHANGE_STATE:
+		var state_info = data.get("value")
+		StateHandler.change_state(state_info.get("state"), state_info.get("state_data"))
+
 func _ready():
 	session_node = await SessionManager.create_client_session(SCRIPT_PATHS.CLIENT_SESSION)
 	#_populate_server_list()
 	session_node.server_found.connect(_on_server_found)
 	session_node.start_discovery()
+	StateHandler.register_state(self)
 
 func _process(delta : float):
 	_check_server_status()

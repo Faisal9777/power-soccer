@@ -163,10 +163,11 @@ func _ready() -> void:
 	var red_spawns  := get_node(TEAM_RED_PATH)   as Node3D
 	var ball_spawn  = ball_root
 	_create_ball_server()
+	var net_objects := [ball_scene, ingame]
 	if not multiplayer.is_server():
 		net = WorldClientScript.new()
 		_initialize_multiplayer("NetClient", net)
-		net.init(local_view_proxy, _scoreboard_instance, ingame, blue_spawns, red_spawns, ball_scene, get_node(joystick_path))
+		net.init(local_view_proxy, _scoreboard_instance, ingame, blue_spawns, red_spawns, ball_scene,net_objects, get_node(joystick_path))
 	else:
 		var ids: Array[int] = []
 		var rosters = GameState.roster.duplicate()
@@ -176,9 +177,8 @@ func _ready() -> void:
 		net = WorldServerScript.new()
 		_initialize_multiplayer("NetServer", net)
 		net.start_init(_players, _scoreboard_instance, ingame, replication_manager, blue_spawns, red_spawns, ball_spawn,
-		ball_scene, GameState.match_len_sec, GameState.goal_limit, rosters, get_node(joystick_path))
+		ball_scene, net_objects, GameState.match_len_sec, GameState.goal_limit, rosters,get_node(joystick_path))
 		
-
 
 	# 1) Connect to the Network autoload signals (do it here so it works even if not wired in editor)
 
@@ -642,29 +642,28 @@ func _initialize_multiplayer(name: String, net : Node) -> void:
 
 func _create_ball_server() -> void:
 	# Instance a **fresh** rigid body
-	var ball := ball_packed.instantiate() as RigidBody3D
-	ball.name = "Ball"  # stable name helps other scripts find it
-	ball.add_to_group("ball")
+	ball_scene = ball_packed.instantiate() as RigidBody3D
+	ball_scene.name = "Ball"  # stable name helps other scripts find it
+	ball_scene.add_to_group("ball")
 	# Make it inert before adding/placing (prevents the "rocket" issue)
-	ball.linear_velocity = Vector3.ZERO
-	ball.angular_velocity = Vector3.ZERO
+	ball_scene.linear_velocity = Vector3.ZERO
+	ball_scene.angular_velocity = Vector3.ZERO
 
 	# Add under the spawner's path so it replicates to clients
-	ball_root.add_child(ball)
-	ball_scene = ball
+	ball_root.add_child(ball_scene)
 
-func _create_ball_spawner() -> void:
-	# Set up once
-	var ball_spawner := ball_root.get_node_or_null("MultiplayerSpawner") as MultiplayerSpawner
-	if ball_spawner == null:
-		ball_spawner = MultiplayerSpawner.new()
-		ball_spawner.name = "MultiplayerSpawner"
-		ball_root.add_child(ball_spawner)
-		ball_spawner.spawn_path = ball_root.get_path()
-
-	# register the ball scene so the spawner knows how to recreate it on clients
-	if ball_packed:
-		ball_spawner.add_spawnable_scene(ball_packed.resource_path)
+#func _create_ball_spawner() -> void:
+	## Set up once
+	#var ball_spawner := ball_root.get_node_or_null("MultiplayerSpawner") as MultiplayerSpawner
+	#if ball_spawner == null:
+		#ball_spawner = MultiplayerSpawner.new()
+		#ball_spawner.name = "MultiplayerSpawner"
+		#ball_root.add_child(ball_spawner)
+		#ball_spawner.spawn_path = ball_root.get_path()
+#
+	## register the ball scene so the spawner knows how to recreate it on clients
+	#if ball_packed:
+		#ball_spawner.add_spawnable_scene(ball_packed.resource_path)
 
 
 func _setup_team_position(plane_z: float = 0.0) -> void:
@@ -682,6 +681,8 @@ func _server_begin_match(peer_ids: Array[int], rosters) -> void:
 		_on_peer_joined(id, rosters)  # your existing spawn path
 
 func _physics_process(delta: float) -> void:
+	if Input.is_action_pressed("debug"):
+		print("the position of the balll in the client is: ", ball_scene.position)
 	#if  Input.is_action_just_pressed("tackle"): print("tackle input was detected in physics process")
 	#var inputs := _gather_input()
 	#_send_local_input(inputs)
@@ -845,7 +846,6 @@ func _spawn_player_for(id: int) -> void:
 		# Tell only that client to attach their camera to this player
 	_notify_client_to_attach_camera(p, id)
 		# Focus camera if this is *our* player on this machine
-		#_focus_camera_on_player(p, id)
 
 func _spawn_player_for2(id: int, rosters) -> void:
 	if !multiplayer.is_server():
@@ -929,7 +929,6 @@ func _spawn_players() -> void:
 			# Tell only that client to attach their camera to this player
 		_notify_client_to_attach_camera(p, id)
 			# Focus camera if this is *our* player on this machine
-			#_focus_camera_on_player(p, id)
 
 # -------------------------
 # Input → server
@@ -1095,15 +1094,7 @@ func _rpc_attach_cam(player_path: NodePath, _unused_joystick_path: NodePath, bal
 		#p.call_deferred("attach_camera", cam, joystick)
 
 
-func _focus_camera_on_player(p: Node, peer_id: int) -> void:
-	# Find your camera (adjust the path/group/name to your project)
-	var my_id := multiplayer.get_unique_id()
-	# If this world.gd is running on the same machine that should see the camera,
-	# do it locally; otherwise, tell that specific client to do it.
-	if my_id == peer_id:
-		_enable_local_view_now(p)
-	else:
-		rpc_id(peer_id, "_rpc_enable_local_view", p.get_path())
+
 func _enable_local_view_now(p: Node) -> void:
 	# mark for convenience if you want in Player.gd
 	p.add_to_group("LocalPlayer")
@@ -1132,14 +1123,7 @@ func _rpc_client_receive_facing_snapshots(snapshots: Dictionary) -> void:
 	# Forward to client-only helper
 	net.on_recieving_snapshots(snapshots)
 
-@rpc("any_peer", "call_local")
-func _rpc_enable_local_view(player_path: NodePath) -> void:
-	#_log_pid("in rpc enabble local view now")
-	var p := get_node_or_null(player_path)
-	if p:
-		_enable_local_view_now(p)
-	else:
-		print("there is no player scene attached in the player_path when in rpc enable local view now")
+
 func _on_ball_out_of_bounds(body: Node) -> void:
 	if !multiplayer.is_server():
 		return

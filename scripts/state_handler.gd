@@ -15,7 +15,11 @@ func change_state(state, state_data=null):
 	_change_state(state)
 
 func handle_data(data):
-	if current_state:
+	var msg = data.get("message")
+	if msg == NetCodes.state_message.CHANGE_STATE:
+		var state_info = data.get("value")
+		StateHandler.change_state(state_info.get("state"), state_info.get("state_data"))
+	elif current_state:
 		current_state.handle_data(data)
 
 func send_data_id(target_id, value):

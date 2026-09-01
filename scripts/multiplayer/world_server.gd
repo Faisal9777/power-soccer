@@ -10,12 +10,12 @@ var _peers_ready := 0
 var _is_also_player := false
 var _game : Node
 var _client_game : Node
+var _net_objects : Array
 var GameClient := load("res://scripts/multiplayer/game_client.gd")
 var p_controller : LocalController
 var controllers : Array = []
 var broadcast_id : int = -1
 var ball: Node
-var rosters : Dictionary
 # Input pump
 const NET_INPUT_HZ: float = 30.0
 var last_server_seq:= {}
@@ -30,16 +30,17 @@ func start_init(players: Dictionary,
 	red_spawns: Node3D,
 	ball_spawn: Node3D,
 	ball_scene: Node3D,
+	net_objects,
 	match_len_sec: int,
 	goal_limit: int,
 	roster: Dictionary,
 	joystick : Node) -> void:
 	ball = ball_scene
+	_net_objects = net_objects
 	if GameState.roster.has(1):
 		_is_also_player = true
 	_players = players
 	ingame.set_roster(GameState.roster)
-	rosters = roster
 	_replication_manager = replication_manager
 	_player_controller_setup(players, ball_scene, joystick, controllers)
 	_game = GameServer.new()
@@ -65,11 +66,8 @@ func handle_data(val):
 		process_input_by_id(value["id"], msg, value)
 	elif msg == NetCodes.Msg.DISCRETE_INPUTS:
 		_client_discrete_input(value)
-	elif msg == NetCodes.Msg.PLAYER_RECONNECT:
-		var id = value.get("value")
-		var old_id = value.get("old_id")
-		rosters[id] = rosters[old_id]
-		rosters.erase(old_id)
+	elif msg == NetCodes.state_message.PLAYER_RECONNECT:
+		var id = value.get("id")
 		StateHandler.send_data_id(id, {"message":NetCodes.state_message.CHANGE_STATE, "value":{"state" : NetCodes.States.WORLD, "state_data" : GameState.roster}})
 
 func process_input_by_id(peer_id: int, msg, cmd : Dictionary) -> void:
@@ -132,7 +130,10 @@ func _simulate_remote_players(delta) -> void:
 func _broadcast_snapshots() -> void:
 	if not can_process:
 		return
-	var snapshots := _get_snapshot()
+	
+	var snapshots := { "players":_get_snapshot()}
+	for net_obj in _net_objects:
+		snapshots[net_obj.name] = net_obj.get_snapshot()
 	var data = {"message" : NetCodes.Msg.SNAPSHOTS, "value" : snapshots}
 	StateHandler.send_data(data)
 

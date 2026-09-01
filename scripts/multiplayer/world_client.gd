@@ -43,7 +43,7 @@ var _next_input_seq: int = -1
 
 var _latest_local_snapshot: Dictionary = {}   # newest snapshot waiting to reconcile
 var _latest_local_snapshot_id: int = -1       # ordering guard (server_tick or last_server_seq)
-
+var _net_objects : Array
 # --- remote interpolation buffer ---
 # peer_id -> Array of { "t": int(ms), "xform": Transform3D, "snap": Dictionary }
 var _remote_buf: Dictionary[int, Array] = {}
@@ -107,12 +107,14 @@ func init(p : Node3D,
 	blue_spawns: Node3D,
 	red_spawns: Node3D,
 	ball_scene: Node3D,
+	net_objects,
 	j_stick) -> void:
 	proxy = p
 	joystick = j_stick
 	blue_sp = blue_spawns
 	red_sp = red_spawns
 	ball = ball_scene
+	_net_objects = net_objects
 	state = ingame
 	scoreboard = score_board 
 	
@@ -156,10 +158,14 @@ func _evaluate_all_phases() -> void:
 
 # ---------- Snapshot storage ----------
 func _store_snapshots(snapshots: Dictionary) -> void:
-	current_snapshots = snapshots
+	for net_obj in _net_objects:
+		var snap = snapshots.get(net_obj.name)
+		if snap:
+			net_obj.apply_snapshot(snap)
+	current_snapshots = snapshots.get("players")
 	_my_id = p_controller.id
-	for k in snapshots.keys():
-		var  entry = snapshots[k]
+	for k in current_snapshots.keys():
+		var  entry = current_snapshots[k]
 		var node_id = entry.get("node_id")
 		var node_id_int := int(node_id)
 		var c_id = ArrayUtils.find(controllers, node_id_int)
@@ -167,7 +173,7 @@ func _store_snapshots(snapshots: Dictionary) -> void:
 		if not _players.has(node_id_int):
 			continue
 
-		var snap: Dictionary = snapshots[k]
+		var snap: Dictionary = current_snapshots[k]
 
 		# Prefer server_tick if you add it later; fallback to last_server_seq
 

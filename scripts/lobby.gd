@@ -372,6 +372,9 @@ func _update_start_enabled() -> void:
 func _handle_lobby_action(msg, data):
 	if msg == NetCodes.Lobby_action.READY:
 		GameState.roster[data.get("id")]["ready"] = data.get("value")
+	elif msg == NetCodes.state_message.PLAYER_CONNECT:
+		var id = data.get("id")
+		StateHandler.send_data_id(id, {"message":NetCodes.state_message.CHANGE_STATE, "value":{"state" : NetCodes.States.LOBBY}})
 
 
 func _submit_name_to_host() -> void:
