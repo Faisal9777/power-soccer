@@ -82,8 +82,6 @@ func process_input_dictionary(msg : int, value : Variant) -> void:
 		_game.end_game(value)
 	
 	elif msg == NetCodes.Msg.SNAPSHOTS:
-		if value is PackedByteArray:
-			print("[SNAP] packet in, bytes=", value.size())
 		_store_snapshots(_decode_snapshots(value) if value is PackedByteArray else value)
 	elif msg == NetCodes.Msg.ROUND_START:
 		_game.start_game(value)
@@ -183,12 +181,9 @@ func _store_snapshots(snapshots: Dictionary) -> void:
 		if not (k is int or (k is String and k.is_valid_int())):
 			continue
 		var peer_id := int(k)
-		if peer_id == _my_id:
-			print("[SNAP] mine! is_frozen=", snapshots[k].get("is_frozen"), " id=", _my_id)
+
 		var c_id = ArrayUtils.find(controllers, peer_id)
 		if c_id < 0:
-			if peer_id == _my_id:
-				print("[SNAP] my id ", _my_id, " has no matching controller!")
 			continue
 		var controller = controllers[c_id]
 		if not _players.has(peer_id):

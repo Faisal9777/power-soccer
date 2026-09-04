@@ -208,13 +208,16 @@ app.post("/api/auth/login-mobile", async (req, res) => {
         const googleName = payload.name || "Player";
 
         let player = getPlayerByGoogleSub.get(googleSub);
-        if (!player) {
-            console.log("Rejected unregistered user:", googleSub);
-            return res.status(403).json({ error: "User is not registered." });
-        }
 
-        updateLastLogin.run(player.player_id);
-        player = getPlayerById.get(player.player_id);
+        if (!player) {
+            const playerTag = crypto.randomUUID();
+            const result = createPlayer.run(googleSub, playerTag, googleName);
+            player = getPlayerById.get(result.lastInsertRowid);
+            console.log(`Created new account (mobile): player_id=${player.player_id}`);
+        } else {
+            updateLastLogin.run(player.player_id);
+            player = getPlayerById.get(player.player_id);
+        }
 
         const sessionToken = jwt.sign(
             {

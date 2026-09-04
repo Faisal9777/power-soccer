@@ -384,7 +384,6 @@ func _apply_fp_tp_self_visibility() -> void:
 	cull_mask |= RenderLayers.PLAYER_UI_MASK
 
 func _compute_desired_camera_position(target_transform: Transform3D, fwd_3d: Vector3) -> Vector3:
-
 	var focus := (
 		target_transform.origin
 		+ Vector3(0.0, height, 0.0)
@@ -395,16 +394,12 @@ func _compute_desired_camera_position(target_transform: Transform3D, fwd_3d: Vec
 		0.0,
 		fwd_3d.z
 	).normalized()
-	# -------------------------------------------------
-	# ORBIT POSITION
-	# -------------------------------------------------
+
 	var desired_pos := (
 		focus
 		- fwd_xz * distance
 	)
-	# -------------------------------------------------
-	# WALL AVOIDANCE
-	# -------------------------------------------------
+
 	var space := get_world_3d().direct_space_state
 
 	var q := PhysicsRayQueryParameters3D.create(
@@ -415,9 +410,15 @@ func _compute_desired_camera_position(target_transform: Transform3D, fwd_3d: Vec
 	q.collision_mask = collision_mask
 	q.hit_from_inside = true
 
+	if is_instance_valid(_follow_target) and _follow_target.has_method("get_rid"):
+		q.exclude = [_follow_target.get_rid()]
+
 	var hit := space.intersect_ray(q)
 
-	if not hit.is_empty():
+	# Ignore hits right at the origin — that's the player's own collision
+	# shape (hit_from_inside catches it), not a real wall. A real obstruction
+	# won't be sitting inside the player's own capsule.
+	if not hit.is_empty() and focus.distance_to(hit.position) > 0.5:
 
 		var back_dir : Vector3= (
 			focus - hit.position

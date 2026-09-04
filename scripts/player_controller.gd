@@ -110,7 +110,6 @@ func _reconcile_local_best_practice(p: Node3D, snap: Dictionary) -> void:
 	else:
 		p.global_transform = _snap_to_xform(snap, p)
 	freeze(snap["is_frozen"])
-	print("[SNAP] reconciled: Controller.is_frozen=", is_frozen, " can_process=", can_process, " snap_said=", snap["is_frozen"])
 
 	look_yaw = snap.get("yaw", look_yaw)
 	look_pitch = snap.get("pitch", look_pitch)
