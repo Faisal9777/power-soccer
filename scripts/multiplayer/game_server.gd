@@ -311,12 +311,6 @@ func _process_game_end() -> void:
 		else:
 			game_end_data[controller.id] = red_scene
 	game_end.emit(game_end_data)
-func _finalize_game_end(pid : int, data : Dictionary) -> void:
-	var _pid = int(pid)
-	if pid != multiplayer.get_unique_id():
-		_network_endpoint.rpc_id(_pid, NetCodes.Rpc.INPUT_STREAM, NetCodes.Msg.GAME_END, data)
-	#if _client and :
-		#_
 
 func _stop_all_process() -> void:
 	_goal_lock = true

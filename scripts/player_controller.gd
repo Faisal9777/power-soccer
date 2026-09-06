@@ -53,6 +53,11 @@ func physics_tick(delta: float) -> void:
 		if is_instance_valid(player):
 			_reconcile_player(player)
 			process_input(delta)
+			player._local_physics_process(delta)
+
+func process_tick(delta: float) -> void:
+	if can_process:
+		player._local_process(delta)
 
 func process_input(delta):
 	var input = input_buffer.get_input()
@@ -76,7 +81,6 @@ func _reconcile_player(me : Node) -> void:
 
 
 func _reconcile_local_best_practice(p: Node3D, snap: Dictionary) -> void:
-
 	# --- B) apply authoritative snap (server state) ---
 	if p.has_method("apply_snapshot"):
 		

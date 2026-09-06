@@ -170,7 +170,7 @@ func _store_snapshots(snapshots: Dictionary) -> void:
 		var node_id_int := int(node_id)
 		var c_id = ArrayUtils.find(controllers, node_id_int)
 		var controller = controllers[c_id]
-		if not _players.has(node_id_int):
+		if not controller:
 			continue
 
 		var snap: Dictionary = current_snapshots[k]

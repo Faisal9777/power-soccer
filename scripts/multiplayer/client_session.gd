@@ -117,6 +117,9 @@ func _on_request_timeout() -> void:
 
 
 func _on_server_found(info):
+	var res = info.get("response")
+	if res == NetCodes.ResponseType.REJOIN:
+		print("Found lobby which was left")
 	server_found.emit(info)
 
 func _on_discovery_failed(info):

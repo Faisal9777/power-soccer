@@ -175,6 +175,7 @@ var _pre_move_vel: Vector3
 var tackle_active: bool = false
 var tackle_time_left: float = 0.0
 var tackle_velocity: Vector3 = Vector3.ZERO
+var is_arrow_presentable := false
 # replicated to owner (UI only)
 var tackle_cd_ui: float = 0.0
 
@@ -292,6 +293,19 @@ func attach_camera(c: Camera3D, j: Node) -> void:
 		cam.current = true
 		cam.near = max(cam.near, 0.12)
 
+func enable_arrow(toggle) -> void:
+	is_arrow_presentable = toggle
+	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+	_captured = true
+	_client_side_setup()
+	# ⬇️ prevent taps-anywhere from triggering 'shoot'
+	if is_mobile:
+		var ev := InputEventMouseButton.new()
+		ev.button_index = MOUSE_BUTTON_LEFT
+		InputMap.action_erase_event("shoot", ev)   # remove mouse-left binding at runtime
+	set_ability_local(_ability_id)
+	
+
 # Aim the camera at a world position.
 # yaw_only=true keeps the camera level (no pitch); set false to let it tilt up/down.
 @rpc("any_peer", "reliable", "call_local")
@@ -309,9 +323,18 @@ func get_yaw() -> Dictionary:
 
 func get_snapshot() -> Dictionary:
 	var snapshot := {
+			"global_tansform" : global_transform,
 			"pos" : global_position,
 			"vel": velocity,
-			"is_frozen" : _is_frozen
+			"is_frozen" : _is_frozen,
+			"owner_peer_id" : owner_peer_id,
+			"aim_active" : aim_active,
+			"charge" : _charge,
+			"stamina" : _stamina,
+			"current_ball_path" : current_ball_path,
+			"tackle_cd_ui" : tackle_cd_ui,
+			"ability_id" : ability_id,
+			"aim_pivot" : aim_pivot.rotation
 		}
 	return snapshot
 func apply_snapshot(snap: Dictionary) -> void:
@@ -320,7 +343,16 @@ func apply_snapshot(snap: Dictionary) -> void:
 	var pitch := snap.get("pitch", 0) as float
 	_is_frozen = snap["is_frozen"]
 	set_look_rotation(yaw, pitch)
-	global_position = snap["pos"]
+	global_transform = snap["global_tansform"]
+	owner_peer_id = snap["owner_peer_id"]
+	aim_active = snap["aim_active"]
+	_charge = snap["charge"]
+	_stamina = snap["stamina"]
+	current_ball_path = snap["current_ball_path"]
+	tackle_cd_ui = snap["tackle_cd_ui"]
+	ability_id = snap["ability_id"]
+	if snap["aim_pivot"]:	
+		aim_pivot.rotation = snap["aim_pivot"]
 
 
 func get_visual_node() -> Node:
@@ -455,24 +487,14 @@ func _ready() -> void:
 		$KickArea.body_entered.connect(_on_kick_area_body_entered)
 		$KickArea.body_exited.connect(_on_kick_area_body_exited)
 	var my_id := get_tree().get_multiplayer().get_unique_id()
-	var is_local := (owner_peer_id == my_id)
+	var is_local := _is_local_owner()
 	var is_dedicated := OS.has_feature("server")
 	
 	ball_latch_anchor.name = "BallLatchAnchor"
 	add_child(ball_latch_anchor)  # or: tackle_field.add_child(ball_latch_anchor)
 	
 	_ensure_aim_arrow()
-	if is_local:
-		Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
-		_captured = true
-		_client_side_setup()
-	# ⬇️ prevent taps-anywhere from triggering 'shoot'
-	if is_mobile:
-		var ev := InputEventMouseButton.new()
-		ev.button_index = MOUSE_BUTTON_LEFT
-		InputMap.action_erase_event("shoot", ev)   # remove mouse-left binding at runtime
 	_ensure_name_tag()
-	set_ability_local(_ability_id)
 
 
 func _ensure_name_tag() -> void:
@@ -510,7 +532,7 @@ func _client_side_setup() -> void:
 	physics_interpolation_mode = Node3D.PHYSICS_INTERPOLATION_MODE_ON
 
 func _physics_process(delta: float) -> void:
-	_local_physics_process(delta)
+	#_local_physics_process(delta)
 		# Approach #2: only the SERVER simulates gameplay.
 	if !multiplayer.is_server():
 		return
@@ -520,8 +542,8 @@ func _physics_process(delta: float) -> void:
 func _process(delta: float) -> void:
 	if _ability:
 		_ability.client_tick(self, delta)
-	if get_tree().get_multiplayer().get_unique_id() == owner_peer_id: 
-		_local_process(delta)
+	#if get_tree().get_multiplayer().get_unique_id() == owner_peer_id: 
+		#_local_process(delta)
 	if name_tag:
 		var cam := get_viewport().get_camera_3d()
 		if cam:
@@ -532,10 +554,10 @@ func _process(delta: float) -> void:
 				name_tag.rotate_y(PI)  # Label3D front faces -Z; flip it
 				
 func _local_physics_process(delta: float) -> void:
-	if get_tree().get_multiplayer().get_unique_id() == owner_peer_id: 
+	#if get_tree().get_multiplayer().get_unique_id() == owner_peer_id: 
 		#request_arrow_calculation()
 		#_handle_player_facing(delta)
-		_update_arrow_position(delta)
+	_update_arrow_position(delta)
 
 func _update_arrow_position(delta: float) -> void:
 	var ball := _resolve_ball() as RigidBody3D
@@ -544,8 +566,7 @@ func _update_arrow_position(delta: float) -> void:
 		return
 
 	# Live for owner, interpolated for others
-	var is_owner := (multiplayer.get_unique_id() == owner_peer_id)
-	var pxf: Transform3D = (global_transform if is_owner else get_global_transform_interpolated())
+	var pxf: Transform3D = (global_transform if is_arrow_presentable else get_global_transform_interpolated())
 	var bxf: Transform3D = ball.get_global_transform_interpolated()
 
 	var P: Vector3 = pxf.origin
@@ -555,11 +576,12 @@ func _update_arrow_position(delta: float) -> void:
 	var contact: Vector3 = C  # RMB not held => center of ball
 
 	if _is_aiming():
+		print("[debug] _aim_az=", _aim_az, " _aim_el=", _aim_el)
 		# RMB held: orbit on sphere via local azimuth/elevation (no camera rays)
 		var pivot := get_node_or_null("AimPivot") as Node3D
 		var pivot_pos: Vector3 = pxf.origin
 		if is_instance_valid(pivot):
-			pivot_pos = (pivot.global_transform.origin if is_owner else pivot.get_global_transform_interpolated().origin)
+			pivot_pos = (pivot.global_transform.origin if is_arrow_presentable else pivot.get_global_transform_interpolated().origin)
 
 		# Orthonormal frame at ball, pointing toward player
 		var front: Vector3 = (pivot_pos - C).normalized()   # from ball → player
@@ -585,7 +607,7 @@ func _update_arrow_position(delta: float) -> void:
 		_show_arrow(false)
 		return
 
-	_show_arrow(is_owner)
+	_show_arrow(is_arrow_presentable)
 	aim_arrow.global_position = P
 	aim_arrow.look_at(P + vec.normalized(), Vector3.UP)
 	aim_arrow.scale = Vector3(1.0, 1.0, maxf(vec.length(), aim_min_len))
@@ -609,8 +631,10 @@ func _resolve_ball() -> RigidBody3D:
 
 # --- Server gameplay loop (moved out of _physics_process for clarity) ---
 func _is_local_owner() -> bool:
-	return get_tree().get_multiplayer().get_unique_id() == owner_peer_id
+	return is_arrow_presentable
 func _local_process(delta: float) -> void:
+	if Input.is_action_pressed("debug"):
+			print("debuggging")
 	if _charge_bar:
 		_update_charge_ui_from_replication()
 	if _stam_bar:
@@ -1807,7 +1831,7 @@ func get_muzzle_from_camera(cam: Camera3D) -> Vector3:
 
 func get_muzzle_from_view() -> Vector3:
 	# pick a stable anchor point on the player
-	var is_owner := (multiplayer.get_unique_id() == owner_peer_id)
+	var is_owner := _is_local_owner()
 	var pxf: Transform3D = (global_transform if is_owner else get_global_transform_interpolated())
 
 	var origin := pxf.origin

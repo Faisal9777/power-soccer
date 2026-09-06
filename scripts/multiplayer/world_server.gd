@@ -200,12 +200,6 @@ func _client_discrete_input_logs(from_id: int, d: Dictionary) -> void:
 
 	print("---- [_client_discrete_input] end ----")
 
-func _build_player_paths() -> Dictionary:
-	var paths := {}
-	for peer_id in _players.keys():
-		var p: Node = _players[peer_id]
-		paths[peer_id] = p.get_path()  # NodePath
-	return paths
 
 func _player_controller_setup(rosters : Dictionary, ball : Node, joystick: Node, controllers) -> void:
 	for k in rosters.keys():
@@ -234,26 +228,6 @@ func _player_controller_setup(rosters : Dictionary, ball : Node, joystick: Node,
 
 		if node != null:
 			_players[k] = node
-
-
-
-#func _update_local_player_states(delta : float) -> void:
-	#for peer_id in _players_input.keys():
-		#var player := _players[peer_id]
-		#var buf: Dictionary = _players_input[peer_id]
-#
-		#var next_seq := int(last_server_seq.get(peer_id, -1)) + 1
-		#
-		##print("next seq: ", next_seq)
-		##print("buffer; ", buf)
-		#if buf.has(next_seq):
-			#var input := buf[next_seq] as Dictionary
-			#buf.erase(next_seq)  # remove the one we just applied
-			#player.update_player_states(input, delta)
-			#last_server_seq[peer_id] = next_seq
-		#else:
-			## no next input yet -> do nothing for now (later: hold last / idle)
-			#pass
 
 
 func _on_peer_left(id : int) -> void:

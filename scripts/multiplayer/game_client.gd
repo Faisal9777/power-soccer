@@ -272,6 +272,7 @@ func _show_banner_for(text: String, seconds: float) -> void:
 	_countdown_label.hide()
 
 func _on_phase_changed(old, new) -> void:
-	if state.WorldPhase.POST_MATCH:
+	if state.current_phase == state.WorldPhase.POST_MATCH:
+		print("not true tho")
 		_countdown_label.text = "End!"
 		_countdown_label.show()
