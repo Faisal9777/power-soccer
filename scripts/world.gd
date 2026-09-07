@@ -814,17 +814,11 @@ func _server_begin_match(peer_ids: Array[int]) -> void:
 		_on_peer_joined(id)  # your existing spawn path
 
 func _physics_process(delta: float) -> void:
-	#if  Input.is_action_just_pressed("tackle"): print("tackle input was detected in physics process")
-	#var inputs := _gather_input()
-	#_send_local_input(inputs)
-	#_perf_tick(delta)
-	_update_inputs() 
-	_input_accum += delta
-	var step: float = 1.0 / NET_INPUT_HZ
-	while _input_accum >= step:
-		_input_accum -= step
-		_send_local_input()
-		_reset_inputs()
+	# Legacy 30 Hz movement input path intentionally disabled.
+	# The active networking path is PlayerController @ 60 Hz, which keeps
+	# local prediction, server reconciliation, and remote interpolation on one
+	# consistent tick cadence.
+	_update_inputs()
 func _shoot_action() -> String:
 	return "shoot_touch" if is_mobile else "shoot"
 func _update_inputs() -> void:

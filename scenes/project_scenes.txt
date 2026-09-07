@@ -1,0 +1,1060 @@
+
+
+=========================================
+SCENE FILE: ball.tscn 
+PATH: .\ball.tscn
+=========================================
+
+[gd_scene load_steps=6 format=3 uid="uid://ds26o286r5vvn"]
+
+[ext_resource type="Script" uid="uid://bo47gum1v8t2s" path="res://scripts/ball.gd" id="1_x8fbi"]
+
+[sub_resource type="PhysicsMaterial" id="PhysicsMaterial_7s4qf"]
+friction = 0.9
+bounce = 0.6
+
+[sub_resource type="SphereMesh" id="SphereMesh_djrsh"]
+radius = 1.0
+height = 2.0
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_6tagv"]
+radius = 1.0
+
+[sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_4h6ng"]
+properties/0/path = NodePath(".:global_transform")
+properties/0/spawn = true
+properties/0/replication_mode = 1
+properties/1/path = NodePath(".:linear_velocity")
+properties/1/spawn = true
+properties/1/replication_mode = 1
+properties/2/path = NodePath(".:angular_velocity")
+properties/2/spawn = true
+properties/2/replication_mode = 1
+
+[node name="Ball" type="RigidBody3D" groups=["ball"]]
+collision_layer = 4
+collision_mask = 3
+mass = 0.1
+physics_material_override = SubResource("PhysicsMaterial_7s4qf")
+can_sleep = false
+linear_damp = 0.2
+script = ExtResource("1_x8fbi")
+
+[node name="Mesh" type="MeshInstance3D" parent="."]
+mesh = SubResource("SphereMesh_djrsh")
+metadata/_edit_lock_ = true
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("SphereShape3D_6tagv")
+metadata/_edit_lock_ = true
+
+[node name="BallSynchronizer" type="MultiplayerSynchronizer" parent="."]
+replication_config = SubResource("SceneReplicationConfig_4h6ng")
+
+
+=========================================
+SCENE FILE: BlockingOverlay.tscn 
+PATH: .\BlockingOverlay.tscn
+=========================================
+
+[gd_scene load_steps=2 format=3 uid="uid://cgx6hmcj5sv03"]
+
+[ext_resource type="Script" uid="uid://bthw24c2iehmm" path="res://scripts/autoload/blocking_overlay.gd" id="1_6n5xf"]
+
+[node name="BlockingOverlay" type="CanvasLayer"]
+layer = 100
+visible = false
+script = ExtResource("1_6n5xf")
+
+[node name="ColorRect" type="ColorRect" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.6)
+
+[node name="CenterContainer" type="CenterContainer" parent="ColorRect"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="PanelContainer" type="PanelContainer" parent="ColorRect/CenterContainer"]
+layout_mode = 2
+
+[node name="MarginContainer" type="MarginContainer" parent="ColorRect/CenterContainer/PanelContainer"]
+layout_mode = 2
+theme_override_constants/margin_left = 20
+theme_override_constants/margin_top = 20
+theme_override_constants/margin_right = 20
+theme_override_constants/margin_bottom = 20
+
+[node name="VBoxContainer" type="VBoxContainer" parent="ColorRect/CenterContainer/PanelContainer/MarginContainer"]
+layout_mode = 2
+theme_override_constants/separation = 12
+alignment = 1
+
+[node name="Label" type="Label" parent="ColorRect/CenterContainer/PanelContainer/MarginContainer/VBoxContainer"]
+layout_mode = 2
+horizontal_alignment = 1
+
+
+=========================================
+SCENE FILE: BotPlayer.tscn 
+PATH: .\BotPlayer.tscn
+=========================================
+
+[gd_scene load_steps=8 format=3 uid="uid://c7c8psuolfrbi"]
+
+[ext_resource type="Script" uid="uid://d27tl46wdl1bi" path="res://scripts/bot.gd" id="1_0djdi"]
+[ext_resource type="ArrayMesh" uid="uid://dfkb3j37cjp2g" path="res://3DModels/android_phone.obj" id="2_temvm"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_ld6s0"]
+radius = 1.0
+height = 4.0
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_f3sb7"]
+radius = 19.017
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_fj7yv"]
+radius = 1.467
+
+[sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_kpjcp"]
+properties/0/path = NodePath(".:owner_peer_id")
+properties/0/spawn = true
+properties/0/replication_mode = 1
+properties/1/path = NodePath(".:aim_active")
+properties/1/spawn = true
+properties/1/replication_mode = 1
+properties/2/path = NodePath(".:_charge")
+properties/2/spawn = true
+properties/2/replication_mode = 1
+properties/3/path = NodePath(".:_stamina")
+properties/3/spawn = true
+properties/3/replication_mode = 1
+properties/4/path = NodePath(".:current_ball_path")
+properties/4/spawn = true
+properties/4/replication_mode = 1
+
+[sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_xhfnw"]
+
+[node name="Player" type="CharacterBody3D"]
+collision_layer = 2
+collision_mask = 5
+script = ExtResource("1_0djdi")
+
+[node name="Mesh" type="MeshInstance3D" parent="."]
+transform = Transform3D(3.821371e-17, 8.7422775e-10, 0.02, 0.02, -8.7422775e-10, 0, 8.7422775e-10, 0.02, -8.7422775e-10, 0.8497119, -1.4332567, 0.239928)
+mesh = ExtResource("2_temvm")
+
+[node name="PlayerCollision" type="CollisionShape3D" parent="."]
+shape = SubResource("CapsuleShape3D_ld6s0")
+
+[node name="KickArea" type="Area3D" parent="."]
+collision_layer = 8
+collision_mask = 4
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="KickArea"]
+transform = Transform3D(0.99997, 0.00703362, 0.0031066, -0.00703358, 0.999975, -2.18512e-05, -0.00310668, 0, 0.999995, 0, -0.9, -0.6)
+shape = SubResource("SphereShape3D_f3sb7")
+
+[node name="TackleField" type="Area3D" parent="."]
+collision_layer = 16
+collision_mask = 4
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="TackleField"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.0160648, -1.35571, 4.76837e-07)
+shape = SubResource("SphereShape3D_fj7yv")
+
+[node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="."]
+replication_config = SubResource("SceneReplicationConfig_kpjcp")
+
+[node name="AimPivot" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.19209e-07, 1.18405, 0.071167)
+
+[node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="AimPivot"]
+replication_config = SubResource("SceneReplicationConfig_xhfnw")
+
+[node name="NameTag" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5, 0)
+
+
+=========================================
+SCENE FILE: DefeatScene.tscn 
+PATH: .\DefeatScene.tscn
+=========================================
+
+[gd_scene load_steps=5 format=3 uid="uid://m5et0rw3tfxl"]
+
+[ext_resource type="Script" uid="uid://bpxjwt0o0hd37" path="res://scripts/win_screen.gd" id="1_xro01"]
+[ext_resource type="Texture2D" uid="uid://bhlg1ylaa8m1o" path="res://Texture/DefeatPng.png" id="2_xro01"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_j4jwh"]
+bg_color = Color(0.0110876, 0.0110876, 0.0110876, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_uuemd"]
+bg_color = Color(0, 0, 0, 1)
+
+[node name="WinScene" type="Control" node_paths=PackedStringArray("_next", "_countdown_label")]
+layout_mode = 3
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_xro01")
+_next = NodePath("Panel/VBoxContainer/HBoxContainer/NextButton")
+_countdown_label = NodePath("Panel/VBoxContainer/HBoxContainer/CountDownLabel")
+
+[node name="Panel" type="Panel" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Panel"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -38.0
+offset_top = -29.0
+offset_right = 38.0
+offset_bottom = 29.0
+grow_horizontal = 2
+grow_vertical = 2
+alignment = 1
+
+[node name="Label" type="Label" parent="Panel/VBoxContainer"]
+z_index = 1
+layout_mode = 2
+theme_override_styles/normal = SubResource("StyleBoxFlat_j4jwh")
+text = "YOU LOSE!"
+
+[node name="HBoxContainer" type="HBoxContainer" parent="Panel/VBoxContainer"]
+z_index = 1
+layout_mode = 2
+
+[node name="NextButton" type="Button" parent="Panel/VBoxContainer/HBoxContainer"]
+layout_mode = 2
+action_mode = 0
+text = "
+"
+
+[node name="CountDownLabel" type="Label" parent="Panel/VBoxContainer/HBoxContainer"]
+layout_mode = 2
+theme_override_styles/normal = SubResource("StyleBoxFlat_uuemd")
+
+[node name="TextureRect" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -576.0
+offset_top = -512.0
+offset_right = 559.0
+offset_bottom = 512.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("2_xro01")
+stretch_mode = 5
+
+
+=========================================
+SCENE FILE: GrappleShot.tscn 
+PATH: .\GrappleShot.tscn
+=========================================
+
+[gd_scene load_steps=3 format=3 uid="uid://d4mdf4duq868k"]
+
+[ext_resource type="Script" uid="uid://d0avn18j4wjhv" path="res://scripts/grapple_shot.gd" id="1_cfvmp"]
+[ext_resource type="Script" uid="uid://xb644i5ud0pt" path="res://scripts/hook.gd" id="2_1p83u"]
+
+[node name="GrappleShot" type="Node3D"]
+script = ExtResource("1_cfvmp")
+linger_time = 100.0
+
+[node name="Rope" type="MeshInstance3D" parent="."]
+
+[node name="Hook" type="Node3D" parent="."]
+script = ExtResource("2_1p83u")
+claw_curve_radius = 0.12
+claw_radius = 0.022
+open_amount = 1.0
+
+
+=========================================
+SCENE FILE: Lobby.tscn 
+PATH: .\Lobby.tscn
+=========================================
+
+[gd_scene load_steps=2 format=3 uid="uid://duglm4trbrvn7"]
+
+[ext_resource type="Script" uid="uid://cb3sfmtcpxe6b" path="res://scripts/lobby.gd" id="1_gv8if"]
+
+[node name="Lobby" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_gv8if")
+
+[node name="PanelContainer" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="PanelContainer"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="PanelContainer/VBoxContainer"]
+layout_mode = 2
+text = "Custom Lobby
+"
+
+[node name="StatusLabel" type="Label" parent="PanelContainer/VBoxContainer"]
+layout_mode = 2
+text = "Connected: 0
+
+"
+
+[node name="HBoxContainer" type="HBoxContainer" parent="PanelContainer/VBoxContainer"]
+custom_minimum_size = Vector2(0, 50)
+layout_mode = 2
+alignment = 1
+
+[node name="StartButton" type="Button" parent="PanelContainer/VBoxContainer/HBoxContainer"]
+layout_mode = 2
+text = "Start
+"
+
+[node name="LeaveButton" type="Button" parent="PanelContainer/VBoxContainer/HBoxContainer"]
+layout_mode = 2
+text = "Leave
+"
+
+[node name="ReadyButton" type="Button" parent="PanelContainer/VBoxContainer/HBoxContainer"]
+layout_mode = 2
+text = "Ready
+"
+
+[node name="MatchSizeOption" type="OptionButton" parent="PanelContainer/VBoxContainer/HBoxContainer"]
+layout_mode = 2
+
+[node name="FillBotsCheck" type="CheckButton" parent="PanelContainer/VBoxContainer/HBoxContainer"]
+layout_mode = 2
+text = "Fill with bots"
+
+[node name="PlayerList" type="Tree" parent="PanelContainer/VBoxContainer"]
+custom_minimum_size = Vector2(0, 50)
+layout_mode = 2
+
+[node name="PasswordLabel" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -55.0
+offset_right = 56.0
+offset_bottom = 49.0
+grow_horizontal = 2
+
+
+=========================================
+SCENE FILE: Player.tscn 
+PATH: .\Player.tscn
+=========================================
+
+[gd_scene load_steps=8 format=3 uid="uid://dv5l1qjf5gwfn"]
+
+[ext_resource type="Script" uid="uid://ct4g33ulp8nx5" path="res://scripts/player.gd" id="1_xhfnw"]
+[ext_resource type="ArrayMesh" uid="uid://dfkb3j37cjp2g" path="res://3DModels/android_phone.obj" id="2_kpjcp"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_ld6s0"]
+radius = 1.0
+height = 4.0
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_f3sb7"]
+radius = 19.017
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_fj7yv"]
+radius = 1.467
+
+[sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_kpjcp"]
+properties/0/path = NodePath(".:owner_peer_id")
+properties/0/spawn = true
+properties/0/replication_mode = 1
+properties/1/path = NodePath(".:aim_active")
+properties/1/spawn = true
+properties/1/replication_mode = 1
+properties/2/path = NodePath(".:_charge")
+properties/2/spawn = true
+properties/2/replication_mode = 1
+properties/3/path = NodePath(".:_stamina")
+properties/3/spawn = true
+properties/3/replication_mode = 1
+properties/4/path = NodePath(".:current_ball_path")
+properties/4/spawn = true
+properties/4/replication_mode = 1
+properties/5/path = NodePath(".:tackle_cd_ui")
+properties/5/spawn = true
+properties/5/replication_mode = 2
+properties/6/path = NodePath(".:ability_id")
+properties/6/spawn = true
+properties/6/replication_mode = 1
+
+[sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_xhfnw"]
+properties/0/path = NodePath(".:rotation")
+properties/0/spawn = true
+properties/0/replication_mode = 1
+
+[node name="Player" type="CharacterBody3D"]
+collision_layer = 2
+collision_mask = 7
+script = ExtResource("1_xhfnw")
+walk_speed = 9.5
+sprint_speed = 12.0
+jump_velocity = 10.0
+stamina_regen_rate = 10.0
+stamina_sprint_drain = 20.0
+stamina_tackle_cost = 30.0
+stamina_min_to_stop_ball = 50.0
+latch_stamina_drain = 15.0
+latch_min_to_start = 100.0
+
+[node name="Mesh" type="MeshInstance3D" parent="."]
+transform = Transform3D(3.82137e-17, 8.74228e-10, 0.02, 0.02, -8.74228e-10, 0, 8.74228e-10, 0.02, -8.74228e-10, 0.849712, -1.43326, 0.239928)
+mesh = ExtResource("2_kpjcp")
+
+[node name="PlayerCollision" type="CollisionShape3D" parent="."]
+shape = SubResource("CapsuleShape3D_ld6s0")
+
+[node name="KickArea" type="Area3D" parent="."]
+collision_layer = 8
+collision_mask = 4
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="KickArea"]
+transform = Transform3D(0.99997, 0.00703362, 0.0031066, -0.00703358, 0.999975, -2.18512e-05, -0.00310668, 0, 0.999995, 0, -0.9, -0.6)
+shape = SubResource("SphereShape3D_f3sb7")
+
+[node name="TackleField" type="Area3D" parent="."]
+collision_layer = 16
+collision_mask = 6
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="TackleField"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.0160648, -1.35571, 4.76837e-07)
+shape = SubResource("SphereShape3D_fj7yv")
+
+[node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="."]
+replication_config = SubResource("SceneReplicationConfig_kpjcp")
+
+[node name="AimPivot" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.19209e-07, 1.18405, 0.071167)
+
+[node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="AimPivot"]
+replication_config = SubResource("SceneReplicationConfig_xhfnw")
+
+[node name="NameTag" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5, 0)
+
+[node name="Visual" type="Node3D" parent="."]
+
+
+=========================================
+SCENE FILE: PlayerCamera.tscn 
+PATH: .\PlayerCamera.tscn
+=========================================
+
+[gd_scene load_steps=2 format=3 uid="uid://dpicujbq5yvvi"]
+
+[ext_resource type="Script" uid="uid://nekyowughkgb" path="res://scripts/camera_3d.gd" id="1_ckl5i"]
+
+[node name="Camera3D" type="Camera3D"]
+transform = Transform3D(1, 0, 0, 0, 0.866025, 0.5, 0, -0.5, 0.866025, 0, 0, 0)
+fov = 80.0
+script = ExtResource("1_ckl5i")
+ball_target_path = NodePath("../Scene/Ball")
+collision_mask = 2
+
+
+=========================================
+SCENE FILE: ScoreboardScene.tscn 
+PATH: .\ScoreboardScene.tscn
+=========================================
+
+[gd_scene load_steps=2 format=3 uid="uid://d08l8i60jf442"]
+
+[ext_resource type="Script" uid="uid://cuc8adgf52jgm" path="res://scripts/scoreboard_scene.gd" id="1_bc6es"]
+
+[node name="ScoreboardScene" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_bc6es")
+tree_path = NodePath("PanelContainer/VBoxContainer/Tree")
+
+[node name="PanelContainer" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="PanelContainer"]
+layout_mode = 2
+
+[node name="Title" type="Label" parent="PanelContainer/VBoxContainer"]
+layout_mode = 2
+text = "ScoreBoard"
+horizontal_alignment = 1
+
+[node name="Tree" type="Tree" parent="PanelContainer/VBoxContainer"]
+custom_minimum_size = Vector2(0, 620)
+layout_mode = 2
+columns = 4
+column_titles_visible = true
+hide_root = true
+
+
+=========================================
+SCENE FILE: ServerEntry.tscn 
+PATH: .\ServerEntry.tscn
+=========================================
+
+[gd_scene load_steps=3 format=3 uid="uid://caxetbdf0uwpr"]
+
+[ext_resource type="Script" uid="uid://dhdlwp81e474s" path="res://scenes/server_entry.gd" id="1_7l45w"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_l5w3b"]
+bg_color = Color(0.164706, 0.164706, 0.164706, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[node name="ServerEntry" type="PanelContainer"]
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("StyleBoxFlat_l5w3b")
+script = ExtResource("1_7l45w")
+
+[node name="MarginContainer" type="MarginContainer" parent="."]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 6
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 6
+
+[node name="HBoxContainer" type="HBoxContainer" parent="MarginContainer"]
+layout_mode = 2
+theme_override_constants/separation = 20
+
+[node name="LeftGroup" type="HBoxContainer" parent="MarginContainer/HBoxContainer"]
+layout_mode = 2
+
+[node name="LockIcon" type="TextureRect" parent="MarginContainer/HBoxContainer/LeftGroup"]
+layout_mode = 2
+expand_mode = 3
+stretch_mode = 5
+
+[node name="NameLabel" type="Label" parent="MarginContainer/HBoxContainer/LeftGroup"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Server Name"
+
+[node name="Spacer" type="Control" parent="MarginContainer/HBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="RightGroup" type="HBoxContainer" parent="MarginContainer/HBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 16
+alignment = 2
+
+[node name="PlayersLabel" type="Label" parent="MarginContainer/HBoxContainer/RightGroup"]
+layout_mode = 2
+text = "0/0"
+
+[node name="PingLabel" type="Label" parent="MarginContainer/HBoxContainer/RightGroup"]
+layout_mode = 2
+text = "0 ms"
+
+[node name="JoinButton" type="Button" parent="MarginContainer/HBoxContainer/RightGroup"]
+custom_minimum_size = Vector2(80, 0)
+layout_mode = 2
+text = "Join"
+
+[node name="NetworkLabel" type="Label" parent="MarginContainer/HBoxContainer/RightGroup"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+
+=========================================
+SCENE FILE: ServerList.tscn 
+PATH: .\ServerList.tscn
+=========================================
+
+[gd_scene load_steps=3 format=3 uid="uid://dcy4agh5qcqs7"]
+
+[ext_resource type="Script" uid="uid://de1wwmdpnlt28" path="res://scenes/server_list.gd" id="1_4xksb"]
+[ext_resource type="Script" uid="uid://ceee5sxahoj0d" path="res://scripts/back_button.gd" id="2_jl44o"]
+
+[node name="ServerList" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_4xksb")
+
+[node name="TextureRect" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = -1
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Label" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -59.5
+offset_top = 20.0
+offset_right = 59.5
+offset_bottom = 23.0
+grow_horizontal = 2
+text = "Server Browser"
+
+[node name="ScrollContainer" type="ScrollContainer" parent="."]
+layout_mode = 1
+anchors_preset = -1
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 20.0
+offset_top = 80.0
+offset_right = -20.0
+offset_bottom = -100.0
+
+[node name="ServerListContainer" type="VBoxContainer" parent="ScrollContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 10
+
+[node name="FilterBox" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -36.0
+grow_horizontal = 2
+grow_vertical = 0
+
+[node name="FilterBar" type="HBoxContainer" parent="FilterBox"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="FilterServers" type="Button" parent="FilterBox/FilterBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Filter"
+
+[node name="FilterOptions" type="HBoxContainer" parent="FilterBox"]
+layout_mode = 2
+theme_override_constants/separation = 20
+alignment = 1
+
+[node name="LAN" type="CheckBox" parent="FilterBox/FilterOptions"]
+layout_mode = 2
+text = "LAN"
+
+[node name="Cloud" type="CheckBox" parent="FilterBox/FilterOptions"]
+layout_mode = 2
+text = "Cloud"
+
+[node name="HasPlayers" type="CheckBox" parent="FilterBox/FilterOptions"]
+layout_mode = 2
+text = "Lobbies Not Full"
+
+[node name="Private" type="CheckBox" parent="FilterBox/FilterOptions"]
+layout_mode = 2
+text = "Private"
+
+[node name="Public" type="CheckBox" parent="FilterBox/FilterOptions"]
+layout_mode = 2
+text = "Public"
+
+[node name="ServerSearch" type="LineEdit" parent="FilterBox/FilterOptions"]
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "Server Name"
+
+[node name="BackButton" type="Button" parent="."]
+layout_mode = 1
+anchors_preset = -1
+anchor_right = 0.05
+anchor_bottom = 0.05
+offset_right = 8.0
+offset_bottom = 8.0
+script = ExtResource("2_jl44o")
+
+
+=========================================
+SCENE FILE: TeleporterPad.tscn 
+PATH: .\TeleporterPad.tscn
+=========================================
+
+[gd_scene load_steps=4 format=3 uid="uid://chl6gnurtocpi"]
+
+[ext_resource type="Texture2D" uid="uid://ckyaiflvqt25u" path="res://teleporter.png" id="5_nrv3q"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_al8n4"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_qx8rq"]
+
+[node name="TeleporterPad" type="Area3D"]
+
+[node name="TeleporterPad" type="Area3D" parent="."]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="TeleporterPad"]
+transform = Transform3D(2, 0, 0, 0, 0.3, 0, 0, 0, 2, 0, 0, 0)
+shape = SubResource("BoxShape3D_al8n4")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="TeleporterPad"]
+transform = Transform3D(2, 0, 0, 0, 0.3, 0, 0, 0, 2, 0, 0, 0)
+mesh = SubResource("BoxMesh_qx8rq")
+
+[node name="Decal" type="Decal" parent="TeleporterPad"]
+texture_albedo = ExtResource("5_nrv3q")
+
+
+=========================================
+SCENE FILE: TieScene.tscn 
+PATH: .\TieScene.tscn
+=========================================
+
+[gd_scene load_steps=5 format=3 uid="uid://pla076kf4l1h"]
+
+[ext_resource type="Script" uid="uid://bpxjwt0o0hd37" path="res://scripts/win_screen.gd" id="1_rbe8a"]
+[ext_resource type="Texture2D" uid="uid://d0noboxhki6le" path="res://Texture/W (1).png" id="2_xnhaf"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_j4jwh"]
+bg_color = Color(0.0110876, 0.0110876, 0.0110876, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_uuemd"]
+bg_color = Color(0, 0, 0, 1)
+
+[node name="WinScene" type="Control" node_paths=PackedStringArray("_next", "_countdown_label")]
+layout_mode = 3
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_rbe8a")
+_next = NodePath("Panel/VBoxContainer/HBoxContainer/NextButton")
+_countdown_label = NodePath("Panel/VBoxContainer/HBoxContainer/CountDownLabel")
+
+[node name="Panel" type="Panel" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Panel"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -38.0
+offset_top = -29.0
+offset_right = 38.0
+offset_bottom = 29.0
+grow_horizontal = 2
+grow_vertical = 2
+alignment = 1
+
+[node name="Label" type="Label" parent="Panel/VBoxContainer"]
+z_index = 1
+layout_mode = 2
+theme_override_styles/normal = SubResource("StyleBoxFlat_j4jwh")
+text = "TIE!"
+horizontal_alignment = 1
+
+[node name="HBoxContainer" type="HBoxContainer" parent="Panel/VBoxContainer"]
+z_index = 1
+layout_mode = 2
+
+[node name="NextButton" type="Button" parent="Panel/VBoxContainer/HBoxContainer"]
+layout_mode = 2
+action_mode = 0
+text = "
+"
+
+[node name="CountDownLabel" type="Label" parent="Panel/VBoxContainer/HBoxContainer"]
+layout_mode = 2
+theme_override_styles/normal = SubResource("StyleBoxFlat_uuemd")
+
+[node name="TextureRect" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -576.0
+offset_top = -324.0
+offset_right = 576.0
+offset_bottom = 324.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("2_xnhaf")
+stretch_mode = 5
+
+
+=========================================
+SCENE FILE: title_screen.tscn 
+PATH: .\title_screen.tscn
+=========================================
+
+[gd_scene load_steps=4 format=3 uid="uid://c7aw8ja2qjdd3"]
+
+[ext_resource type="Script" uid="uid://clneitjkeupvq" path="res://scripts/title_screen.gd" id="1_sa3yf"]
+[ext_resource type="Texture2D" uid="uid://bsg80ej0slplt" path="res://Texture/backgrou.png" id="2_s4lrb"]
+
+[sub_resource type="Theme" id="Theme_1s85s"]
+default_font_size = 30
+
+[node name="TitleScreen" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme = SubResource("Theme_1s85s")
+script = ExtResource("1_sa3yf")
+
+[node name="bg" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("2_s4lrb")
+stretch_mode = 5
+
+[node name="CenterContainer" type="CenterContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 0
+
+[node name="VBoxContainer" type="VBoxContainer" parent="CenterContainer"]
+layout_mode = 2
+theme_override_constants/separation = 20
+alignment = 1
+
+[node name="TitleLabek\\l" type="Label" parent="CenterContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 56
+text = "Soccer
+"
+horizontal_alignment = 1
+
+[node name="TestButton" type="Button" parent="CenterContainer/VBoxContainer"]
+layout_mode = 2
+text = "Test
+"
+
+[node name="MultiPlayerButton" type="Button" parent="CenterContainer/VBoxContainer"]
+layout_mode = 2
+text = "Multiplayer
+"
+
+[node name="MultiplayerPopup1" type="Window" parent="."]
+scaling_3d_scale = 0.25
+title = "Multiplayer"
+size = Vector2i(460, 300)
+visible = false
+popup_window = true
+
+[node name="VBox" type="VBoxContainer" parent="MultiplayerPopup1"]
+offset_right = 40.0
+offset_bottom = 40.0
+
+[node name="FindServerButton" type="Button" parent="MultiplayerPopup1/VBox"]
+layout_mode = 2
+text = "Find Server"
+
+[node name="CreateServerButton" type="Button" parent="MultiplayerPopup1/VBox"]
+layout_mode = 2
+text = "Create Server"
+
+[node name="CreateLanButton" type="Button" parent="MultiplayerPopup1/VBox"]
+layout_mode = 2
+text = "Create LAN Server"
+
+[node name="MultiplayerPopup" type="CanvasLayer" parent="."]
+visible = false
+
+[node name="PanelContainer" type="PanelContainer" parent="MultiplayerPopup"]
+custom_minimum_size = Vector2(460, 300)
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -74.5
+offset_top = -50.5
+offset_right = 74.5
+offset_bottom = 50.5
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="MarginContainer" type="MarginContainer" parent="MultiplayerPopup/PanelContainer"]
+layout_mode = 2
+
+[node name="VBox" type="VBoxContainer" parent="MultiplayerPopup/PanelContainer/MarginContainer"]
+layout_mode = 2
+
+[node name="FindServerButton" type="Button" parent="MultiplayerPopup/PanelContainer/MarginContainer/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+text = "Find Server"
+
+[node name="CreateServerButton" type="Button" parent="MultiplayerPopup/PanelContainer/MarginContainer/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+text = "Create Server"
+
+[node name="CreateLanButton" type="Button" parent="MultiplayerPopup/PanelContainer/MarginContainer/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+text = "Create LAN Server"
+
+[connection signal="gui_input" from="CenterContainer" to="." method="_on_center_container_gui_input"]
+
+
+=========================================
+SCENE FILE: WinScene.tscn 
+PATH: .\WinScene.tscn
+=========================================
+
+[gd_scene load_steps=5 format=3 uid="uid://ymx4qo3ehpc6"]
+
+[ext_resource type="Script" uid="uid://bpxjwt0o0hd37" path="res://scripts/win_screen.gd" id="1_t3pix"]
+[ext_resource type="Texture2D" uid="uid://d0noboxhki6le" path="res://Texture/W (1).png" id="2_uuemd"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_j4jwh"]
+bg_color = Color(0.0110876, 0.0110876, 0.0110876, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_uuemd"]
+bg_color = Color(0, 0, 0, 1)
+
+[node name="WinScene" type="Control" node_paths=PackedStringArray("_next", "_countdown_label")]
+layout_mode = 3
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_t3pix")
+_next = NodePath("Panel/VBoxContainer/HBoxContainer/NextButton")
+_countdown_label = NodePath("Panel/VBoxContainer/HBoxContainer/CountDownLabel")
+
+[node name="Panel" type="Panel" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Panel"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -38.0
+offset_top = -29.0
+offset_right = 38.0
+offset_bottom = 29.0
+grow_horizontal = 2
+grow_vertical = 2
+alignment = 1
+
+[node name="Label" type="Label" parent="Panel/VBoxContainer"]
+z_index = 1
+layout_mode = 2
+theme_override_styles/normal = SubResource("StyleBoxFlat_j4jwh")
+text = "YOU WIN!"
+
+[node name="HBoxContainer" type="HBoxContainer" parent="Panel/VBoxContainer"]
+z_index = 1
+layout_mode = 2
+
+[node name="NextButton" type="Button" parent="Panel/VBoxContainer/HBoxContainer"]
+layout_mode = 2
+action_mode = 0
+text = "
+"
+
+[node name="CountDownLabel" type="Label" parent="Panel/VBoxContainer/HBoxContainer"]
+layout_mode = 2
+theme_override_styles/normal = SubResource("StyleBoxFlat_uuemd")
+
+[node name="TextureRect" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -576.0
+offset_top = -324.0
+offset_right = 576.0
+offset_bottom = 324.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("2_uuemd")
+stretch_mode = 5

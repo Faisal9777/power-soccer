@@ -209,6 +209,12 @@ func _player_controller_setup(rosters : Dictionary, ball : Node, joystick: Node,
 			cam.init(node, joystick)
 			var input_source = NodeUtils.init_input_source(self)
 			var input_buffer = LocalInputBuffer.new(input_source)
+			# Give the buffer a reference to World so it can read and consume
+			# edge-latch action flags (jump, tackle, latch, abilities, etc.)
+			# that world.gd::_update_inputs() sets each physics tick.
+			var world := get_node_or_null("/root/World")
+			if world:
+				input_buffer.world_node = world
 			p_controller = LocalController.new(node, peer_id, name, team, cam, ball, joystick, input_buffer)
 			p_controller.get_body_mesh().visible = false
 			controllers.append(p_controller)

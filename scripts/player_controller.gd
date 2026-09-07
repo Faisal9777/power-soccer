@@ -10,7 +10,10 @@ var _latest_local_snapshot_id: int = -1       # ordering guard (server_tick or l
 var _fixed_dt: float = 1.0 / 60.0
 var _scheduler : JobScheduler
 var _task : Node
-var send_interval := 1.0 / 45.0  # 60 Hz
+
+const INPUT_SEND_HZ := 60.0
+var send_interval := 1.0 / INPUT_SEND_HZ
+
 var send_accumulator := 0.0
 var can_process := false
 var task_id := 0

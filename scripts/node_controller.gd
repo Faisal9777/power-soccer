@@ -40,6 +40,11 @@ func _apply_inputs(input, delta) -> void:
 		player.handle_movement(p_input, delta, not player.get_tree().get_multiplayer().is_server())
 	if not input.is_empty():
 		player.set_look_rotation(look_yaw, look_pitch)
+		# On the listen-server, simulate_server() reads actions from player._net.
+		# Feed the input dict into _net so actions (jump, shoot, tackle, latch, etc.)
+		# are processed on the same tick they arrive from LocalInputBuffer.
+		if player.get_tree().get_multiplayer().is_server() and player.has_method("apply_net_input"):
+			player.apply_net_input(input)
 
 func _get_player_input(input) -> Dictionary:
 	var mov_input = _get_player_movement(input)

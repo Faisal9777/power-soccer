@@ -211,6 +211,12 @@ func _resolve_players_from_roster(rosters) -> void:
 			var cam = get_node_or_null("/root/World/Scene/Camera3D") as Camera3D
 			cam.init(proxy, joystick)
 			var input_buffer = LocalInputBuffer.new(NodeUtils.init_input_source(self))
+			# Give the buffer a reference to World so it can read and consume
+			# edge-latch action flags (jump, tackle, latch, abilities, etc.)
+			# that world.gd::_update_inputs() sets each physics tick.
+			var world := get_node_or_null("/root/World")
+			if world:
+				input_buffer.world_node = world
 			p_controller = PlayerController.new(node, peer_id, name, team, cam, ball, joystick, self, input_buffer, scheduler)
 			p_controller.get_body_mesh().visible = false
 			proxy.init(node, p_controller)
