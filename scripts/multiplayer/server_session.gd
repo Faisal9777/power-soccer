@@ -75,26 +75,26 @@ func host(server_name, is_public, scene):
 	Network.host(server_info)
 
 func toggle_scene_action(domain, event : int, value):
-	var scene_data = {"id": multiplayer.get_unique_id(), "state": domain, "value" : value}
-	handle_data(event, scene_data)
+	var scene_data = {"id": multiplayer.get_unique_id(), "state": domain, "value" : value, "event" : event}
+	handle_data(scene_data)
 
-func handle_data(msg, data):
-	var state = data["state"]
-	if state == NetCodes.States.SESSION:
-		if msg == NetCodes.Msg.REGISTER_PEER:
-			_srv_register_player(data)
+func handle_data(data):
+	var msg = data["message"]
+	var value = data.get("value")
+	var action = value.get("action")
+	if msg == NetCodes.message.SESSION:
+		if action == NetCodes.session_message.REGISTER_PEER:
+			_srv_register_player(value)
 			
 		if msg == NetCodes.Msg.AUTH_REQUEST:
 			_authenticate_password(data)
 			
 	else:
-		StateHandler.handle_data(msg, data, state)
+		StateHandler.handle_data(value.get("value"))
 
-func send_data_id(target_id, msg, value):
-	sync.send_data_id(target_id, msg, value)
-
-func send_data_id_reliable(target_id, msg, value):
-	sync.send_data_id_reliable(target_id, msg, value)
+func send_data_id(target_id, value):
+	var val = {"message" : NetCodes.message.STATE, "value" : {"value":value}}
+	sync.send_data_id(target_id, val)
 
 func send_data(msg, value):
 	sync.send_data_all(msg, value)
@@ -138,7 +138,7 @@ func _broadcast():
 		server_info["lobby_size"] = GameState.get_lobby_size()
 		server_info["players_connected"] = GameState.get_players_connected()
 		server_info["can_other_join"] = can_other_join
-		server_info["current_state"] = current_scene
+		server_info["current_state"] = StateHandler.current_scene
 		if is_cloud_session:
 			server_info["players"] = _get_all_user_ids()
 
@@ -155,10 +155,9 @@ func _broadcast():
 func _broadcast_states():
 	if not can_world_state_broadcast:
 		return
-	var state_data = {}
-	state_data["roster"] = GameState.roster
-	state_data["state"] = NetCodes.States.SESSION
-	sync.send_data_all(NetCodes.Msg.STATE_DATA, state_data)
+	var state_data = {"message" : NetCodes.message.SESSION, "value" : 
+		{"action" : NetCodes.session_message.SESSION_DATA, "roster" : GameState.roster}}
+	sync.send_data_all(state_data)
 
 func _handle_state_action(msg, data):
 	if data.get("domain") == "lobby":
@@ -221,228 +220,56 @@ func _srv_register_player(payload: Dictionary):
 	var user_id = payload.get("user_id", 0)
 	var session_token = payload.get("session_token", "")
 	print("[register] incoming id=%s user_id=%s can_other_join=%s is_cloud_session=%s" % [id, user_id, can_other_join, is_cloud_session])
-	var lobby_full := GameState.get_players_connected() >= GameState.get_lobby_size()
 
-	if user_id <= 0:
-		print("[register] REJECTING id=%s: invalid_identity" % id)
-		sync.send_data_id(id, NetCodes.Msg.REJECT, {"message": "Identity Is invalid"})
-		#Network.disconnect_peer(id)
-		return
-
-	if banned_user_ids.has(user_id):
-		print("[register] REJECTING id=%s: banned" % id)
-		sync.send_data_id(id, NetCodes.Msg.REJECT, {"message": "You have been banned from this lobby"})
-		#Network.disconnect_peer(id)
-		return
-		
-	if lobby_full:
-		print("[register] REJECTING id=%s: lobby full" % id)
-		sync.send_data_id(id, NetCodes.Msg.REJECT, {"message": "Lobby is full"})
-		#Network.disconnect_peer(id)
-		return
-		
-	var should_reject = not can_other_join or (is_cloud_session and not await _can_join(user_id, session_token))
+	var should_reject = not can_other_join or (is_cloud_session and not await _can_join(user_id))
 	print("[register] should_reject=%s" % should_reject)
 	if should_reject:
 		print("[register] REJECTING id=%s" % id)
-		sync.send_data_id(id, NetCodes.Msg.REJECT, {"message": "Cannot join"})
 		Network.disconnect_peer(id)
+		sync.send_data_id(id, NetCodes.Msg.REJECT, {"message": "Cannot join"})
 		return
 
 	if not multiplayer.is_server():
 		print("[register] aborting, not server, id=%s" % id)
 		return
 
-	GameState.roster[id] = {
-		"name": "",
-		"ready": false,
-		"is_active": true,
-		"user_id": user_id,
-		"session_token": session_token
-	}
+	GameState.roster[id] = {"name": "", "ready": false, "is_active": true, "user_id": user_id}
 	GameState.roster[id]["name"] = payload.get('name', "Unknown")
 	print("[register] roster set id=%s entry=%s" % [id, GameState.roster[id]])
 
 	var temp_server_info = server_info.duplicate()
 	temp_server_info["server_id"] = multiplayer.get_unique_id()
-	temp_server_info["state"] = NetCodes.States.SESSION
+	temp_server_info["action"] = NetCodes.session_message.REGISTRATION_COMPLETE
+	temp_server_info["was_reactivated"] = _existing_player
 	print("[register] sending REGISTRATION_COMPLETE to id=%s payload=%s" % [id, temp_server_info])
 
-	sync.send_data_id(id, NetCodes.Msg.REGISTRATION_COMPLETE, temp_server_info)
+	sync.send_data_id(id, {"message":NetCodes.message.SESSION, "value":temp_server_info})
 	TaskScheduler.schedule(60, _broadcast_states)
+	var message = NetCodes.state_message.PLAYER_CONNECT
+	var value = {"id" : id}
+	if _existing_player:
+		message = NetCodes.state_message.PLAYER_RECONNECT
+	StateHandler.handle_data({"message" : message,"value":value})
 	print("[register] broadcast scheduled, roster size=%s" % GameState.roster.size())
 
-func _authenticate_password(payload):
-	var id = payload.get("id", 0)
-	var password = payload.get("password", "")
-	var session_token = payload.get("session_token", "")
-	
-	# 1. Password check if lobby is private (server_password != 0)
-	if server_password != 0:
-		var pass_int = 0
-		if password is String:
-			pass_int = password.to_int()
-		else:
-			pass_int = int(password)
-		if pass_int != server_password:
-			
-			sync.send_data_id(id, NetCodes.Msg.AUTH_FAILED, {})
-			return
-		elif server_info["is_lan"] == true:
-			sync.send_data_id(id, NetCodes.Msg.AUTH_OK, {})
 
-			
-	if server_info["is_lan"] != true :
-		# 2. Session validation via Node.js
-		var player_info = await _verify_token_with_backend(session_token)
-		if player_info.is_empty():
-			sync.send_data_id(id, NetCodes.Msg.AUTH_FAILED, {})
-			return
-			
-		peer_identities[id] = player_info
-		sync.send_data_id(id, NetCodes.Msg.AUTH_OK, {})
-
-func _verify_token_with_backend(token: String) -> Dictionary:
-	if token == "":
-		return {}
-		
-	Config.load_config()
-	var backend_url = Config.get_value("cloud_server_endpoint", "http://127.0.0.1:3000")
-	var verify_url = backend_url + "/api/auth/verify"
-	
-	var http_client = HTTPRequest.new()
-	add_child(http_client)
-	
-	var headers = [
-		"Content-Type: application/json",
-		"Authorization: Bearer " + token
-	]
-	
-	var err = http_client.request(verify_url, headers, HTTPClient.METHOD_GET)
-	if err != OK:
-		http_client.queue_free()
-		return {}
-		
-	var response = await http_client.request_completed
-	http_client.queue_free()
-	
-	var response_code = response[1]
-	var body = response[3]
-	
-	if response_code == 200:
-		var json = JSON.new()
-		if json.parse(body.get_string_from_utf8()) == OK:
-			var data = json.data
-			if data.has("player_tag"):
-				return {
-					"user_id": int(data["player_id"]),
-					"player_tag": data["player_tag"],
-					"player_name": data.get("player_name", "Player")
-				}
-	return {}
-
-
-func _notify_player_joined(user_id: int, session_token: String) -> bool:
+func _notify_player_joined(user_id: int) -> bool:
 	var body = JSON.stringify({
 		"user_id": user_id,
 		"server_id": server_info.get("id")
 	})
 	return await _transport_method.post(NetCodes.backend.PLAYER_JOINED, body, session_token) == HTTPClient.RESPONSE_OK
 
+func _find_roster_entry_by_user(user_id) -> int:
+	for peer_id in GameState.roster:
+		if GameState.roster[peer_id]["user_id"] == user_id:
+			return peer_id
+	return -1
 func _get_all_user_ids() -> Array:
-	var user_ids: Array = []
+		return GameState.roster.values().map(func(player): return player["user_id"])
 
-	for player in GameState.roster.values():
-		if player.get("is_bot", false):
-			continue
-
-		if player.has("user_id"):
-			user_ids.append(player["user_id"])
-
-	return user_ids
-func _can_join(user_id, session_token: String):
-	var validated = await _transport_method.validate(user_id, session_token)
-	print("validate =", validated)
-
-	var joined = await _notify_player_joined(user_id, session_token)
-	print("notify_player_joined =", joined)
-
-	if !validated:
+func _can_join(user_id):
+	var is_validated : bool = await _transport_method.validate(user_id)
+	if not is_validated or not await _notify_player_joined(user_id):
 		return false
-
-	if !joined:
-		return false
-
 	return true
-
-func disconnect_connection() -> void:
-	_disconnect()
-	
-func _disconnect() -> void:
-	if is_connected:
-		_disconnect_from_events()
-		GameState.clear()
-		Network.close_connection()
-		is_connected = false
-		StateHandler.change_state(NetCodes.States.TITLE)
-
-func _disconnect_from_events():
-	if Network.joined_server.is_connected(_on_joined_server):
-		Network.joined_server.disconnect(_on_joined_server)
-
-	if Network.connection_failed.is_connected(_on_connection_failed):
-		Network.connection_failed.disconnect(_on_connection_failed)
-
-	if Network.server_disconnected.is_connected(_on_server_disconnected):
-		Network.server_disconnected.disconnect(_on_server_disconnected)
-
-func _on_connection_failed() -> void:
-	_disconnect()
-
-func _on_server_disconnected() -> void:
-	_disconnect()
-	
-func _on_all_peers_left() -> void:
-	if !GameState.is_dedicated_server():
-		return
-
-	# IMPORTANT:
-	# Empty lobby should NOT be destroyed here.
-	# Let the backend idle timeout handle it normally.
-	if current_scene != NetCodes.States.WORLD:
-		return
-
-	print("All players left during game. Destroying dedicated match.")
-
-	_empty_shutdown_started = true
-	call_deferred("_shutdown_empty_game_server")
-
-func _shutdown_empty_game_server() -> void:
-	if !GameState.is_dedicated_server():
-		return
-
-	# Someone rejoined before shutdown.
-	if multiplayer.get_peers().size() > 0:
-		_empty_shutdown_started = false
-		return
-
-	# Stop heartbeat FIRST.
-	disable_broadcast()
-
-	print("No players remain in WORLD.")
-	print("Stopping heartbeat and shutting down dedicated game.")
-
-	# Remove server from backend immediately.
-	if _transport_method != null and _transport_method.has_method("unregister"):
-		await _transport_method.unregister(server_info.get("id", ""))
-
-	# Destroy dedicated server process.
-	get_tree().quit()
-
-# server_session.gd — add
-func send_movement_id(target_id, msg, value):
-	sync.send_movement_id(target_id, msg, value)
-
-
-func send_movement(msg, value):
-	sync.send_movement_all(msg, value)

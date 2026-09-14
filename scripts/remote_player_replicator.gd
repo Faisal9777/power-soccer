@@ -61,25 +61,26 @@ func process_tick(delta: float) -> void:
 	if _snapshot_queue.is_empty():
 		return
 
-	# Render a few server ticks behind the newest authoritative state.
-	var render_tick := _latest_server_tick - REMOTE_INTERP_DELAY_TICKS
+	var snapshot : Dictionary= _snapshot_queue.pop_front()
 
-	# -----------------------------------------------------
-	# Remove snapshots that are definitely behind us.
-	# Keep one snapshot before render_tick.
-	# -----------------------------------------------------
+	_apply_snapshot(snapshot, delta)
 
-	while _snapshot_queue.size() >= 2:
-		var next_tick := int(_snapshot_queue[1]["tick"])
 
-		if next_tick <= render_tick:
-			_snapshot_queue.pop_front()
-		else:
-			break
 
-	# -----------------------------------------------------
-	# We have two snapshots -> interpolate.
-	# -----------------------------------------------------
+# =========================================================
+# APPLY AUTHORITATIVE STATE
+# =========================================================
+func _apply_snapshot(snapshot: Dictionary, delta: float) -> void:
+	var snap = snapshot.get("snap")
+	# Remote interpolation runs every render frame for smoothness
+	var now := Time.get_ticks_msec()
+	var render_time := now - remote_interp_delay_ms
+
+	if _snapshot_queue.is_empty():
+		return
+	# Drop snapshots that are definitely older than our render_time
+	while _snapshot_queue.size() >= 2 and int(_snapshot_queue[1]["t"]) <= render_time:
+		_snapshot_queue.pop_front()
 
 	if _snapshot_queue.size() >= 2:
 		var a := _snapshot_queue[0] as Dictionary
@@ -98,87 +99,10 @@ func process_tick(delta: float) -> void:
 				1.0
 			)
 
-		var xa := a["xform"] as Transform3D
-		var xb := b["xform"] as Transform3D
-
-		var target_transform := xa.interpolate_with(xb, alpha)
-
-		_apply_visual_position(target_transform.origin, delta)
-
-		# Rotation is also interpolated using server state.
-		var snap_a: Dictionary = a["snap"]
-		var snap_b: Dictionary = b["snap"]
-
-		var yaw_a := float(snap_a.get("yaw", 0.0))
-		var yaw_b := float(snap_b.get("yaw", yaw_a))
-
-		var pitch_a := float(snap_a.get("pitch", 0.0))
-		var pitch_b := float(snap_b.get("pitch", pitch_a))
-
-		look_yaw = lerp_angle(yaw_a, yaw_b, alpha)
-		look_pitch = lerp(pitch_a, pitch_b, alpha)
-
-		player.set_look_rotation(look_yaw, look_pitch)
-
-		if snap_b.has("vel"):
-			player.velocity = snap_b["vel"]
-
-		return
-
-	# -----------------------------------------------------
-	# Only one snapshot available.
-	#
-	# Don't immediately teleport to it.
-	# Use a very short server-tick extrapolation.
-	# -----------------------------------------------------
-
-	var s := _snapshot_queue[0] as Dictionary
-	var snap: Dictionary = s["snap"]
-
-	var snapshot_tick := int(s["tick"])
-	var ticks_since_snapshot = max(
-		0,
-		_latest_server_tick - snapshot_tick
-	)
-
-	var ideal_pos := (s["xform"] as Transform3D).origin
-
-	if (
-		not bool(snap.get("is_frozen", false))
-		and ticks_since_snapshot <= extrapolation_cap_ticks
-		and snap.has("vel")
-	):
-		var physics_hz := float(
-			ProjectSettings.get_setting(
-				"physics/common/physics_ticks_per_second"
-			)
-		)
-
-		var dt := 1.0 / maxf(physics_hz, 1.0)
-
-		ideal_pos += (
-			snap["vel"] as Vector3
-		) * (ticks_since_snapshot * dt)
-
-	_apply_visual_position(ideal_pos, delta)
-
-# =========================================================
-# SMALL VISUAL CORRECTION
-# =========================================================
-
-func _apply_visual_position(
-	ideal_pos: Vector3,
-	delta: float
-) -> void:
-
-	var a := 1.0 - pow(
-		0.001,
-		delta * error_catchup_speed
-	)
-
-	_visual_err = _visual_err.lerp(
-		Vector3.ZERO,
-		a
-	)
-
-	player.global_position = ideal_pos + _visual_err
+	var xa := a["xform"] as Transform3D
+	var xb := b["xform"] as Transform3D
+	#dbg_print_if_moved_xz(p)
+	if not player:
+		print("client error")
+	snap["global_transform"] = xa.interpolate_with(xb, alpha)
+	player.apply_snapshot(snap)

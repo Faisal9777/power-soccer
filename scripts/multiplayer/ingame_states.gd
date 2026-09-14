@@ -20,9 +20,6 @@ var countdown_ms: int = 0
 var scene_path_to_load := ""
 var game_data = {}
 var goal_scored := false    
-func _ready() -> void:
-	set_multiplayer_authority(1)
-	_install_synchronizer()
 
 func _install_synchronizer() -> void:
 	var sync := MultiplayerSynchronizer.new()
@@ -54,6 +51,32 @@ func _install_synchronizer() -> void:
 
 	sync.replication_config = cfg
 	sync.replication_interval = 0.0
+
+func get_snapshot() -> Dictionary:
+	return {
+		"current_phase": current_phase,
+		"time_left_ms": time_left_ms,
+		"blue_score": blue_score,
+		"red_score": red_score,
+		"countdown_ms": countdown_ms,
+		"is_paused": is_paused,
+		"can_process": can_process,
+		"scene_path_to_load": scene_path_to_load,
+		"game_data": game_data,
+		"goal_scored": goal_scored,
+	}
+
+func apply_snapshot(snap: Dictionary) -> void:
+	current_phase = snap.get("current_phase", current_phase)
+	time_left_ms = snap.get("time_left_ms", time_left_ms)
+	blue_score = snap.get("blue_score", blue_score)
+	red_score = snap.get("red_score", red_score)
+	countdown_ms = snap.get("countdown_ms", countdown_ms)
+	is_paused = snap.get("is_paused", is_paused)
+	can_process = snap.get("can_process", can_process)
+	scene_path_to_load = snap.get("scene_path_to_load", scene_path_to_load)
+	game_data = snap.get("game_data", game_data)
+	goal_scored = snap.get("goal_scored", goal_scored)
 
 func set_roster(roster : Dictionary) -> void:
 	for peer_id in roster.keys():

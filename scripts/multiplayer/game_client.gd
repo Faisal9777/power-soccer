@@ -1,6 +1,6 @@
 extends Node
 
-@onready var state: Node = get_node("../ingame_state") 
+var state: Node
 var game : Dictionary = {}
 var _scoreboard_instance: Control
 # ---------- UI ----------
@@ -236,19 +236,6 @@ func end_game(value : Dictionary) -> void:
 	GameState.game_results = state.game_data
 	_end_match(scene)
 
-func ww(toggle : bool) -> void:
-	var switch := false
-	if not toggle:
-		switch = true
-	for k in GameState.roster.keys():
-		var p := get_node(GameState.roster[k]["player_path"]) as Node3D
-		#print("the player's id is: ", pid)
-		if p == null:
-			continue
-		
-		p.freeze(switch)
-	_all_player_frozen = switch
-
 func _position_players2(game_data) -> void:
 	var ball_position : Vector3 = game_data["ball_position"]
 	for controller in p_controllers:
@@ -259,24 +246,6 @@ func _position_players2(game_data) -> void:
 		controller.face_at(ball_position)
 		controller.freeze(pdata.get("freeze", true))
 	
-
-func process_data(data : Dictionary, msg : StringName) -> void:
-	if msg == "init":
-		for k in GameState.roster.keys():
-			var entry := GameState.roster.get(k) as Dictionary
-			if entry == null:
-				continue
-
-			var path = entry.get("player_path")
-			var player := get_node_or_null(path) as Node3D
-			if player == null:
-				continue
-
-			var pdata := data.get(k) as Dictionary
-			if pdata == null:
-				continue
-
-			player.global_transform = pdata["global_transform"]
 
 func _init_entry(pid: int, name: String, team: int) -> void:
 	# Each peer (and the caller) runs this locally
@@ -304,6 +273,7 @@ func _show_banner_for(text: String, seconds: float) -> void:
 	_countdown_label.hide()
 
 func _on_phase_changed(old, new) -> void:
-	if state.WorldPhase.POST_MATCH:
+	if state.current_phase == state.WorldPhase.POST_MATCH:
+		print("not true tho")
 		_countdown_label.text = "End!"
 		_countdown_label.show()

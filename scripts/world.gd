@@ -20,6 +20,7 @@ var _def_tex_a1: Texture2D
 var _def_tex_a2: Texture2D
 var _def_tex_a3: Texture2D
 
+
 func _set_btn_tex(btn: Node, tex: Texture2D, fallback: Texture2D) -> void:
 	var use_tex := tex if tex != null else fallback
 	if use_tex == null or btn == null:
@@ -141,25 +142,25 @@ func _ready() -> void:
 		score_btn.button_up.connect(_on_mobile_score_up)
 	
 	_setup_team_position()
-	# If you didn't set the spawner in the editor, do it here:
-	var spawner : Node
-	if players_root:
-		spawner = players_root.get_node_or_null("MultiplayerSpawner")
-	if spawner == null:
-		spawner = MultiplayerSpawner.new()
-		spawner.name = "MultiplayerSpawner"
-		players_root.add_child(spawner)
-		spawner.spawn_path = players_root.get_path()
-		
-
-	# Register ALL player-type scenes that might be spawned
-	if player_scene:
-		spawner.add_spawnable_scene(player_scene.resource_path)
-
-	if bot_player_scene:
-		spawner.add_spawnable_scene(bot_player_scene.resource_path)
-
-	_create_ball_spawner()
+	## If you didn't set the spawner in the editor, do it here:
+	#var spawner : Node
+	#if players_root:
+		#spawner = players_root.get_node_or_null("MultiplayerSpawner")
+	#if spawner == null:
+		#spawner = MultiplayerSpawner.new()
+		#spawner.name = "MultiplayerSpawner"
+		#players_root.add_child(spawner)
+		#spawner.spawn_path = players_root.get_path()
+		#
+#
+	## Register ALL player-type scenes that might be spawned
+	#if player_scene:
+		#spawner.add_spawnable_scene(player_scene.resource_path)
+#
+	#if bot_player_scene:
+		#spawner.add_spawnable_scene(bot_player_scene.resource_path)
+#
+	#_create_ball_spawner()
 	_setup_pause_dialog()
 	_tackle_cd_label = _ensure_cd_label(tackle_btn)
 	_pass_cd_label = _ensure_cd_label(pass_btn)
@@ -176,23 +177,24 @@ func _ready() -> void:
 	var ingame := get_node_or_null("ingame_state")
 	var blue_spawns := get_node(TEAM_BLUE_PATH)  as Node3D
 	var red_spawns  := get_node(TEAM_RED_PATH)   as Node3D
-	var ball_spawn  := get_node(BALL_SPAWN_PATH) as Node3D
-
+	var ball_spawn  = ball_root
+	_create_ball_server()
+	var net_objects := [ball_scene, ingame]
 	if not multiplayer.is_server():
 		net = WorldClientScript.new()
 		_initialize_multiplayer("NetClient", net)
-		net.init(local_view_proxy, _scoreboard_instance, ingame, blue_spawns, red_spawns, ball_spawn, get_node(joystick_path))
+		net.init(local_view_proxy, _scoreboard_instance, ingame, blue_spawns, red_spawns, ball_scene,net_objects, get_node(joystick_path))
 		net.local_controller_created.connect(_on_player_controller_created)
 	else:
-		_create_ball_server()
 		var ids: Array[int] = []
+		var rosters = GameState.roster.duplicate()
 		for k in GameState.roster.keys():
 			ids.append(int(k))   # ensure int
-		_server_begin_match(ids)
+			_on_peer_joined(int(k), rosters)
 		net = WorldServerScript.new()
 		_initialize_multiplayer("NetServer", net)
 		net.start_init(_players, _scoreboard_instance, ingame, replication_manager, blue_spawns, red_spawns, ball_spawn,
-		ball_scene, GameState.match_len_sec, GameState.goal_limit, GameState.roster, get_node(joystick_path))
+		ball_scene, net_objects, GameState.match_len_sec, GameState.goal_limit, rosters,get_node(joystick_path))
 		_local_controller = net.get_local_controller()
 
 
@@ -774,29 +776,28 @@ func _initialize_multiplayer(name: String, net : Node) -> void:
 
 func _create_ball_server() -> void:
 	# Instance a **fresh** rigid body
-	var ball := ball_packed.instantiate() as RigidBody3D
-	ball.name = "Ball"  # stable name helps other scripts find it
-	ball.add_to_group("ball")
+	ball_scene = ball_packed.instantiate() as RigidBody3D
+	ball_scene.name = "Ball"  # stable name helps other scripts find it
+	ball_scene.add_to_group("ball")
 	# Make it inert before adding/placing (prevents the "rocket" issue)
-	ball.linear_velocity = Vector3.ZERO
-	ball.angular_velocity = Vector3.ZERO
+	ball_scene.linear_velocity = Vector3.ZERO
+	ball_scene.angular_velocity = Vector3.ZERO
 
 	# Add under the spawner's path so it replicates to clients
-	ball_root.add_child(ball)
-	ball_scene = ball
+	ball_root.add_child(ball_scene)
 
-func _create_ball_spawner() -> void:
-	# Set up once
-	var ball_spawner := ball_root.get_node_or_null("MultiplayerSpawner") as MultiplayerSpawner
-	if ball_spawner == null:
-		ball_spawner = MultiplayerSpawner.new()
-		ball_spawner.name = "MultiplayerSpawner"
-		ball_root.add_child(ball_spawner)
-		ball_spawner.spawn_path = ball_root.get_path()
-
-	# register the ball scene so the spawner knows how to recreate it on clients
-	if ball_packed:
-		ball_spawner.add_spawnable_scene(ball_packed.resource_path)
+#func _create_ball_spawner() -> void:
+	## Set up once
+	#var ball_spawner := ball_root.get_node_or_null("MultiplayerSpawner") as MultiplayerSpawner
+	#if ball_spawner == null:
+		#ball_spawner = MultiplayerSpawner.new()
+		#ball_spawner.name = "MultiplayerSpawner"
+		#ball_root.add_child(ball_spawner)
+		#ball_spawner.spawn_path = ball_root.get_path()
+#
+	## register the ball scene so the spawner knows how to recreate it on clients
+	#if ball_packed:
+		#ball_spawner.add_spawnable_scene(ball_packed.resource_path)
 
 
 func _setup_team_position(plane_z: float = 0.0) -> void:
@@ -809,16 +810,24 @@ func _setup_team_position(plane_z: float = 0.0) -> void:
 	# Face opposite direction (yaw 180°)
 	team_red.rotation_degrees.y = fposmod(team_blue.rotation_degrees.y + 180.0, 360.0)
 
-func _server_begin_match(peer_ids: Array[int]) -> void:
+func _server_begin_match(peer_ids: Array[int], rosters) -> void:
 	for id in peer_ids:
-		_on_peer_joined(id)  # your existing spawn path
+		_on_peer_joined(id, rosters)  # your existing spawn path
 
 func _physics_process(delta: float) -> void:
-	# Legacy 30 Hz movement input path intentionally disabled.
-	# The active networking path is PlayerController @ 60 Hz, which keeps
-	# local prediction, server reconciliation, and remote interpolation on one
-	# consistent tick cadence.
-	_update_inputs()
+	if Input.is_action_pressed("debug"):
+		print("the position of the balll in the client is: ", ball_scene.position)
+	#if  Input.is_action_just_pressed("tackle"): print("tackle input was detected in physics process")
+	#var inputs := _gather_input()
+	#_send_local_input(inputs)
+	#_perf_tick(delta)
+	_update_inputs() 
+	_input_accum += delta
+	var step: float = 1.0 / NET_INPUT_HZ
+	while _input_accum >= step:
+		_input_accum -= step
+		_send_local_input()
+		_reset_inputs()
 func _shoot_action() -> String:
 	return "shoot_touch" if is_mobile else "shoot"
 func _update_inputs() -> void:
@@ -923,12 +932,12 @@ func _on_server_started() -> void:
 func _on_joined_server() -> void:
 	print("Client joined server.")
 	
-func _on_peer_joined(id: int) -> void:
+func _on_peer_joined(id: int, rosters) -> void:
 	print("Peer joined: ", id)
 	if multiplayer.is_server():
 		if GameState.is_dedicated_server() and id == 1:
 			return  # never spawn the dedicated server as a player
-		_spawn_player_for2(id)
+		_spawn_player_for2(id, rosters)
 
 
 func on_peer_joined(id: int) -> void:
@@ -974,9 +983,8 @@ func _spawn_player_for(id: int) -> void:
 		# Tell only that client to attach their camera to this player
 	_notify_client_to_attach_camera(p, id)
 		# Focus camera if this is *our* player on this machine
-		#_focus_camera_on_player(p, id)
 
-func _spawn_player_for2(id: int) -> void:
+func _spawn_player_for2(id: int, rosters) -> void:
 	if !multiplayer.is_server():
 		return
 
@@ -1011,6 +1019,8 @@ func _spawn_player_for2(id: int) -> void:
 	# store player_path back into roster (server-side)
 	if GameState.roster.has(id):
 		GameState.roster[id]["player_path"] = p.get_path()
+	rosters[id]["player_path"] = p.get_path()
+	rosters[id]["node_id"] = p.owner_peer_id
 
 	print("Spawned/registered player for peer ", id,
 		" (bot=", rec.get("is_bot", false),
@@ -1056,7 +1066,6 @@ func _spawn_players() -> void:
 			# Tell only that client to attach their camera to this player
 		_notify_client_to_attach_camera(p, id)
 			# Focus camera if this is *our* player on this machine
-			#_focus_camera_on_player(p, id)
 
 # -------------------------
 # Input → server
@@ -1126,7 +1135,7 @@ func _gather_input() -> Dictionary:
 	"shoot_up": shoot_up,
 	"rmb": aim_pressed,
 	"facing": facing,
-	"aim_position": _my_player.get_aim_arrow_position() if _my_player and shoot_edge_latched else null,
+	"aim_position": net.p_controller.player.get_aim_arrow_position() if net.p_controller.player and shoot_edge_latched else null,
 	"cam_yaw": yaw,
 	"assist_pass_pressed": assist_pass_edge_latched,
 	"latch_toggle": latch_edge_latched,
@@ -1138,18 +1147,21 @@ func _gather_input() -> Dictionary:
 
 
 func _send_local_input() -> void:
+	if GameState.is_dedicated_server():
+		return
 	if multiplayer.multiplayer_peer == null:
 		return
 
 	var d := _gather_input()
-	d["id"] = multiplayer.get_unique_id()
-	d["action_seq"] = _next_action_seq
-	_next_action_seq += 1
+	if d.get("jump_pressed"):
+		print("jumpring")
+	d["id"] = net.p_controller.id
+	var player = net.p_controller.player
 
 	# ✅ IMPORTANT: also feed local player immediately on this machine
 	# so client-side code (_ability.client_tick, UI, etc.) can react instantly.
-	if is_instance_valid(_my_player) and _my_player.has_method("apply_net_input"):
-		_my_player.apply_net_input(d)
+	if is_instance_valid(player) and player.has_method("apply_net_input"):
+		player.apply_net_input(d)
 
 	if multiplayer.is_server():
 		if _players.has(1):
@@ -1160,8 +1172,7 @@ func _send_local_input() -> void:
 					print("PLAYER: got ability_action1 (server=", multiplayer.is_server(), ")")
 
 	else:
-		# One-shot gameplay edges (notably shoot_up) must arrive once and in order.
-		StateHandler.send_data_id_reliable(NetCodes.Msg.DISCRETE_INPUTS, d)
+		StateHandler.send_data({"message":NetCodes.Msg.DISCRETE_INPUTS,"value" : d})
 
 @rpc("any_peer")
 func _rpc_client_input(from_id: int, d: Dictionary) -> void:
@@ -1234,15 +1245,7 @@ func _rpc_attach_cam(player_path: NodePath, _unused_joystick_path: NodePath, bal
 		#p.call_deferred("attach_camera", cam, joystick)
 
 
-func _focus_camera_on_player(p: Node, peer_id: int) -> void:
-	# Find your camera (adjust the path/group/name to your project)
-	var my_id := multiplayer.get_unique_id()
-	# If this world.gd is running on the same machine that should see the camera,
-	# do it locally; otherwise, tell that specific client to do it.
-	if my_id == peer_id:
-		_enable_local_view_now(p)
-	else:
-		rpc_id(peer_id, "_rpc_enable_local_view", p.get_path())
+
 func _enable_local_view_now(p: Node) -> void:
 	# mark for convenience if you want in Player.gd
 	p.add_to_group("LocalPlayer")
@@ -1271,14 +1274,7 @@ func _rpc_client_receive_facing_snapshots(snapshots: Dictionary) -> void:
 	# Forward to client-only helper
 	net.on_recieving_snapshots(snapshots)
 
-@rpc("any_peer", "call_local")
-func _rpc_enable_local_view(player_path: NodePath) -> void:
-	#_log_pid("in rpc enabble local view now")
-	var p := get_node_or_null(player_path)
-	if p:
-		_enable_local_view_now(p)
-	else:
-		print("there is no player scene attached in the player_path when in rpc enable local view now")
+
 func _on_ball_out_of_bounds(body: Node) -> void:
 	if !multiplayer.is_server():
 		return

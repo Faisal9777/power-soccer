@@ -10,6 +10,7 @@ var _peers_ready := 0
 var _is_also_player := false
 var _game : Node
 var _client_game : Node
+var _net_objects : Array
 var GameClient := load("res://scripts/multiplayer/game_client.gd")
 var p_controller : LocalController
 var controllers : Array = []
@@ -37,6 +38,7 @@ func start_init(players: Dictionary,
 	red_spawns: Node3D,
 	ball_spawn: Node3D,
 	ball_scene: Node3D,
+	net_objects,
 	match_len_sec: int,
 	goal_limit: int,
 	roster: Dictionary,
@@ -46,6 +48,7 @@ func start_init(players: Dictionary,
 	ball = ball_scene
 	GameState.is_paused = false   # <-- added: world_client.gd's init() does this, start_init() never did
 
+	_net_objects = net_objects
 	if GameState.roster.has(1):
 		_is_also_player = true
 	_players = players
@@ -66,17 +69,18 @@ func start_init(players: Dictionary,
 	if _is_also_player:
 		_peers_ready +=1
 		_client_game = NodeUtils.create_game_client(self, GameClient, "GameClient", ingame, score_board, controllers)
-	for pid in roster.keys():
-		if roster[pid].get("is_bot", false):
-			_peers_ready += 1
-	_network_endpoint.rpc(NetCodes.Rpc.INPUT_STREAM, NetCodes.Msg.INIT_BEGIN, data)
-	_check_start_game()
+	StateHandler.send_data({"message" : NetCodes.state_message.CHANGE_STATE,"value" : {"state" : NetCodes.States.WORLD,"state_data" : roster}})
 
-func handle_data(msg, value):
+func handle_data(val):
+	var msg = val.get("message")
+	var value = val.get("value")
 	if msg == NetCodes.Msg.INPUTS:
 		process_input_by_id(value["id"], msg, value)
 	elif msg == NetCodes.Msg.DISCRETE_INPUTS:
-		_client_discrete_input(value["id"], value)
+		_client_discrete_input(value)
+	elif msg == NetCodes.state_message.PLAYER_RECONNECT:
+		var id = value.get("id")
+		StateHandler.send_data_id(id, {"message":NetCodes.state_message.CHANGE_STATE, "value":{"state" : NetCodes.States.WORLD, "state_data" : GameState.roster}})
 
 func process_input_by_id(peer_id: int, msg, cmd : Dictionary) -> void:
 	var idx = controllers.find_custom(
@@ -100,18 +104,18 @@ func process_input_by_id(peer_id: int, msg, cmd : Dictionary) -> void:
 func process_input_dictionary(msg: int, value : Dictionary) -> void:
 	#print("the msg recieved in receive_network_input_dictionary is: ", msg)
 	if msg == NetCodes.Msg.INIT_DONE:
-		_peers_ready += 1
-		print("[INIT] got INIT_DONE, _peers_ready=", _peers_ready, " / roster.size()=", GameState.roster.size())
-		_check_start_game()
-
-func _check_start_game() -> void:
-	print("[INIT] check: _peers_ready=", _peers_ready, " roster.size()=", GameState.roster.size(), " can_process=", can_process)
-	if _peers_ready == GameState.roster.size() and not can_process:
-		_game.game_reset.connect(_on_game_reset)
-		_game.start_game(get_parent())
-		LoadingUI.hide_loading()
-		broadcast_id = TaskScheduler.schedule(60, _broadcast_snapshots)
-		can_process = true
+		if _game and _game.is_in_game():
+			var snap = _game.get_game_snapshot()
+			StateHandler.send_data_id(value["id"], {"message":NetCodes.Msg.GAME_BEGIN, "value":snap})
+		else:
+			_peers_ready += 1
+			#print("_peers_ready: ", _peers_ready)
+			if _peers_ready == GameState.roster.size():
+				_game.game_reset.connect(_on_game_reset)
+				_game.start_game(get_parent())
+				LoadingUI.hide_loading()
+				broadcast_id = TaskScheduler.schedule(60, _broadcast_snapshots)
+				can_process = true
 
 func get_node_track() -> Node3D:
 	return
@@ -157,6 +161,14 @@ func _simulate_remote_players(delta) -> void:
 func _broadcast_snapshots() -> void:
 	if not can_process:
 		return
+	
+	var snapshots := { "players":_get_snapshot()}
+	for net_obj in _net_objects:
+		snapshots[net_obj.name] = net_obj.get_snapshot()
+	var data = {"message" : NetCodes.Msg.SNAPSHOTS, "value" : snapshots}
+	StateHandler.send_data(data)
+
+func _get_snapshot() -> Dictionary:
 	var snapshots := {}
 
 	for controller in controllers:
@@ -164,32 +176,62 @@ func _broadcast_snapshots() -> void:
 		snapshot["server_tick"] = _server_tick
 		snapshot["ack_input_seq"] = controller.input_buffer.get_last_processed_seq()
 		snapshots[controller.id] = snapshot
+	
+	if Input.is_action_just_pressed("jump"):
+		print("the players snapshot from the server is when jump is pressed")
+	
+	#snapshots["game_state"] = _game.current_state
+	return snapshots
 
-	snapshots["game_state"] = _game.current_state
-	StateHandler.send_movement(NetCodes.Msg.SNAPSHOTS, snapshots)
-
-func _client_discrete_input(from_id: int, d: Dictionary) -> void:
-	var action_seq := int(d.get("action_seq", -1))
-	if action_seq >= 0:
-		var last_action_seq := int(_last_action_seq_by_peer.get(from_id, -1))
-		if action_seq <= last_action_seq:
-			return
-		_last_action_seq_by_peer[from_id] = action_seq
+func _client_discrete_input(d: Dictionary) -> void:
+	var from_id = d.get("id")
 	if d.get("grapple_toggle", false):
 		print("World got grapple toggle from ", from_id)
-	if _players.has(from_id):
-		#print("_rpc_client_input2")
-		var p: CharacterBody3D = _players[from_id]
-		if p and p.has_method("apply_net_input"):
-			#print("_rpc_client_input3")
-			p.apply_net_input(d)
 
-func _build_player_paths() -> Dictionary:
-	var paths := {}
-	for peer_id in _players.keys():
-		var p: Node = _players[peer_id]
-		paths[peer_id] = p.get_path()  # NodePath
-	return paths
+	var c_id = ArrayUtils.find(controllers, from_id)
+	if c_id == -1:
+		return
+
+	var controller = controllers[c_id]
+	var player = controller.player
+	if controller and player and player.has_method("apply_net_input"):
+		if d.get("jump_pressed"):
+			print("jumpring")
+		player.apply_net_input(d)
+
+func _client_discrete_input_logs(from_id: int, d: Dictionary) -> void:
+	print("---- [_client_discrete_input] called ----")
+	print("[LOG] from_id: ", from_id)
+	print("[LOG] input dict: ", d)
+
+	if d.get("grapple_toggle", false):
+		print("[LOG] grapple_toggle == true")
+		print("World got grapple toggle from ", from_id)
+	else:
+		print("[LOG] grapple_toggle == false or absent")
+
+	var c_id = ArrayUtils.find(controllers, from_id)
+	print("[LOG] ArrayUtils.find(controllers, from_id) -> c_id = ", c_id)
+
+	if c_id == -1:
+		print("[LOG] no controller found for from_id=", from_id, " — aborting")
+		return   # no controller for this id — see guard note below
+
+	var controller = controllers[c_id]
+	print("[LOG] resolved controller: ", controller)
+
+	var player = controller.player
+	print("[LOG] controller.player: ", player)
+
+	if controller and player.has_method("apply_net_input"):
+		print("[LOG] player has apply_net_input — calling it now")
+		player.apply_net_input(d)
+		print("[LOG] apply_net_input call completed")
+	else:
+		print("[LOG] SKIPPED apply_net_input — controller null? ", controller == null, " | player has method? ", player.has_method("apply_net_input") if player else "player is null")
+
+	print("---- [_client_discrete_input] end ----")
+
 
 func _player_controller_setup(rosters : Dictionary, ball : Node, joystick: Node, controllers) -> void:
 	for k in rosters.keys():
@@ -205,7 +247,7 @@ func _player_controller_setup(rosters : Dictionary, ball : Node, joystick: Node,
 		var node := get_node_or_null(ppath)
 		if peer_id == multiplayer.get_unique_id():
 			var player = get_node(ppath)
-			var cam = get_node_or_null("/root/World/Scene/Camera3D") as Camera3D
+			var cam = get_node_or_null(ObjectPath.CAMERA) as Camera3D
 			cam.init(node, joystick)
 			var input_source = NodeUtils.init_input_source(self)
 			var input_buffer = LocalInputBuffer.new(input_source)
@@ -224,26 +266,6 @@ func _player_controller_setup(rosters : Dictionary, ball : Node, joystick: Node,
 
 		if node != null:
 			_players[k] = node
-
-
-
-#func _update_local_player_states(delta : float) -> void:
-	#for peer_id in _players_input.keys():
-		#var player := _players[peer_id]
-		#var buf: Dictionary = _players_input[peer_id]
-#
-		#var next_seq := int(last_server_seq.get(peer_id, -1)) + 1
-		#
-		##print("next seq: ", next_seq)
-		##print("buffer; ", buf)
-		#if buf.has(next_seq):
-			#var input := buf[next_seq] as Dictionary
-			#buf.erase(next_seq)  # remove the one we just applied
-			#player.update_player_states(input, delta)
-			#last_server_seq[peer_id] = next_seq
-		#else:
-			## no next input yet -> do nothing for now (later: hold last / idle)
-			#pass
 
 
 func _on_peer_left(id : int) -> void:

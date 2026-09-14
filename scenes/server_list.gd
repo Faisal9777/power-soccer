@@ -32,6 +32,12 @@ var filter_public := true
 
 var filter_has_players := false
 
+func handle_data(data):
+	var msg = data.get("message")
+	if msg == NetCodes.state_message.CHANGE_STATE:
+		var state_info = data.get("value")
+		StateHandler.change_state(state_info.get("state"), state_info.get("state_data"))
+
 func _ready():
 	session_node = await SessionManager.create_client_session(SCRIPT_PATHS.CLIENT_SESSION)
 	#_populate_server_list()
@@ -40,6 +46,7 @@ func _ready():
 	session_node.rejected.connect(_on_rejected)
 
 	session_node.start_discovery()
+	StateHandler.register_state(self)
 	filter_options.visible = false
 
 	if AuthManager.is_guest():

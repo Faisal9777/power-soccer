@@ -46,9 +46,13 @@ var ABILITY_NAME := {
 	"grapple": "Grapple",
 }
 
-func handle_data(msg, data):
+func handle_data(data):
+	var msg = data.get("message")
 	if multiplayer.is_server():
-		_handle_lobby_action(msg, data)
+		_handle_lobby_action(msg, data.get("value"))
+	if msg == NetCodes.state_message.CHANGE_STATE:
+		var state_info = data.get("value")
+		StateHandler.change_state(state_info.get("state"), state_info.get("state_data"))
 
 func _get_ability_id(e: Dictionary) -> String:
 	return String(e.get("ability", "grapple"))
@@ -438,6 +442,9 @@ func _update_start_enabled() -> void:
 func _handle_lobby_action(msg, data):
 	if msg == NetCodes.Lobby_action.READY:
 		GameState.roster[data.get("id")]["ready"] = data.get("value")
+	elif msg == NetCodes.state_message.PLAYER_CONNECT:
+		var id = data.get("id")
+		StateHandler.send_data_id(id, {"message":NetCodes.state_message.CHANGE_STATE, "value":{"state" : NetCodes.States.LOBBY}})
 
 
 func _submit_name_to_host() -> void:
@@ -453,7 +460,8 @@ func _on_ready_toggle() -> void:
 	if multiplayer.is_server():
 		_handle_lobby_action(NetCodes.Lobby_action.READY, action_val)
 	else:
-		StateHandler.send_data_id(NetCodes.Lobby_action.READY, action_val)
+		var payload = {"message" : NetCodes.Lobby_action.READY, "value" : action_val}
+		StateHandler.send_data(payload)
 	_refresh_ui()
 	_update_start_enabled()
 
@@ -679,9 +687,6 @@ func _try_start_match() -> void:
 		return
 	for pid in GameState.roster.keys():
 		GameState.roster[pid]["ready"] = false
-	if multiplayer.is_server():
-		SessionManager.session_node.change_state(NetCodes.States.WORLD)
-	rpc("_rpc_start_match", WORLD_SCENE)
 	SessionManager.change_state(NetCodes.States.WORLD)
 
 func _broadcast_lobby_state() -> void:

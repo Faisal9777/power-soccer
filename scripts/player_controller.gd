@@ -48,8 +48,7 @@ scheduler : JobScheduler):
 func _process_interval():
 	if GameState.is_paused:
 		return
-	var value := {"inputs" : _pending_inputs.duplicate()}
-	network.submit_input(value)
+	network.submit_input(_pending_inputs.duplicate())
 
 func physics_tick(delta: float) -> void:
 	if Input.is_action_pressed("debug"):
@@ -57,7 +56,12 @@ func physics_tick(delta: float) -> void:
 	if can_process:
 		if is_instance_valid(player):
 			_reconcile_player(player)
-			process_input(_fixed_dt)
+			process_input(delta)
+			player._local_physics_process(delta)
+
+func process_tick(delta: float) -> void:
+	if can_process:
+		player._local_process(delta)
 
 func process_input(delta):
 	if GameState.is_paused:
@@ -106,8 +110,7 @@ func _reconcile_player(me : Node) -> void:
 
 # player_controller.gd — in _reconcile_local_best_practice(), right after freeze(snap["is_frozen"])
 func _reconcile_local_best_practice(p: Node3D, snap: Dictionary) -> void:
-	var pre_reconcile_origin: Vector3 = p.global_position
-
+	# --- B) apply authoritative snap (server state) ---
 	if p.has_method("apply_snapshot"):
 		p.apply_snapshot(snap)
 	else:

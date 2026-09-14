@@ -4,6 +4,14 @@ class_name NetCodes
 # Bump this if you change ids in a breaking way
 const PROTOCOL_VERSION := 1
 
+enum session_message {
+	REGISTER_PEER = 7,
+	REGISTRATION_COMPLETE = 8,
+	SESSION_DATA = 12,
+	SCENE_ACTION = 13,
+	REJECT = 14,
+}
+
 enum Msg {
 	INIT_BEGIN = 1,
 	INIT_DONE  = 2,
@@ -11,14 +19,9 @@ enum Msg {
 	SET_PLAYERS   = 4,
 	GAME_BEGIN       = 5,
 	GAME_END       = 6,
-	REGISTER_PEER = 7,
-	REGISTRATION_COMPLETE = 8,
 	SNAPSHOTS = 9,
 	ROUND_START = 10,
 	INPUTS = 11,
-	STATE_DATA = 12,
-	SCENE_ACTION = 13,
-	REJECT = 14,
 	DISCRETE_INPUTS = 15,
 	AUTH_REQUEST = 16,
 	AUTH_OK = 17,
@@ -41,11 +44,23 @@ enum MatchAction {
 }
 
 enum States {
-	SESSION = -1,
+	STATE = -1,
 	TITLE = 0,
 	LOBBY = 1,
 	WORLD = 2,
 	SCOREBOARD = 3
+}
+
+enum message {
+	SESSION = -1,
+	STATE = 0
+}
+
+enum state_message {
+	PLAYER_RECONNECT = 17,
+	CHANGE_STATE = 0,
+	STATE = 1,
+	PLAYER_CONNECT = 18
 }
 
 enum ResponseType{

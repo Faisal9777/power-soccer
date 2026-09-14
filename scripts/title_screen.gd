@@ -31,6 +31,13 @@ var _is_public : bool
 
 const LOBBY_SCENE := "res://scenes/Lobby.tscn"
 
+func handle_data(data):
+	var msg = data.get("message")
+	if msg == NetCodes.state_message.CHANGE_STATE:
+		var state_info = data.get("value")
+		StateHandler.change_state(state_info.get("state"), state_info.get("state_data"))
+
+
 func _ready() -> void:
 	GameState.player_name = Settings.player_name
 	var args := OS.get_cmdline_args()
@@ -98,6 +105,7 @@ func _ready() -> void:
 	# Network callbacks while we are on the title screen
 	Network.connection_failed.connect(_on_connection_failed)
 	Network.server_disconnected.connect(_on_server_disconnected)
+	StateHandler.register_state(self)
 
 func _get_arg_value2(flag: String, args: Array) -> String:
 	var prefix := flag + "="
@@ -351,7 +359,8 @@ func _on_create_server_with_data(name: String, is_public: bool) -> void:
 	# Start ENet server and go to lobby
 	GameState.player_name = Settings.player_name
 	GameState.id = 1
-	GameState.roster[1] = {"name": GameState.player_name, "ready": false, "team": GameState.Team.BLUE} # team optional
+	GameState.roster[1] = {"name": GameState.player_name, "ready": false,
+	"is_active" : true, "user_id" : GameState.user_id} # team optional
 	
 	var lan := get_lan_ip()
 	print("Hosting on UDP 24565, LAN IP =", lan)

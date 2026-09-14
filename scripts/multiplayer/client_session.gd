@@ -17,7 +17,7 @@ var server_id := 1
 var sync : Node
 var ENDPOINTS = preload("res://scripts/shared/endpoints.gd")
 const C = preload("res://scripts/shared/scene.gd")
-const REQUEST_TIMEOUT_MS = 30.0  # seconds
+const REQUEST_TIMEOUT_MS = 3000.0  # seconds
 var client_password
 
 var _timeout_timer: SceneTreeTimer = null
@@ -60,8 +60,9 @@ func change_state(state_info: int):
 	if state_info == NetCodes.States.SCOREBOARD:
 		scene_data["next_scene"] = NetCodes.States.LOBBY
 
-func send_data_id(msg, value):
-	sync.send_data_id(server_id, msg, value)
+func send_data(value):
+	var val = {"message" : NetCodes.message.STATE, "value" : {"value":value}}
+	sync.send_data_id(server_id, val)
 
 func send_data_id_reliable(msg, value):
 	sync.send_data_id_reliable(server_id, msg, value)
@@ -97,7 +98,7 @@ func join(server_info, password):
 
 	Network.join(ip, port)
 
-func handle_data(msg, data):
+func handle_data(data):
 	if data is PackedByteArray:
 		StateHandler.handle_data(msg, data, current_scene)
 		return
@@ -116,14 +117,17 @@ func handle_data(msg, data):
 	if msg == NetCodes.Msg.REJECT:
 		var message = data.get("message", "")
 		rejected.emit(message)
-	var state = data.get("state")
-	if state == NetCodes.States.SESSION:
-		if msg == NetCodes.Msg.STATE_DATA:
-			GameState.roster = data["roster"]
-		elif msg == NetCodes.Msg.REGISTRATION_COMPLETE:
-				_cl_sync_roster(data)
+	var msg = data.get("message")
+	var value = data.get("value")
+	var action = value.get("action")
+	if msg == NetCodes.message.SESSION:
+		if action == NetCodes.session_message.SESSION_DATA:
+			GameState.roster = value.get("roster")
+		elif action == NetCodes.session_message.REGISTRATION_COMPLETE:
+				_cl_sync_roster(value)
 	else:
-		StateHandler.handle_data(msg, data, state)
+		StateHandler.handle_data(value.get("value"))
+
 func disconnect_connection() -> void:
 	_disconnect()
 
@@ -151,6 +155,9 @@ func _on_request_timeout() -> void:
 
 
 func _on_server_found(info):
+	var res = info.get("response")
+	if res == NetCodes.ResponseType.REJOIN:
+		print("Found lobby which was left")
 	server_found.emit(info)
 
 func _on_discovery_failed(info):
@@ -164,13 +171,8 @@ func _on_joined_server(s):
 	Network.connection_failed.connect(_on_connection_failed)
 	Network.server_disconnected.connect(_on_server_disconnected)
 	is_connected = true
-	var payload := {
-		"name" : Settings.player_name,
-		"id" : multiplayer.get_unique_id(),
-		"state" : NetCodes.States.SESSION,
-		"user_id" : GameState.user_id,
-		"session_token": AuthManager.session_token
-	}
+	var payload := {"name" : Settings.player_name, "id" : multiplayer.get_unique_id(),
+	"state" : NetCodes.States.SESSION, "user_id" : GameState.user_id}
 	sync = s
 	sync.send_data_id(1, NetCodes.Msg.REGISTER_PEER, payload)
 	
@@ -208,7 +210,7 @@ func _disconnect() -> void:
 func _cl_sync_roster(server_info):
 	BlockingOverlay.hide()
 	server_id = server_info.get("server_id", 1)
-	StateHandler.on_connected_to_server(server_info)
+	#StateHandler.on_connected_to_server(server_info)
 	stop_discovery()
 
 func _disconnect_from_events():
