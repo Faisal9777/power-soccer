@@ -26,7 +26,10 @@ func process_input(delta):
 	if is_mobile and is_instance_valid(joystick):
 		input["mvx"] = joystick.vector.x
 		input["mvz"] = joystick.vector.y
-		input["move_magnitude"] = joystick.mag
+
+		var mag := clampf(joystick.mag, 0.0, 1.0)
+		input["sprint"] = joystick.is_sprinting
+		input["move_magnitude"] = 1.0 if input["sprint"] else mag
 
 		# IMPORTANT: get camera yaw BEFORE movement is calculated
 		if is_instance_valid(cam) and cam.has_method("get_cam_yaw"):
@@ -69,7 +72,15 @@ func _init(p_player, pid, p_name, team, c_cam, ball, joystick, i_buffer : InputB
 	cam.set_rotation_source(self)
 	self.joystick = joystick
 
+	if p_player and p_player.has_method("attach_camera"):
+		p_player.attach_camera(c_cam, joystick)
+
 	super._init(p_player, pid, p_name, team, ball, i_buffer)
+
+	# Now that super._init() has set `player`, apply FP/TP visibility.
+	# This covers both the host (listen-server) and regular clients.
+	if is_instance_valid(cam) and cam.has_method("_apply_fp_tp_self_visibility"):
+		cam._apply_fp_tp_self_visibility()
 
 func _get_player_movement(input) -> Dictionary:
 	if _paused:
@@ -105,7 +116,6 @@ func _generate_facing_direction_with_input(input) -> void:
 		return
 	if typeof(input) != TYPE_DICTIONARY or input == null:
 		return
-
 	if input.has("yaw") and input.has("pitch"):
 		look_yaw = float(input["yaw"])
 		look_pitch = clamp(float(input["pitch"]), min_pitch, max_pitch)
@@ -114,8 +124,9 @@ func _generate_facing_direction_with_input(input) -> void:
 	if is_mobile:
 		return
 
-	if input.get('rmb'):
-		# Direction FROM camera TO target
+	var aiming = is_instance_valid(cam) and cam.has_method("is_aim_mode_active") and cam.is_aim_mode_active()
+
+	if aiming:
 		var dir : Vector3 = (w_ball.global_position - player.global_position).normalized()
 		look_yaw = atan2(-dir.x, -dir.z)
 		look_pitch = clamp(

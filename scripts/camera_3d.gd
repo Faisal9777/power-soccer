@@ -10,7 +10,7 @@ extends Camera3D
 @export var distance: float = 0.0          # ✅ start in first-person
 @export var min_distance: float = 0.0      # FP distance
 @export var max_distance: float = 10.0
-@export var goal_third_person_distance: float = 6.0  # TP distance when toggled
+@export var goal_third_person_distance: float = 3.0  # TP distance when toggled
 
 @export var invert_y: bool = false
 @export var follow_speed: float = 12.0
@@ -23,13 +23,12 @@ extends Camera3D
 var rotation_manager : LocalController
 
 var _look_touch_id: int = -1
+@onready var aim_joystick: Control = get_node_or_null("/root/World/CanvasLayer/UI/AimJoyStick") as Control
 
 @export var lead_factor: float = 0.0   # (not used yet) try 0.1..0.25 to lead targets slightly
 
 var _dy_accum: float = 0.0    # yaw delta since last read
 var _dp_accum: float = 0.0    # pitch delta since last read
-@export var self_layer_ui: int = 19
-var _self_layer_mask: int
 var _aim_mode: bool = false
 var _target: Node3D
 var _follow_target: Node3D
@@ -47,7 +46,6 @@ var _is_frozen := false
 @export var front_is_plus_z: bool = true
 var is_debugging := false
 func _ready() -> void:
-	_self_layer_mask = 1 << (self_layer_ui - 1)
 	_target = get_node_or_null(target_path)
 	_target_ball = get_node_or_null("Ball")
 	activate()
@@ -87,6 +85,7 @@ func set_joystick(n: Control) -> void:
 
 func set_rotation_source(r_manager : LocalController) -> void:
 	rotation_manager = r_manager
+	_apply_fp_tp_self_visibility()
 
 # ----------------------------
 # Activation / Deactivation API
@@ -108,6 +107,16 @@ func _touch_on_joystick(pos: Vector2) -> bool:
 		var g_pos := joystick.global_position
 		var g_scale := joystick.get_global_transform().get_scale()
 		var g_size := Vector2(joystick.size.x * abs(g_scale.x), joystick.size.y * abs(g_scale.y))
+		var margin := 24.0
+		var rect := Rect2(g_pos - Vector2(margin, margin), g_size + Vector2(margin * 2.0, margin * 2.0))
+		return rect.has_point(pos)
+	return false
+
+func _touch_on_aim_joystick(pos: Vector2) -> bool:
+	if is_instance_valid(aim_joystick) and aim_joystick.is_visible_in_tree():
+		var g_pos := aim_joystick.global_position
+		var g_scale := aim_joystick.get_global_transform().get_scale()
+		var g_size := Vector2(aim_joystick.size.x * abs(g_scale.x), aim_joystick.size.y * abs(g_scale.y))
 		var margin := 24.0
 		var rect := Rect2(g_pos - Vector2(margin, margin), g_size + Vector2(margin * 2.0, margin * 2.0))
 		return rect.has_point(pos)
@@ -194,7 +203,7 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventScreenTouch:
 		var st := event as InputEventScreenTouch
 		if st.pressed:
-			if _touch_on_joystick(st.position):
+			if _touch_on_joystick(st.position) or _touch_on_aim_joystick(st.position):
 				return
 			if _look_touch_id == -1:
 				_look_touch_id = st.index
@@ -370,19 +379,16 @@ func set_first_person_view() -> void:
 	_apply_fp_tp_self_visibility()
 
 func _apply_fp_tp_self_visibility() -> void:
-	return
-	if distance <= 0.05:
-		# First person:
-		# hide player body
-		cull_mask &= ~RenderLayers.PLAYER_BODY_MASK
-	else:
-		# Third person:
-		# show player body
-		cull_mask |= RenderLayers.PLAYER_BODY_MASK
-
-	# Always show UI-related visuals
+	# Other players are always visible, FP or TP.
+	cull_mask |= RenderLayers.PLAYER_BODY_MASK
 	cull_mask |= RenderLayers.PLAYER_UI_MASK
 
+	# Hide/show my own body directly - true in third person, false in first person.
+	if is_instance_valid(rotation_manager):
+		var mesh := rotation_manager.get_body_mesh()
+		if is_instance_valid(mesh):
+			mesh.visible = distance > 0.05
+	
 func _compute_desired_camera_position(target_transform: Transform3D, fwd_3d: Vector3) -> Vector3:
 	var focus := (
 		target_transform.origin

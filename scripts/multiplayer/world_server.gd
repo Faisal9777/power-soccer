@@ -216,7 +216,7 @@ func _player_controller_setup(rosters : Dictionary, ball : Node, joystick: Node,
 			if world:
 				input_buffer.world_node = world
 			p_controller = LocalController.new(node, peer_id, name, team, cam, ball, joystick, input_buffer)
-			p_controller.get_body_mesh().visible = false
+			#p_controller.get_body_mesh().visible = false
 			controllers.append(p_controller)
 		else:
 			

@@ -1,16 +1,19 @@
 extends Control
 
-@export var radius: float = 110.0      # thumb travel in pixels inside this control
-@export var deadzone: float = 0.12     # 0..1 (fraction of radius)
+@export var radius: float = 110.0
+@export var deadzone: float = 0.12
+@export var overdrive_distance: float = 20.0
 
 # Public API
-var vector: Vector2 = Vector2.ZERO     # -1..1 (x,y), with y+=up (game-style)
-var dir: Vector2 = Vector2.ZERO        # unit direction (or ZERO if mag==0)
-var mag: float = 0.0                   # 0..1 how far the stick is pushed
+var vector: Vector2 = Vector2.ZERO
+var dir: Vector2 = Vector2.ZERO
+var mag: float = 0.0
 var is_active: bool = false
+var is_sprinting: bool = false
 
 var _touch_id: int = -1
-var _prev_mag: float = 0.0             # for change detection
+var _prev_mag: float = 0.0
+var _is_sprinting_previous: bool = false
 
 @onready var _knob: Control = ($Knob as Control) if has_node("Knob") else null
 @onready var _base: Control = ($Base as Control) if has_node("Base") else null
@@ -20,10 +23,9 @@ signal pressed()
 signal released()
 
 func _ready() -> void:
-	# Center visuals
 	if _knob:
 		_knob.pivot_offset = _knob.size * 0.5
-		_knob.position = size * 0.5
+		_knob.position = size * 0.5 - _knob.size * 0.5
 	if _base:
 		_base.position = Vector2.ZERO
 		_base.size = size
@@ -34,7 +36,7 @@ func _gui_input(event: InputEvent) -> void:
 		var mb := event as InputEventMouseButton
 		if mb.pressed:
 			if _touch_id == -1:
-				_claim_pointer(-1, mb.position)      # LOCAL pos
+				_claim_pointer(-1, mb.position)
 		else:
 			if _touch_id == -1:
 				_release_pointer()
@@ -42,7 +44,7 @@ func _gui_input(event: InputEvent) -> void:
 
 	if event is InputEventMouseMotion:
 		if _touch_id == -1 and is_active:
-			_update_vector((event as InputEventMouseMotion).position)  # LOCAL pos
+			_update_vector((event as InputEventMouseMotion).position)
 		return
 
 	# Touch (mobile)
@@ -50,7 +52,7 @@ func _gui_input(event: InputEvent) -> void:
 		var st := event as InputEventScreenTouch
 		if st.pressed:
 			if _touch_id == -1:
-				_claim_pointer(st.index, st.position)  # LOCAL pos
+				_claim_pointer(st.index, st.position)
 		else:
 			if st.index == _touch_id:
 				_release_pointer()
@@ -59,7 +61,7 @@ func _gui_input(event: InputEvent) -> void:
 	if event is InputEventScreenDrag:
 		var sd := event as InputEventScreenDrag
 		if sd.index == _touch_id:
-			_update_vector(sd.position)                # LOCAL pos
+			_update_vector(sd.position)
 		return
 
 func _claim_pointer(id: int, local_pos: Vector2) -> void:
@@ -73,8 +75,10 @@ func _release_pointer() -> void:
 	is_active = false
 	vector = Vector2.ZERO
 	dir = Vector2.ZERO
-	_prev_mag = mag
 	mag = 0.0
+	is_sprinting = false
+	_prev_mag = 0.0
+	_is_sprinting_previous = false
 	_move_knob(Vector2.ZERO)
 	vector_changed.emit(vector, mag)
 	released.emit()
@@ -82,35 +86,34 @@ func _release_pointer() -> void:
 func _update_vector(local_pos: Vector2) -> void:
 	var center: Vector2 = size * 0.5
 	var delta_local: Vector2 = local_pos - center
+	var v_raw := Vector2(delta_local.x, -delta_local.y)
+	var raw_length := v_raw.length()
+	var sprint_radius := radius + overdrive_distance
+	is_sprinting = raw_length >= sprint_radius
 
-	# Build a game-style vector where +Y is up (UI Y+ is down, so flip here)
-	var v: Vector2 = Vector2(delta_local.x, -delta_local.y)
-
-	# Clamp to radius in UI units, then convert to normalized stick output
-	if v.length() > radius:
-		v = v.normalized() * radius
+	var v := v_raw
+	if raw_length > radius:
+		v = v_raw.normalized() * radius
 
 	var new_mag := v.length() / radius
-	var out: Vector2 = (v / radius)  # now in -1..1
+	var out := v / radius
 
-	# Deadzone
 	if new_mag < deadzone:
 		out = Vector2.ZERO
 		new_mag = 0.0
+		is_sprinting = false
 
-	# Update public API
 	var magnitude_changed := not is_equal_approx(new_mag, _prev_mag)
-	if out != vector or magnitude_changed:
+	if out != vector or magnitude_changed or is_sprinting != _is_sprinting_previous:
 		vector = out
-		_prev_mag = mag
+		_prev_mag = new_mag
 		mag = new_mag
 		dir = (vector.normalized() if mag > 0.0 else Vector2.ZERO)
 		vector_changed.emit(vector, mag)
 
-	# Move knob (convert back to UI coords: UI Y+ is down → negate game Y)
+	_is_sprinting_previous = is_sprinting
 	_move_knob(v)
 
 func _move_knob(v_game_up: Vector2) -> void:
 	if _knob:
-		# v_game_up uses +Y = up; UI uses +Y = down → flip Y to place
-		_knob.position = (size * 0.5) + Vector2(v_game_up.x, -v_game_up.y)  
+		_knob.position = (size * 0.5) + Vector2(v_game_up.x, -v_game_up.y) - _knob.size * 0.5

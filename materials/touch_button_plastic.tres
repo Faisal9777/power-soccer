@@ -1,0 +1,10 @@
+[gd_resource type="ShaderMaterial" load_steps=2 format=3 uid="uid://bwkhx4l4sh1qs"]
+
+[ext_resource type="Shader" uid="uid://cpeewhlpsfq4s" path="res://Shaders/touch_button_plastic.gdshader" id="1_shader"]
+
+[resource]
+shader = ExtResource("1_shader")
+shader_parameter/body_alpha = 0.38
+shader_parameter/edge_alpha = 0.55
+shader_parameter/highlight_strength = 0.2
+shader_parameter/text_darkness = 0.55

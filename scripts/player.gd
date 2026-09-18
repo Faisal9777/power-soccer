@@ -126,15 +126,16 @@ var _ability_id: StringName = &"grapple"
 
 var _aim_az := 0.0      # yaw around the ball (left/right)
 var _aim_el := 0.0      # pitch around the ball (up/down)
+var _aim_release_timer := 0.0
 var _captured := true
 var _yaw_delta_accum: float = 0.0  # collected since last send
 var _pitch_delta_accum := 0.0
 var _yaw_abs: float = 0.0
 var _pitch_abs: float = 0.0
 var _is_frozen := true
-const SELF_LAYER_UI := 19                     # the checkbox number in the inspector
-const SELF_LAYER_MASK := 1 << (SELF_LAYER_UI - 1)  # convert 1..20 -> bit 0..19
-const WORLD_LAYER_MASK := 1 << 0   # Layer 1 (default / visible to camera)
+const SELF_LAYER_UI := RenderLayers.PLAYER_SELF
+const SELF_LAYER_MASK := RenderLayers.PLAYER_SELF_MASK
+const WORLD_LAYER_MASK := 1 << 0
 const EPS := 1e-6
 # --- Stamina runtime (authoritative on server; replicated to owner) ---
 var _stamina: float = 100.0
@@ -231,6 +232,10 @@ var _ui_charge := 0.0  # client-only visual charge
 @onready var ball_latch_anchor: Node3D = Node3D.new()
 @onready var is_mobile: bool = OS.has_feature("mobile")
 @onready var joystick: Node = null
+@onready var aim_joystick: Node = get_node_or_null("/root/World/CanvasLayer/UI/AimJoyStick")
+@export var aim_joy_az_max: float = deg_to_rad(110.0)   # max azimuth at full stick deflection
+@export var aim_hold_time: float = 2.0                   # seconds to hold the aim after releasing the stick
+@export var aim_return_ease: float = 0.05                 # how fast it eases back to center after that (lower = slower)
 # Add "tackle": 0.0 to the dictionary
 var _cooldowns := {"shoot": 0.0, "move": 0.0, "jump": 0.0, "tackle": 0.0, "assist_pass": 0.0}
 
@@ -292,6 +297,9 @@ func attach_camera(c: Camera3D, j: Node) -> void:
 		_mark_self_layer_recursive(self)  # ✅ move my visuals to SELF layer only
 		cam.current = true
 		cam.near = max(cam.near, 0.12)
+		# Re-apply visibility after layer reassignment so FP hides / TP shows the body.
+		if cam.has_method("_apply_fp_tp_self_visibility"):
+			cam._apply_fp_tp_self_visibility()
 
 # Aim the camera at a world position.
 # yaw_only=true keeps the camera level (no pitch); set false to let it tilt up/down.
@@ -448,7 +456,7 @@ func _mark_self_layer_recursive(n: Node) -> void:
 
 		if ch is VisualInstance3D:
 			var v := ch as VisualInstance3D
-			v.layers = (v.layers | SELF_LAYER_MASK) & ~WORLD_LAYER_MASK
+			v.layers = (v.layers | SELF_LAYER_MASK) & ~WORLD_LAYER_MASK & ~RenderLayers.PLAYER_BODY_MASK
 			v.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 		_mark_self_layer_recursive(ch)
@@ -514,6 +522,13 @@ func _ready() -> void:
 		Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 		_captured = true
 		_client_side_setup()
+		if is_instance_valid(aim_joystick):
+			aim_joystick.visible = false
+			if is_mobile and aim_joystick.has_signal("pressed"):
+				aim_joystick.pressed.connect(func():
+					_aim_az = 0.0
+					_aim_el = 0.0
+				)
 	# ⬇️ prevent taps-anywhere from triggering 'shoot'
 	if is_mobile:
 		var ev := InputEventMouseButton.new()
@@ -589,9 +604,13 @@ func _update_arrow_position(delta: float) -> void:
 	var ball := _resolve_ball() as RigidBody3D
 	if aim_arrow == null or ball == null or !is_instance_valid(ball) or !aim_active:
 		_show_arrow(false)
+		if is_mobile and is_instance_valid(aim_joystick) and aim_joystick.visible:
+			aim_joystick.visible = false
+			if aim_joystick.has_method("_release_pointer"):
+				aim_joystick._release_pointer()
+		_aim_release_timer = 0.0
 		return
 
-	# Live for owner, interpolated for others
 	var is_owner := (multiplayer.get_unique_id() == owner_peer_id)
 	var pxf: Transform3D = (global_transform if is_owner else get_global_transform_interpolated())
 	var bxf: Transform3D = ball.get_global_transform_interpolated()
@@ -599,31 +618,51 @@ func _update_arrow_position(delta: float) -> void:
 	var P: Vector3 = pxf.origin
 	var C: Vector3 = bxf.origin
 	var R: float   = _get_ball_radius(ball)
-	var contact: Vector3 = C  # RMB not held => center of ball
+	var contact: Vector3 = C  # not aiming => center of ball
 
-	if _is_aiming():
-		# RMB held: orbit on sphere via local azimuth/elevation (no camera rays)
+	# Mobile: the stick sets _aim_az/_aim_el directly (absolute position, not a
+	# rate control) while held, holds that aim for aim_hold_time after release,
+	# then eases back to center.
+	var mobile_orbiting := false
+	if is_mobile and is_instance_valid(aim_joystick):
+		aim_joystick.visible = true
+		if aim_joystick.is_active:
+			_aim_az = clamp(aim_joystick.vector.x, -1.0, 1.0) * aim_joy_az_max
+			_aim_el = clamp(clamp(-aim_joystick.vector.y, -1.0, 1.0) * aim_pitch_max, aim_pitch_min, aim_pitch_max)
+			_aim_release_timer = aim_hold_time
+			mobile_orbiting = true
+		elif _aim_release_timer > 0.0:
+			_aim_release_timer -= delta
+			mobile_orbiting = true
+		elif not (is_zero_approx(_aim_az) and is_zero_approx(_aim_el)):
+			var ease: float = 1.0 - pow(1.0 - aim_return_ease, maxf(delta * 60.0, 0.0))
+			_aim_az = lerp(_aim_az, 0.0, ease)
+			_aim_el = lerp(_aim_el, 0.0, ease)
+			if abs(_aim_az) < 0.001 and abs(_aim_el) < 0.001:
+				_aim_az = 0.0
+				_aim_el = 0.0
+			mobile_orbiting = true
+
+	if _is_aiming() or mobile_orbiting:
+		# RMB held (desktop), stick held (mobile), or still settling back to center
 		var pivot := get_node_or_null("AimPivot") as Node3D
 		var pivot_pos: Vector3 = pxf.origin
 		if is_instance_valid(pivot):
 			pivot_pos = (pivot.global_transform.origin if is_owner else pivot.get_global_transform_interpolated().origin)
 
-		# Orthonormal frame at ball, pointing toward player
-		var front: Vector3 = (pivot_pos - C).normalized()   # from ball → player
+		var front: Vector3 = (pivot_pos - C).normalized()
 		var up_ref: Vector3 = Vector3.UP
 		if abs(front.dot(up_ref)) > 0.98:
-			up_ref = Vector3(0, 0, 1)                       # fallback if almost parallel
+			up_ref = Vector3(0, 0, 1)
 		var right: Vector3 = up_ref.cross(front).normalized()
 		var up_s: Vector3 = front.cross(right).normalized()
 
-		# Rotate 'front' by azimuth around up_s, then elevation around right
 		var basis_az: Basis = Basis(up_s, _aim_az)
 		var basis_el: Basis = Basis(right, _aim_el)
 		var dir: Vector3 = ((basis_el * basis_az) * front).normalized()
 
 		contact = C + dir * R
 
-	# Smooth & draw
 	var smooth: float = 1.0 - pow(1.0 - 0.14, maxf(delta * 60.0, 0.0))
 	aim_contact = aim_contact.lerp(contact, clamp(smooth, 0.0, 1.0))
 	_arrow_origin_smoothed = _arrow_origin_smoothed.lerp(P, clamp(smooth, 0.0, 1.0))
@@ -1616,7 +1655,11 @@ func _get_ball_radius(ball: RigidBody3D) -> float:
 # Server uses a simple, camera-forward contact if no aim sent.
 
 func _is_aiming() -> bool:
-	return aim_active and Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)
+	if not aim_active:
+		return false
+	if is_mobile:
+		return is_instance_valid(aim_joystick) and aim_joystick.is_active
+	return Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)
 # KickArea hooks
 func _on_kick_area_body_entered(body: Node) -> void:
 	if not multiplayer.is_server():

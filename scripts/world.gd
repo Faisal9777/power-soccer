@@ -1,5 +1,6 @@
 extends Node
 
+const TOUCH_BUTTON_PLASTIC_MATERIAL := preload("res://materials/touch_button_plastic.tres")
 
 # --- Assign in the inspector or hardcode a PackedScene for clients that join ---
 @export var pause_btn: Button
@@ -9,6 +10,7 @@ extends Node
 @export var scoreboard_scene_path: String = "res://scenes/ScoreboardScene.tscn"
 @export var player_scene: PackedScene
 @export var bot_player_scene: PackedScene
+@export var camera_path: NodePath
 
 var _local_controller: LocalController
 var _player_controller: PlayerController
@@ -31,6 +33,10 @@ func _set_btn_tex(btn: Node, tex: Texture2D, fallback: Texture2D) -> void:
 		(btn as TextureButton).texture_normal = use_tex
 	elif btn is Button:
 		(btn as Button).icon = use_tex
+
+func _apply_plastic_shader_to_touch_buttons() -> void:
+	for node in find_children("*", "TouchScreenButton", true, false):
+		node.material = TOUCH_BUTTON_PLASTIC_MATERIAL
 
 
 var _grapple_crosshair_layer: CanvasLayer
@@ -105,7 +111,7 @@ var _tackle_cd_last_from_player: float = -999.0
 
 var assist_pass_edge_latched := false
 
-@onready var pass_btn: TouchScreenButton = $CanvasLayer/UI/ActionPad/Pass
+@onready var pass_btn: TouchScreenButton = $"CanvasLayer/UI/ActionPad/Pass"
 var _pass_cd_label: Label
 var _pass_cd_local: float = 0.0
 var _pass_cd_last_from_player: float = -999.0
@@ -121,7 +127,7 @@ func _ready() -> void:
 	replication_manager.name = "ReplicationManager"
 	add_child(replication_manager)
 	LoadingUI.show_loading()
-	_setup_desktop_canvas_ui()
+	#_setup_desktop_canvas_ui()
 
 	if multiplayer.is_server():
 		out_bounds.body_entered.connect(_on_ball_out_of_bounds)
@@ -139,6 +145,8 @@ func _ready() -> void:
 		score_btn.button_down.connect(_on_mobile_score_down)
 	if not score_btn.button_up.is_connected(_on_mobile_score_up):
 		score_btn.button_up.connect(_on_mobile_score_up)
+
+	_apply_plastic_shader_to_touch_buttons()
 	
 	_setup_team_position()
 	# If you didn't set the spawner in the editor, do it here:
@@ -882,7 +890,10 @@ func _process(delta: float) -> void:
 	if Input.is_action_just_pressed("join_key"):
 		if multiplayer.multiplayer_peer is ENetMultiplayerPeer:
 			print("Already connected (ENet)")
-	
+	if Input.is_action_just_pressed("debug_third"):
+		var _cam = get_node_or_null(camera_path)
+		if _cam.has_method("set_goal_third_person_view"):
+			_cam.call("set_goal_third_person_view")
 	_update_tackle_cooldown_ui(delta)
 	_update_pass_cooldown_ui(delta)
 

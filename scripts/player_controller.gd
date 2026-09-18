@@ -68,7 +68,10 @@ func process_input(delta):
 	if is_mobile and is_instance_valid(joystick):
 		input["mvx"] = joystick.vector.x
 		input["mvz"] = joystick.vector.y
-		input["move_magnitude"] = joystick.mag
+
+		var mag := clampf(joystick.mag, 0.0, 1.0)
+		input["sprint"] = joystick.is_sprinting
+		input["move_magnitude"] = 1.0 if input["sprint"] else mag
 
 		# Get camera orientation BEFORE movement prediction.
 		if is_instance_valid(cam):
