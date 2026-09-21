@@ -81,7 +81,7 @@ func process_input_dictionary(msg : int, value : Dictionary) -> void:
 		_game.end_game(value)
 	
 	elif msg == NetCodes.Msg.SNAPSHOTS:
-		_store_snapshots(_decode_snapshots(value) if value is PackedByteArray else value)
+		_store_snapshots(value)
 	elif msg == NetCodes.Msg.ROUND_START:
 		_game.start_game(value)
 	elif msg == NetCodes.state_message.CHANGE_STATE:
@@ -99,6 +99,7 @@ func register_player(peer_id: int, player: Node) -> void:
 	_players[peer_id] = player
 
 func submit_input(input):
+	#return
 	_send_network_id(_my_id, NetCodes.Msg.INPUTS, input)
 
 # ---------- Snapshot receive entry points ----------
@@ -140,20 +141,6 @@ func sync_init(value):
 	#ball = get_node_or_null(ball_path)
 	_evaluate_all_phases()
 
-func sync_init(value):
-	GameState.roster = value
-	server_data_completed = true
-	#var ball_path = value.get("ball_path")
-	#ball = get_node_or_null(ball_path)
-	_evaluate_all_phases()
-
-func sync_init(value):
-	GameState.roster = value
-	server_data_completed = true
-	#var ball_path = value.get("ball_path")
-	#ball = get_node_or_null(ball_path)
-	_evaluate_all_phases()
-
 
 func _ready() -> void:
 	StateHandler.register_state(self)
@@ -164,8 +151,6 @@ func _ready() -> void:
 
 # ---------- Main loop ----------
 func _physics_process(delta: float) -> void:
-	if Input.is_action_pressed("debug"):
-		_log_debug_state()
 	if GameState.is_paused and p_controller != null:
 		var neutral := {
 			"mouse_delta": Vector2.ZERO,

@@ -31,9 +31,6 @@ func send_data(value):
 func _ready() -> void:
 	LevelContainer.world_ready.connect(_on_world_node_ready)
 
-func _physics_process(delta: float) -> void:
-	if Input.is_action_pressed("debug"):
-		print("the user id of the current game is: ", GameState.user_id)
 
 func _change_state(state_info: int):
 	var scene_to_load = ""

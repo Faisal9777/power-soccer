@@ -28,12 +28,14 @@ func stop_process() -> void:
 	_scheduler.cancel(_task)
 
 func store_snapshot(snap) -> void:
-	if not snap.has("server_tick") or not snap.has("ack_input_seq"):
+	var seq = snap.get("seq", snap.get("last_server_seq", -1))
+	if not seq:
 		return
-	var server_tick := int(snap["server_tick"])
-	# Strict ordering prevents late or duplicate authoritative state from rewinding us.
-	if server_tick > _latest_local_snapshot_id:
-		_latest_local_snapshot_id = server_tick
+	var snap_id := int(seq)
+	#_calculate_offset_for_local_visual(peer_id, snap)
+	# Local player: keep ONLY newest snapshot
+	if snap_id >= _latest_local_snapshot_id:
+		_latest_local_snapshot_id = snap_id
 		_latest_local_snapshot = snap
 	
 
@@ -48,16 +50,14 @@ scheduler : JobScheduler):
 func _process_interval():
 	if GameState.is_paused:
 		return
+	#print("[pending] size=", _pending_inputs.size(), " t=", Time.get_ticks_msec())
 	network.submit_input(_pending_inputs.duplicate())
 
 func physics_tick(delta: float) -> void:
-	if Input.is_action_pressed("debug"):
-		print("position of the player: ", player.global_position)
 	if can_process:
 		if is_instance_valid(player):
 			_reconcile_player(player)
-			process_input(delta)
-			player._local_physics_process(delta)
+			super.physics_tick(delta)
 
 func process_tick(delta: float) -> void:
 	if can_process:
@@ -120,19 +120,12 @@ func _reconcile_local_best_practice(p: Node3D, snap: Dictionary) -> void:
 	look_yaw = snap.get("yaw", look_yaw)
 	look_pitch = snap.get("pitch", look_pitch)
 
-	var ack_input_seq := int(snap.get("ack_input_seq", -1))
-
-	# Only distrust our replay if the server hasn't even caught up to input WE
-	# discarded ourselves (cap overflow during a long spike). An ordinary skip
-	# in the server's ack just means it moved past a seq we still hold a
-	# complete, correct record of — replaying it is right, not risky.
-	if ack_input_seq < _truncated_up_to_seq:
-		_pending_inputs.clear()
+	var last_server_seq := int(snap.get("seq", -1))
 
 	var i := 0
 	while i < _pending_inputs.size():
 		var seq := int((_pending_inputs[i] as Dictionary).get("seq", -1))
-		if seq <= ack_input_seq:
+		if seq <= last_server_seq:
 			_pending_inputs.remove_at(i)
 		else:
 			i += 1
@@ -143,8 +136,6 @@ func _reconcile_local_best_practice(p: Node3D, snap: Dictionary) -> void:
 		look_yaw = cam.get_cam_yaw()
 		look_pitch = cam.get_cam_pitch()
 
-	var post_reconcile_origin: Vector3 = p.global_position
-	var error_delta: Vector3 = pre_reconcile_origin - post_reconcile_origin
-	on_reconciled.emit(error_delta, player.global_transform, bool(snap.get("bursting", false)))
+	#on_reconciled.emit(player.global_transform)
 func set_paused(state: bool) -> void:
 	super.set_paused(state)

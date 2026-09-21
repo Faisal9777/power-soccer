@@ -605,6 +605,7 @@ func _local_physics_process(delta: float) -> void:
 		#request_arrow_calculation()
 		#_handle_player_facing(delta)
 	_update_arrow_position(delta)
+	_local_process(delta)
 
 func _update_arrow_position(delta: float) -> void:
 	var ball := _resolve_ball() as RigidBody3D
@@ -733,6 +734,8 @@ func simulate_server(delta: float) -> void:
 
 	var mvx := float(_net.get("mvx", 0.0))
 	var mvz := float(_net.get("mvz", 0.0))
+	if Input.is_action_pressed("debug"):
+			print("simullate server in the player")
 
 	var has_movement := Vector2(mvx, mvz).length() > 0.01
 	var want_sprint := _btn_down("sprint")

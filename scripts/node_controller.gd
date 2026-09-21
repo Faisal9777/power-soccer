@@ -26,6 +26,7 @@ func _init(p_player, pid, p_name, p_team, ball, i_buffer : InputBuffer):
 	super._init(p_player, p_name, pid, p_team)
 
 func physics_tick(delta: float) -> void:
+	player._local_physics_process(delta)
 	process_input(delta)
 
 

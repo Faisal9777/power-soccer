@@ -815,12 +815,6 @@ func _server_begin_match(peer_ids: Array[int], rosters) -> void:
 		_on_peer_joined(id, rosters)  # your existing spawn path
 
 func _physics_process(delta: float) -> void:
-	if Input.is_action_pressed("debug"):
-		print("the position of the balll in the client is: ", ball_scene.position)
-	#if  Input.is_action_just_pressed("tackle"): print("tackle input was detected in physics process")
-	#var inputs := _gather_input()
-	#_send_local_input(inputs)
-	#_perf_tick(delta)
 	_update_inputs() 
 	_input_accum += delta
 	var step: float = 1.0 / NET_INPUT_HZ
@@ -1153,10 +1147,14 @@ func _send_local_input() -> void:
 		return
 
 	var d := _gather_input()
+	if d.get("shoot_up") or d.get("shoot_down"):
+		print('the shoot up is in the client side: ', d.get("shoot_up"))
+		print('the shoot down is in the client side: ', d.get("shoot_down"))
 	if d.get("jump_pressed"):
 		print("jumpring")
 	d["id"] = net.p_controller.id
 	var player = net.p_controller.player
+	
 
 	# ✅ IMPORTANT: also feed local player immediately on this machine
 	# so client-side code (_ability.client_tick, UI, etc.) can react instantly.

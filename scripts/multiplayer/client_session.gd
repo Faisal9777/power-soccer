@@ -62,14 +62,14 @@ func change_state(state_info: int):
 
 func send_data(value):
 	var val = {"message" : NetCodes.message.STATE, "value" : {"value":value}}
+	var value2 = value.get("value")
+	if value2.get("debug"):
+		print("send_data client session")
 	sync.send_data_id(server_id, val)
 
 func send_data_id_reliable(msg, value):
 	sync.send_data_id_reliable(server_id, msg, value)
 
-func send_data(msg, value):
-	value["state"] = current_scene
-	sync.send_data_all(msg, value)
 
 func host_cloud_server(name, is_public):
 	BlockingOverlay.show_overlay("Creating Server...") 
@@ -99,24 +99,7 @@ func join(server_info, password):
 	Network.join(ip, port)
 
 func handle_data(data):
-	if data is PackedByteArray:
-		StateHandler.handle_data(msg, data, current_scene)
-		return
 
-	if msg == NetCodes.Msg.AUTH_OK:
-		var payload := {
-			"name" : Settings.player_name,
-			"id" : multiplayer.get_unique_id(),
-			"state" : NetCodes.States.SESSION,
-			"user_id" : GameState.user_id,
-			"session_token": AuthManager.session_token
-		}
-		sync.send_data_id(1, NetCodes.Msg.REGISTER_PEER, payload)
-	if msg == NetCodes.Msg.AUTH_FAILED:
-		auth_failed.emit()
-	if msg == NetCodes.Msg.REJECT:
-		var message = data.get("message", "")
-		rejected.emit(message)
 	var msg = data.get("message")
 	var value = data.get("value")
 	var action = value.get("action")
@@ -125,6 +108,20 @@ func handle_data(data):
 			GameState.roster = value.get("roster")
 		elif action == NetCodes.session_message.REGISTRATION_COMPLETE:
 				_cl_sync_roster(value)
+		if action == NetCodes.Msg.AUTH_OK:
+			var payload := {
+				"name" : Settings.player_name,
+				"id" : multiplayer.get_unique_id(),
+				"action" : NetCodes.session_message.REGISTER_PEER,
+				"user_id" : GameState.user_id,
+				"session_token": AuthManager.session_token
+			}
+			sync.send_data_id(server_id, {"message" : NetCodes.message.SESSION, "value":payload})
+		if action == NetCodes.Msg.AUTH_FAILED:
+			auth_failed.emit()
+		if action == NetCodes.session_message.REJECT:
+			var message = data.get("message", "")
+			rejected.emit(message)
 	else:
 		StateHandler.handle_data(value.get("value"))
 
@@ -172,9 +169,9 @@ func _on_joined_server(s):
 	Network.server_disconnected.connect(_on_server_disconnected)
 	is_connected = true
 	var payload := {"name" : Settings.player_name, "id" : multiplayer.get_unique_id(),
-	"state" : NetCodes.States.SESSION, "user_id" : GameState.user_id}
+	"action" : NetCodes.session_message.REGISTER_PEER, "user_id" : GameState.user_id}
 	sync = s
-	sync.send_data_id(1, NetCodes.Msg.REGISTER_PEER, payload)
+	sync.send_data_id(1, {"message" : NetCodes.message.SESSION,"value":payload})
 	
 func _on_joined_private_server(s):
 	Network.connection_failed.connect(_on_connection_failed)
@@ -186,11 +183,11 @@ func _on_joined_private_server(s):
 		"id" : multiplayer.get_unique_id(),
 		"password": client_password,
 		"session_token": AuthManager.session_token,
-		"state" : NetCodes.States.SESSION, 
+		"action" :  NetCodes.Msg.AUTH_REQUEST,
 		"user_id" : GameState.user_id
 	}
 
-	sync.send_data_id(1, NetCodes.Msg.AUTH_REQUEST, payload)
+	sync.send_data_id(server_id, {"message" : NetCodes.message.SESSION, "value":payload})
 
 func _on_server_disconnected() -> void:
 	_disconnect()

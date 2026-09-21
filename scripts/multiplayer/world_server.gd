@@ -134,8 +134,8 @@ func _ready() -> void:
 
 
 func _physics_process(delta: float) -> void:
-	if Input.is_action_pressed("debug"):
-		_game._process_game_end()
+	#if Input.is_action_pressed("debug"):
+		#_game._process_game_end()
 	if can_process:
 		_server_tick += 1
 		_simulate_remote_players(delta)
@@ -171,10 +171,9 @@ func _broadcast_snapshots() -> void:
 func _get_snapshot() -> Dictionary:
 	var snapshots := {}
 
-	for controller in controllers:
+	for controller in controllers:  # your list of Player nodes on server
 		var snapshot := controller.get_snapshot() as Dictionary
-		snapshot["server_tick"] = _server_tick
-		snapshot["ack_input_seq"] = controller.input_buffer.get_last_processed_seq()
+		snapshot["seq"] = controller.input_buffer.current_input.get("seq")
 		snapshots[controller.id] = snapshot
 	
 	if Input.is_action_just_pressed("jump"):
