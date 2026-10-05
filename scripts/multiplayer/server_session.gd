@@ -205,7 +205,7 @@ func _srv_register_player(payload: Dictionary):
 	var tag = player_info.get("player_tag", "")
 
 	var user_id = payload.get("user_id", 0)
-	var session_token = payload.get("session_token", "")
+	var session_token = payload.get("session_token: ", "")
 	print("[register] incoming id=%s user_id=%s can_other_join=%s is_cloud_session=%s" % [id, user_id, can_other_join, is_cloud_session])
 
 	var existing_peer_id = _find_roster_entry_by_user(user_id)
@@ -257,14 +257,18 @@ func _srv_register_player(payload: Dictionary):
 
 
 func _verify_auth(user_id, session_token) -> bool:
-	return await _transport_method.validate(user_id, session_token)
+	var res = await _transport_method.validate(user_id, session_token)
+	print("the res from _verify_auth is: ", res)
+	return res
 
 func _notify_player_joined(user_id: int, session_token) -> bool:
 	var body = JSON.stringify({
 		"user_id": user_id,
 		"server_id": server_info.get("id")
 	})
-	return await _transport_method.post(NetCodes.backend.PLAYER_JOINED, body, session_token) == HTTPClient.RESPONSE_OK
+	var res = await _transport_method.post(NetCodes.backend.PLAYER_JOINED, body, session_token) == HTTPClient.RESPONSE_OK
+	print("the res from _notify_player_joined is: ", res)
+	return res
 
 func _find_roster_entry_by_user(user_id) -> int:
 	if is_cloud_session:

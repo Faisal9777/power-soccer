@@ -10,6 +10,7 @@ var applied_cmd_id := -1
 var _paused := false
 var _next_input_seq : int = 0
 var _pending_inputs: Array[Dictionary] = []
+var can_process := false
 
 func set_paused(state: bool) -> void:
 	print("SET PAUSED CALLED: ", id, " -> ", state)
@@ -23,36 +24,8 @@ func process_input(delta):
 
 	var input = input_buffer.get_input()
 
-	if is_mobile and is_instance_valid(joystick):
-		input["mvx"] = joystick.vector.x
-		input["mvz"] = joystick.vector.y
-		input["move_magnitude"] = joystick.mag
-
-		# IMPORTANT: get camera yaw BEFORE movement is calculated
-		if is_instance_valid(cam) and cam.has_method("get_cam_yaw"):
-			look_yaw = cam.get_cam_yaw()
-			look_pitch = cam.get_cam_pitch()
-
-		input["yaw"] = look_yaw
-		input["pitch"] = look_pitch
-	else:
-		input["move_magnitude"] = 1.0
-
 	_apply_inputs(input, delta)
 
-	if not input.has("yaw"):
-		input["yaw"] = look_yaw
-		input["pitch"] = look_pitch
-
-	_next_input_seq = int(input["seq"]) + 1
-	var stored := input.duplicate(true)
-	_pending_inputs.append(stored)
-
-	if _pending_inputs.size() > 100:
-		_pending_inputs = _pending_inputs.slice(
-			_pending_inputs.size() - 100,
-			_pending_inputs.size()
-		)
 
 func set_position(gb_transform : Transform3D) -> void:
 	super.set_position(gb_transform)
@@ -63,6 +36,14 @@ func freeze(toggle) -> void:
 	#print("freeze was called on with toggle: ", toggle)
 	super.freeze(toggle)
 	#cam.freeze_rotation(toggle)
+
+func physics_tick(delta: float) -> void:
+	player._local_physics_process(delta)
+	super.physics_tick(delta)
+
+func process_tick(delta: float) -> void:
+	if can_process:
+		player._local_process(delta)
 
 func _init(p_player, pid, p_name, team, c_cam, ball, joystick, i_buffer : InputBuffer):
 	cam = c_cam
@@ -105,14 +86,6 @@ func _generate_facing_direction_with_input(input) -> void:
 	if typeof(input) != TYPE_DICTIONARY or input == null:
 		return
 
-	if input.has("yaw") and input.has("pitch"):
-		look_yaw = float(input["yaw"])
-		look_pitch = clamp(float(input["pitch"]), min_pitch, max_pitch)
-		return
-
-	if is_mobile:
-		return
-
 	if input.get('rmb'):
 		# Direction FROM camera TO target
 		var dir : Vector3 = (w_ball.global_position - player.global_position).normalized()
@@ -123,8 +96,12 @@ func _generate_facing_direction_with_input(input) -> void:
 			max_pitch
 		)
 	else:
-		var look_delta = input.get("mouse_delta", Vector2.ZERO)
-		if look_delta is Vector2:
-			look_yaw = look_yaw - look_delta.x * mouse_sens
-			look_pitch = clamp(look_pitch - look_delta.y * mouse_sens, min_pitch, max_pitch)
+		var look_delta = input.get("mouse_delta")
+		var facing = {"yaw" : look_yaw - look_delta.x * mouse_sens, 
+		"pitch" : look_pitch - look_delta.y * mouse_sens}
+		super._generate_facing_direction_with_input(facing)
+		look_pitch = clamp(look_pitch, min_pitch, max_pitch)
+	
+	input["cam_yaw"] = look_yaw
+	input["aim_position"] = player.get_aim_arrow_position() if player else null
 	

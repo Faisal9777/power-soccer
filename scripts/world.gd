@@ -815,13 +815,14 @@ func _server_begin_match(peer_ids: Array[int], rosters) -> void:
 		_on_peer_joined(id, rosters)  # your existing spawn path
 
 func _physics_process(delta: float) -> void:
-	_update_inputs() 
-	_input_accum += delta
-	var step: float = 1.0 / NET_INPUT_HZ
-	while _input_accum >= step:
-		_input_accum -= step
-		_send_local_input()
-		_reset_inputs()
+	return
+	#_update_inputs() 
+	#_input_accum += delta
+	#var step: float = 1.0 / NET_INPUT_HZ
+	#while _input_accum >= step:
+		#_input_accum -= step
+		#_send_local_input()
+		#_reset_inputs()
 func _shoot_action() -> String:
 	return "shoot_touch" if is_mobile else "shoot"
 func _update_inputs() -> void:
@@ -1145,13 +1146,7 @@ func _send_local_input() -> void:
 		return
 	if multiplayer.multiplayer_peer == null:
 		return
-
 	var d := _gather_input()
-	if d.get("shoot_up") or d.get("shoot_down"):
-		print('the shoot up is in the client side: ', d.get("shoot_up"))
-		print('the shoot down is in the client side: ', d.get("shoot_down"))
-	if d.get("jump_pressed"):
-		print("jumpring")
 	d["id"] = net.p_controller.id
 	var player = net.p_controller.player
 	

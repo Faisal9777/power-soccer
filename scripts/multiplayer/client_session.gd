@@ -169,7 +169,7 @@ func _on_joined_server(s):
 	Network.server_disconnected.connect(_on_server_disconnected)
 	is_connected = true
 	var payload := {"name" : Settings.player_name, "id" : multiplayer.get_unique_id(),
-	"action" : NetCodes.session_message.REGISTER_PEER, "user_id" : GameState.user_id}
+	"action" : NetCodes.session_message.REGISTER_PEER, "user_id" : GameState.user_id, "session_token" : AuthManager.session_token}
 	sync = s
 	sync.send_data_id(1, {"message" : NetCodes.message.SESSION,"value":payload})
 	

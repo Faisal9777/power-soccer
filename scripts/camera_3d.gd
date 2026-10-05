@@ -314,22 +314,22 @@ func _apply_rotation(delta: float) -> void:
 	)
 
 	# Focus / aim mode — point camera at the actual ball
-	if _aim_mode:
-		var ball := get_tree().get_first_node_in_group("ball") as Node3D
-
-		if is_instance_valid(ball):
-			var focus := target_transform.origin + Vector3(0.0, height, 0.0)
-			var dir := (ball.global_position - focus).normalized()
-
-			if dir.length_squared() > 0.0001:
-				_yaw = atan2(-dir.x, -dir.z)
-
-				var horizontal := Vector2(dir.x, dir.z).length()
-				_pitch = clamp(
-					atan2(dir.y, horizontal),
-					rotation_manager.min_pitch,
-					rotation_manager.max_pitch
-				)
+	#if _aim_mode:
+		#var ball := get_tree().get_first_node_in_group("ball") as Node3D
+#
+		#if is_instance_valid(ball):
+			#var focus := target_transform.origin + Vector3(0.0, height, 0.0)
+			#var dir := (ball.global_position - focus).normalized()
+#
+			#if dir.length_squared() > 0.0001:
+				#_yaw = atan2(-dir.x, -dir.z)
+#
+				#var horizontal := Vector2(dir.x, dir.z).length()
+				#_pitch = clamp(
+					#atan2(dir.y, horizontal),
+					#rotation_manager.min_pitch,
+					#rotation_manager.max_pitch
+				#)
 
 	var cam_basis := (
 		Basis(Vector3.UP, _yaw)

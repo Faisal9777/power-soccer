@@ -26,7 +26,6 @@ func _init(p_player, pid, p_name, p_team, ball, i_buffer : InputBuffer):
 	super._init(p_player, p_name, pid, p_team)
 
 func physics_tick(delta: float) -> void:
-	player._local_physics_process(delta)
 	process_input(delta)
 
 
@@ -36,6 +35,7 @@ func _apply_inputs(input, delta) -> void:
 	if not input.is_empty():
 		_generate_facing_direction_with_input(input)
 	var p_input = _get_player_input(input)
+	input.merge(p_input)
 	if not is_frozen:
 		# The server applies gravity in Player.simulate_server(); a predicting client
 		# must apply the same movement-only gravity step here.
@@ -45,8 +45,7 @@ func _apply_inputs(input, delta) -> void:
 		# On the listen-server, simulate_server() reads actions from player._net.
 		# Feed the input dict into _net so actions (jump, shoot, tackle, latch, etc.)
 		# are processed on the same tick they arrive from LocalInputBuffer.
-		if player.get_tree().get_multiplayer().is_server() and player.has_method("apply_net_input"):
-			player.apply_net_input(input)
+		player.apply_net_input(input)
 
 func _get_player_input(input) -> Dictionary:
 	var mov_input = _get_player_movement(input)
@@ -54,21 +53,6 @@ func _get_player_input(input) -> Dictionary:
 
 
 func _get_player_movement(input) -> Dictionary:
-
-	if typeof(input) != TYPE_DICTIONARY or input == null:
-		return {
-			"mvx": 0.0,
-			"mvz": 0.0,
-			"sprint": false
-		}
-	# Mobile / replayed joystick input
-	if input.has("mvx") and input.has("mvz"):
-		return {
-			"mvx": float(input["mvx"]),
-			"mvz": float(input["mvz"]),
-			"sprint": bool(input.get("sprint", false)),
-			"move_magnitude": clampf(float(input.get("move_magnitude", 1.0)), 0.0, 1.0)
-		}
 	var mvx: float = (
 		float(input.get("move_right", 0.0)) -
 		float(input.get("move_left", 0.0))

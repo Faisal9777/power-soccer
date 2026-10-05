@@ -15,7 +15,6 @@ const INPUT_SEND_HZ := 60.0
 var send_interval := 1.0 / INPUT_SEND_HZ
 
 var send_accumulator := 0.0
-var can_process := false
 var task_id := 0
 var _truncated_up_to_seq: int = -1   # last seq WE discarded via the size cap (not server-skipped)
 
@@ -59,9 +58,6 @@ func physics_tick(delta: float) -> void:
 			_reconcile_player(player)
 			super.physics_tick(delta)
 
-func process_tick(delta: float) -> void:
-	if can_process:
-		player._local_process(delta)
 
 func process_input(delta):
 	if GameState.is_paused:

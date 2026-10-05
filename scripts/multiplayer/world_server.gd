@@ -19,7 +19,6 @@ var ball: Node
 # Input pump
 const NET_INPUT_HZ: float = 30.0
 var last_server_seq:= {}
-var _server_tick: int = 0
 var _last_action_seq_by_peer: Dictionary = {}
 var can_process := false
 var _replication_manager : ReplicationManager
@@ -137,26 +136,21 @@ func _physics_process(delta: float) -> void:
 	#if Input.is_action_pressed("debug"):
 		#_game._process_game_end()
 	if can_process:
-		_server_tick += 1
 		_simulate_remote_players(delta)
+
+func _process(delta: float) -> void:
+	#if Input.is_action_pressed("debug"):
+		#_game._process_game_end()
+	if can_process:
+		_simulate_remote_players_process(delta)
+
+func _simulate_remote_players_process(delta) -> void:
+	for controller in controllers:
+		controller.process_tick(delta)
 
 func _simulate_remote_players(delta) -> void:
 	for controller in controllers:
 		controller.physics_tick(delta)
-
-#func _broadcast_snapshots() -> void:
-	#if not can_process:
-		#return
-	#var snapshots := {}
-#
-	#for controller in controllers:  # your list of Player nodes on server
-		#var snapshot := controller.get_snapshot() as Dictionary
-		#snapshot["server_tick"] = _server_tick
-		#snapshot["ack_input_seq"] = controller.input_buffer.get_last_processed_seq()
-		#snapshots[controller.id] = snapshot
-	#
-	#snapshots["game_state"] = _game.current_state
-	#StateHandler.send_movement(NetCodes.Msg.SNAPSHOTS, snapshots)
 
 func _broadcast_snapshots() -> void:
 	if not can_process:
