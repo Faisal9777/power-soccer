@@ -17,6 +17,8 @@ func get_snapshot() -> Dictionary:
 
 func process_input(delta):
 	var input = input_buffer.get_input()
+	if input.is_empty():
+		return
 	_apply_inputs(input, delta)
 
 
@@ -46,6 +48,8 @@ func _apply_inputs(input, delta) -> void:
 		# Feed the input dict into _net so actions (jump, shoot, tackle, latch, etc.)
 		# are processed on the same tick they arrive from LocalInputBuffer.
 		player.apply_net_input(input)
+	#if GameState.is_dedicated:
+		#print("node controller, applied input in the server for the player: ", id, " of the seq; ", input.get("seq"))
 
 func _get_player_input(input) -> Dictionary:
 	var mov_input = _get_player_movement(input)

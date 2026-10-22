@@ -51,7 +51,6 @@ func _ready() -> void:
 		var port = _get_arg_value2("--port", args)
 		var is_public: bool = _get_arg_value2("--public", args) == "true"
 		var player_name = _get_arg_value2("--player_name", args)
-
 		print("Dedicated server args:", args)
 		print("Dedicated server lobby ID:", id)
 		print("Dedicated server port:", port)

@@ -11,7 +11,10 @@ var _fixed_dt: float = 1.0 / 60.0
 var _scheduler : JobScheduler
 var _task : Node
 
-const INPUT_SEND_HZ := 60.0
+
+var _input_sent_times: Dictionary = {}   # NEW
+
+const INPUT_SEND_HZ := 20.0
 var send_interval := 1.0 / INPUT_SEND_HZ
 
 var send_accumulator := 0.0
@@ -89,6 +92,8 @@ func process_input(delta):
 	_next_input_seq = int(input["seq"]) + 1
 	var stored := input.duplicate(true)
 	_pending_inputs.append(stored)
+	
+	_input_sent_times[int(input["seq"])] = Time.get_ticks_msec()   # NEW
 
 	if _pending_inputs.size() > 100:
 		var cutoff := _pending_inputs.size() - 100
@@ -117,6 +122,7 @@ func _reconcile_local_best_practice(p: Node3D, snap: Dictionary) -> void:
 	look_pitch = snap.get("pitch", look_pitch)
 
 	var last_server_seq := int(snap.get("seq", -1))
+	
 
 	var i := 0
 	while i < _pending_inputs.size():

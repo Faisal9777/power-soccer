@@ -58,6 +58,8 @@ const POS_RANGE := 150.0
 const VEL_RANGE := 30.0
 const ANGLE_RANGE := PI
 
+var debug_input_length := 1
+
 
 @onready var _network_endpoint: Node = get_parent()
 
@@ -151,6 +153,15 @@ func _ready() -> void:
 
 # ---------- Main loop ----------
 func _physics_process(delta: float) -> void:
+	
+	#debug start
+	if Input.is_action_pressed("debug2"):
+		debug_input_length += 1
+		print("the debug count now is: ", debug_input_length)
+	
+	#debug ends
+	
+	
 	if GameState.is_paused and p_controller != null:
 		var neutral := {
 			"mouse_delta": Vector2.ZERO,
@@ -204,7 +215,6 @@ func _store_snapshots(snapshots: Dictionary) -> void:
 		var snap: Dictionary = current_snapshots[k]
 
 		# Prefer server_tick if you add it later; fallback to last_server_seq
-
 		controller.store_snapshot(snap)
 	#_game.current_state = snapshots.game_state
 
@@ -280,12 +290,27 @@ func _send_network(msg, value) -> void:
 	if _can_network:
 		_network_endpoint.rpc(NetCodes.Rpc.INPUT_STREAM, msg, value)
 
+#func _send_network_id(sender_id, msg, inputs) -> void:
+	#
+	##debug start
+	#var keep_count: int = clampi(debug_input_length, 0, inputs.size())
+	#inputs = inputs.slice(inputs.size() - keep_count, inputs.size())
+	##debugg end
+	#
+	#var value = {"value": {"inputs" : inputs, "id" : sender_id}, "message" : msg}
+	#if _can_network:
+		#if Input.is_action_pressed("debug"):
+		##StateHandler.send_data_id(msg, value)
+			##print("[server] player=", p_controller.id, " seqs=", inputs.map(func(i): return int(i.get("seq", -1)) if i is Dictionary else -1))
+			#print("[server] player=", p_controller.id, " seqs=", inputs[0].get("seq"))
+			#StateHandler.send_data(value)
+		##StateHandler.send_movement_id(msg, value)
+
 func _send_network_id(sender_id, msg, inputs) -> void:
 	var value = {"value": {"inputs" : inputs, "id" : sender_id}, "message" : msg}
 	if _can_network:
-		#StateHandler.send_data_id(msg, value)
 		StateHandler.send_data(value)
-		#StateHandler.send_movement_id(msg, value) 
+ 
 func _get_player_controller() -> PlayerController:
 	return p_controller
 

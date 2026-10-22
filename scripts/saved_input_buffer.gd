@@ -2,6 +2,7 @@ class_name SavedInputBuffer
 extends InputBuffer
 
 var _queue: Array[Dictionary] = []
+var _test_queue: Array[Dictionary] = []
 var _queued_sequences: Dictionary = {}
 var _next_expected_seq: int = -1
 var _last_input: Dictionary = {}
@@ -32,6 +33,64 @@ func push_input(input: Dictionary) -> bool:
 #	_queue.sort_custom(func(a: Dictionary, b: Dictionary): return int(a["seq"]) < int(b["seq"]))
 	return true
 
+#func push_input_batch(inputs: Array) -> void:
+	#if inputs.is_empty():
+		#return
+#
+	#var queued_sequences: Dictionary = {}
+#
+	#for input in _queue:
+		#queued_sequences[int(input.get("seq", -1))] = true
+#
+	#for item in inputs:
+		#if not item is Dictionary:
+			#continue
+#
+		#var input: Dictionary = item
+		#var seq := int(input.get("seq", -1))
+#
+		#if seq <= last_processed_seq or queued_sequences.has(seq):
+			#continue
+#
+		#queued_sequences[seq] = true
+		#_queue.append(input)
+#
+	#_queue.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		#return int(a.get("seq", -1)) < int(b.get("seq", -1))
+	#)
+
+func push_input_batch(inputs: Array) -> void:
+	if inputs.is_empty():
+		return
+
+	#print("\n========== push_input_batch ==========")
+	#print("Server expected seq: ", last_processed_seq + 1)
+	#print("Incoming client sequences: ", inputs.map(func(input): return input.get("seq", -1)))
+	#print("Existing server queue sequences: ", _queue.map(func(input): return input.get("seq", -1)))
+
+	var queued_sequences: Dictionary = {}
+
+	for input in _queue:
+		queued_sequences[int(input.get("seq", -1))] = true
+
+	for item in inputs:
+		if not item is Dictionary:
+			continue
+
+		var input: Dictionary = item
+		var seq := int(input.get("seq", -1))
+
+		if seq <= last_processed_seq or queued_sequences.has(seq):
+			continue
+
+		queued_sequences[seq] = true
+		_queue.append(input)
+
+	_queue.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return int(a.get("seq", -1)) < int(b.get("seq", -1))
+	)
+
+
 func _held_or_empty() -> Dictionary:
 	_ticks_since_input += 1
 	if not _last_input.is_empty() and _ticks_since_input <= HOLD_TICKS:
@@ -40,33 +99,43 @@ func _held_or_empty() -> Dictionary:
 		current_input = {}
 	return current_input
 
+#func get_input() -> Dictionary:
+	#if _queue.is_empty():
+		#return _held_or_empty()
+#
+	#if _next_expected_seq < 0 or last_processed_seq < 0:
+		#_next_expected_seq = int(_queue[0]["seq"])
+#
+	#while not _queue.is_empty() and int(_queue[0]["seq"]) < _next_expected_seq:
+		#var stale = _queue.pop_front()
+		#_queued_sequences.erase(int(stale["seq"]))
+#
+	#if _queue.is_empty():
+		#return _held_or_empty()
+#
+	#if int(_queue[0]["seq"]) > _next_expected_seq:
+		#if _queue.size() > 2 or _next_expected_seq <= 0:
+			#_next_expected_seq = int(_queue[0]["seq"])
+		#else:
+			#return _held_or_empty()
+#
+	#current_input = _queue.pop_front()
+	#seq = int(current_input["seq"])
+	#_queued_sequences.erase(seq)
+	#last_processed_seq = seq
+	#_next_expected_seq = seq + 1
+	#_last_input = current_input
+	#_ticks_since_input = 0
+	#return current_input
+
 func get_input() -> Dictionary:
 	if _queue.is_empty():
-		return _held_or_empty()
-
-	if _next_expected_seq < 0 or last_processed_seq < 0:
-		_next_expected_seq = int(_queue[0]["seq"])
-
-	while not _queue.is_empty() and int(_queue[0]["seq"]) < _next_expected_seq:
-		var stale = _queue.pop_front()
-		_queued_sequences.erase(int(stale["seq"]))
-
-	if _queue.is_empty():
-		return _held_or_empty()
-
-	if int(_queue[0]["seq"]) > _next_expected_seq:
-		if _queue.size() > 2 or _next_expected_seq <= 0:
-			_next_expected_seq = int(_queue[0]["seq"])
-		else:
-			return _held_or_empty()
+		return {}
 
 	current_input = _queue.pop_front()
 	seq = int(current_input["seq"])
-	_queued_sequences.erase(seq)
 	last_processed_seq = seq
-	_next_expected_seq = seq + 1
 	_last_input = current_input
-	_ticks_since_input = 0
 	return current_input
 
 func size() -> int:

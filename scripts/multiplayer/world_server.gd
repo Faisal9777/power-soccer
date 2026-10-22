@@ -76,6 +76,7 @@ func handle_data(val):
 	if msg == NetCodes.Msg.INPUTS:
 		process_input_by_id(value["id"], msg, value)
 	elif msg == NetCodes.Msg.DISCRETE_INPUTS:
+		print('discrete inputs found in the server')
 		_client_discrete_input(value)
 	elif msg == NetCodes.state_message.PLAYER_RECONNECT:
 		var id = value.get("id")
@@ -94,10 +95,15 @@ func process_input_by_id(peer_id: int, msg, cmd : Dictionary) -> void:
 	var inputs = cmd.get("inputs", []) as Array
 	if inputs.is_empty():
 		return
-	inputs.sort_custom(func(a: Dictionary, b: Dictionary): return int(a.get("seq", -1)) < int(b.get("seq", -1)))
-	for input in inputs:
-		if input is Dictionary:
-			controller.input_buffer.push_input(input)
+	
+	print("[server] player=", controller.id, " seqs=", inputs.map(func(i): return int(i.get("seq", -1)) if i is Dictionary else -1))
+	#print("[server] player=", controller.id, " seqs=", inputs[0].get("seq"))
+	#var start_index: int = max(0, inputs.size() - 8)
+	#var last_eight_inputs: Array = inputs.slice(start_index, inputs.size())
+	
+	controller.input_buffer.push_input_batch(inputs)
+	#var queue = controller.input_buffer._test_queue
+	#print("the proccessed seq is: ", controller.input_buffer.last_processed_seq, " the test queue has: ",queue.map(func(i): return int(i.get("seq", -1)) if i is Dictionary else -1))
 
 
 func process_input_dictionary(msg: int, value : Dictionary) -> void:
@@ -167,7 +173,7 @@ func _get_snapshot() -> Dictionary:
 
 	for controller in controllers:  # your list of Player nodes on server
 		var snapshot := controller.get_snapshot() as Dictionary
-		snapshot["seq"] = controller.input_buffer.current_input.get("seq")
+		snapshot["seq"] = controller.input_buffer.last_processed_seq
 		snapshots[controller.id] = snapshot
 	
 	if Input.is_action_just_pressed("jump"):
@@ -314,3 +320,9 @@ func get_local_controller() -> LocalController:
 
 func _quantize(value: float, range: float) -> int:
 	return int(clampf(value / range, -1.0, 1.0) * 32767.0)
+
+func _get_latest_input(inputs: Array) -> Dictionary:
+	return inputs.reduce(func(a, b):
+		if a.seq > b.seq:
+			return a
+		return b)
