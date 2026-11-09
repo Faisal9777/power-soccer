@@ -93,6 +93,10 @@ func send_data_id(target_id, value):
 	var val = {"message" : NetCodes.message.STATE, "value" : {"value":value}}
 	sync.send_data_id(target_id, val)
 
+func send_data_id_reliable(target_id, value):
+	var val = {"message" : NetCodes.message.STATE, "value" : {"value":value}}
+	sync.send_data_id_reliable(target_id, val)
+
 func send_data(value):
 	var val = {"message" : NetCodes.message.STATE, "value" : {"value":value}}
 	sync.send_data_all(val)
@@ -147,7 +151,7 @@ func _broadcast_states():
 		return
 	var state_data = {"message" : NetCodes.message.SESSION, "value" : 
 		{"action" : NetCodes.session_message.SESSION_DATA, "roster" : GameState.roster}}
-	sync.send_data_all(state_data)
+	sync.send_data_all_reliable(state_data)
 
 func _handle_state_action(msg, data):
 	if data.get("domain") == "lobby":
@@ -222,7 +226,7 @@ func _srv_register_player(payload: Dictionary):
 	if should_reject:
 		print("[register] REJECTING id=%s" % id)
 		Network.disconnect_peer(id)
-		sync.send_data_id(id, NetCodes.session_message.REJECT, {"message": "Cannot join"})
+		sync.send_data_id_reliable(id, NetCodes.session_message.REJECT, {"message": "Cannot join"})
 		return
 
 	if not multiplayer.is_server():
@@ -246,10 +250,10 @@ func _srv_register_player(payload: Dictionary):
 	temp_server_info["was_reactivated"] = _existing_player
 	print("[register] sending REGISTRATION_COMPLETE to id=%s payload=%s" % [id, temp_server_info])
 
-	sync.send_data_id(id, {"message":NetCodes.message.SESSION, "value":temp_server_info})
+	sync.send_data_id_reliable(id, {"message":NetCodes.message.SESSION, "value":temp_server_info})
 	TaskScheduler.schedule(60, _broadcast_states)
 	var message = NetCodes.state_message.PLAYER_CONNECT
-	var value = {"id" : id}
+	var value = {"id" : id, "old_id" : existing_peer_id}
 	if _existing_player:
 		message = NetCodes.state_message.PLAYER_RECONNECT
 	StateHandler.handle_data({"message" : message,"value":value})

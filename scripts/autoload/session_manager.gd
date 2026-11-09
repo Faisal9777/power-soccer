@@ -48,8 +48,8 @@ func change_state(state_info: int):
 func send_data_id(target_id, value):
 	session_node.send_data_id(target_id, value)
 
-func send_data_id_reliable(msg, value):
-	session_node.send_data_id_reliable(msg, value)
+func send_data_id_reliable(id, value):
+	session_node.send_data_id_reliable(id, value)
 
 func send_data(value):
 	session_node.send_data(value)

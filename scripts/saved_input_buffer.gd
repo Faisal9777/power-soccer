@@ -74,21 +74,28 @@ func push_input_batch(inputs: Array) -> void:
 		queued_sequences[int(input.get("seq", -1))] = true
 
 	for item in inputs:
+		if item.get("jump_pressed"):
+			print("for the seq: ", item.get("seq"), " the jump pressed: ", item.get("jump_pressed"))
 		if not item is Dictionary:
 			continue
 
 		var input: Dictionary = item
 		var seq := int(input.get("seq", -1))
+		
+		if item.get("debug"):
+				print("saved iinput buffer, current seq is: ", last_processed_seq)
 
 		if seq <= last_processed_seq or queued_sequences.has(seq):
+			#if item.get("debug"):
+				#print("ignoring outdated seq of: ", seq)
 			continue
 
 		queued_sequences[seq] = true
 		_queue.append(input)
 
-	_queue.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
-		return int(a.get("seq", -1)) < int(b.get("seq", -1))
-	)
+	#_queue.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		#return int(a.get("seq", -1)) < int(b.get("seq", -1))
+	#)
 
 
 func _held_or_empty() -> Dictionary:

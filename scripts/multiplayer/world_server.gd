@@ -14,6 +14,7 @@ var _net_objects : Array
 var GameClient := load("res://scripts/multiplayer/game_client.gd")
 var p_controller : LocalController
 var controllers : Array = []
+var controller_map : Dictionary = {}
 var broadcast_id : int = -1
 var ball: Node
 # Input pump
@@ -80,13 +81,26 @@ func handle_data(val):
 		_client_discrete_input(value)
 	elif msg == NetCodes.state_message.PLAYER_RECONNECT:
 		var id = value.get("id")
-		StateHandler.send_data_id(id, {"message":NetCodes.state_message.CHANGE_STATE, "value":{"state" : NetCodes.States.WORLD, "state_data" : GameState.roster}})
+		var old_id = value.get("old_id")
+		var idx = controller_map.get(old_id, -1)
+		if idx != -1:
+			controller_map.erase(old_id)    # drop the old key/value
+		else:
+			idx = controllers.find_custom(func(c): return c.id == old_id)
+		if idx == -1:
+			push_warning("reconnect: no controller found for old_id %s" % old_id)
+			return
+		controller_map[id] = idx
+		StateHandler.send_data_id_reliable(id, {"message": NetCodes.state_message.CHANGE_STATE, "value": {"state": NetCodes.States.WORLD, "state_data": GameState.roster}})
 
 func process_input_by_id(peer_id: int, msg, cmd : Dictionary) -> void:
-	var idx = controllers.find_custom(
-	func(c):
-		return c.id == peer_id
-	)
+	var idx = controller_map.get(peer_id,  -1)
+
+	if idx == -1:	
+		idx = controllers.find_custom(
+		func(c):
+			return c.id == peer_id
+		)
 
 	if idx == -1:
 		print("the player does not exist with the id: ", idx)
@@ -96,7 +110,7 @@ func process_input_by_id(peer_id: int, msg, cmd : Dictionary) -> void:
 	if inputs.is_empty():
 		return
 	
-	print("[server] player=", controller.id, " seqs=", inputs.map(func(i): return int(i.get("seq", -1)) if i is Dictionary else -1))
+	#print("[server] player=", controller.id, " seqs=", inputs.map(func(i): return int(i.get("seq", -1)) if i is Dictionary else -1))
 	#print("[server] player=", controller.id, " seqs=", inputs[0].get("seq"))
 	#var start_index: int = max(0, inputs.size() - 8)
 	#var last_eight_inputs: Array = inputs.slice(start_index, inputs.size())

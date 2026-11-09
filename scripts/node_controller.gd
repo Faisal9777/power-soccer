@@ -14,13 +14,25 @@ func get_snapshot() -> Dictionary:
 	player_data["node_id"] = id
 	return player_data
 
+func get_state() -> Dictionary:
+	return {"starting_seq" : input_buffer.seq}
+
+func set_state(data) -> void:
+	if data and data.get("starting_seq"):
+		input_buffer.seq = data.get("starting_seq")
 
 func process_input(delta):
 	var input = input_buffer.get_input()
 	if input.is_empty():
 		return
+	
+	#if input.get("debug") and input.get("jump_pressed"):
+		#print("for the seq: ", input.get("seq"), " jump pressed: ", input.get("jump_pressed"))
+	
 	_apply_inputs(input, delta)
 
+func reset() -> void:
+	input_buffer.reset()
 
 func _init(p_player, pid, p_name, p_team, ball, i_buffer : InputBuffer):
 	input_buffer = i_buffer

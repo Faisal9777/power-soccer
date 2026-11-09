@@ -48,9 +48,9 @@ func _change_state(state_info: int):
 		SessionManager.session_node.queue_free()
 	get_tree().change_scene_to_file(scene_to_load)
 
-func send_data_id_reliable(msg, value):
+func send_data_id_reliable(id, value):
 	value["state"] = current_scene
-	SessionManager.send_data_id_reliable(msg, value)
+	SessionManager.send_data_id_reliable(id, value)
 
 func on_connected_to_server(server_info):
 	_change_state(server_info.get("current_state"))

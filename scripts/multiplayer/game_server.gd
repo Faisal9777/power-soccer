@@ -135,9 +135,10 @@ func get_game_snapshot() -> Dictionary:
 		game_data[controller.id] = {}
 
 		game_data[controller.id]["position"] = controller.player.global_transform
-
 		game_data[controller.id]["face_at"] = ball.global_transform.origin
 		game_data[controller.id]["freeze"] = not is_in_game()
+		
+		#print("game_server, game_data is ready with: ", game_data)
 	
 	return game_data
 

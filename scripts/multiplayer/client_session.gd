@@ -116,7 +116,7 @@ func handle_data(data):
 				"user_id" : GameState.user_id,
 				"session_token": AuthManager.session_token
 			}
-			sync.send_data_id(server_id, {"message" : NetCodes.message.SESSION, "value":payload})
+			sync.send_data_id_reliable(server_id, {"message" : NetCodes.message.SESSION, "value":payload})
 		if action == NetCodes.Msg.AUTH_FAILED:
 			auth_failed.emit()
 		if action == NetCodes.session_message.REJECT:
@@ -171,7 +171,7 @@ func _on_joined_server(s):
 	var payload := {"name" : Settings.player_name, "id" : multiplayer.get_unique_id(),
 	"action" : NetCodes.session_message.REGISTER_PEER, "user_id" : GameState.user_id, "session_token" : AuthManager.session_token}
 	sync = s
-	sync.send_data_id(1, {"message" : NetCodes.message.SESSION,"value":payload})
+	sync.send_data_id_reliable(1, {"message" : NetCodes.message.SESSION,"value":payload})
 	
 func _on_joined_private_server(s):
 	Network.connection_failed.connect(_on_connection_failed)

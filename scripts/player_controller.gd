@@ -89,7 +89,9 @@ func process_input(delta):
 		input["yaw"] = look_yaw
 		input["pitch"] = look_pitch
 
-	_next_input_seq = int(input["seq"]) + 1
+	if input.get("jump_pressed"):
+		print("the input contains: ", input)
+		print("for the seq: ", input.get("seq"), " the jump pressed: ", input.get("jump_pressed"))
 	var stored := input.duplicate(true)
 	_pending_inputs.append(stored)
 	

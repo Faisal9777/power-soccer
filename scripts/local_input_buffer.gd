@@ -46,4 +46,5 @@ func _get_input() -> Dictionary:
 		"ability_toggle": input.get("ability_toggle"),
 		"ability_action1": input.get("ability_action1"),
 		"ability_action3": input.get("ability_action3"),
+		"debug" : Input.is_action_pressed("debug")
 	}

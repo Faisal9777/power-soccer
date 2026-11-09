@@ -675,8 +675,8 @@ func _resolve_ball() -> RigidBody3D:
 func _is_local_owner() -> bool:
 	return is_arrow_presentable
 func _local_process(delta: float) -> void:
-	if Input.is_action_pressed("debug"):
-			print("debuggging")
+	#if Input.is_action_pressed("debug"):
+			#print("debuggging")
 	if _charge_bar:
 		_update_charge_ui_from_replication()
 	if _stam_bar:
