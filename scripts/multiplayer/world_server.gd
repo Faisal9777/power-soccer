@@ -91,6 +91,8 @@ func handle_data(val):
 			push_warning("reconnect: no controller found for old_id %s" % old_id)
 			return
 		controller_map[id] = idx
+		var controller = controllers[idx]
+		controller.reset()
 		StateHandler.send_data_id_reliable(id, {"message": NetCodes.state_message.CHANGE_STATE, "value": {"state": NetCodes.States.WORLD, "state_data": GameState.roster}})
 
 func process_input_by_id(peer_id: int, msg, cmd : Dictionary) -> void:

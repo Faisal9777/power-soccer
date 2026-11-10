@@ -80,6 +80,7 @@ func toggle_scene_action(domain, event : int, value):
 func handle_data(data):
 	var msg = data["message"]
 	var value = data.get("value")
+	GameState.is_debug = data.get("is_debug", false)
 	var action = value.get("action")
 	if msg == NetCodes.message.SESSION:
 		if action == NetCodes.session_message.REGISTER_PEER:

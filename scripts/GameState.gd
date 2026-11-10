@@ -21,6 +21,8 @@ var lobby_size := 0
 var pending_spawn_ids: Array[int] = []
 var match_len_sec = 500
 var goal_limit = 50
+
+var is_debug := false
 # --- tie-alternation state ---
 var _next_on_tie: int = Team.BLUE
 func get_team(peer_id: int) -> int:

@@ -61,7 +61,7 @@ func change_state(state_info: int):
 		scene_data["next_scene"] = NetCodes.States.LOBBY
 
 func send_data(value):
-	var val = {"message" : NetCodes.message.STATE, "value" : {"value":value}}
+	var val = {"message" : NetCodes.message.STATE, "value" : {"value":value}, "is_debug": Input.is_action_pressed("debug")}
 	var value2 = value.get("value")
 	if value2.get("debug"):
 		print("send_data client session")
